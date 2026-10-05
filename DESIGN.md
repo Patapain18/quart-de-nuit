@@ -316,10 +316,27 @@ qui ne répond plus) ; ce qui est dur, c'est **barrer, tenir un cap** ; l'élect
    le dos). Mesuré (`test-barre`) : par bonne brise, le cap tenu à 1-4° près à toutes les
    allures (la barre lâchée sans aide, le bateau part de 84° en 40 s) ; un virage de 60°
    ou 120° sans dépasser de plus de 6° ; dans la tempête, en fuite, à 2-11° près.
-9. **Le son, avec de vrais enregistrements** (CC0) — le vent, la pluie, la mer, les
-   déferlantes, les coups de mer sur la coque, le tonnerre, les grincements du bois et des
-   cordages, le gréement qui siffle, la voile qui bat, la cabine étouffée, la corne du
-   cargo, la radio ; mélangés en direct selon ce qui se passe, et un atelier du son.
+9. ✅ **Le son, avec de vrais enregistrements** — 34 enregistrements du domaine public
+   (CC0 : BigSoundBank de Joseph Sardin, et 12 membres de Freesound, licence vérifiée sur
+   chaque page), coupés et réglés par une recette (`scripts/sons/recette.mjs`,
+   `npm run sons`, ffmpeg) en **21 sons** pour le jeu (`public/sons/`, 8 Mo) : 16 boucles
+   (le vent de la brise à la tempête et ses rafales, le gréement qui siffle puis hurle, la
+   mer qui déferle, le cockpit par beau temps enregistré au large, les voiles pleines, la
+   pluie sur le pont, une voile qui bat, le moteur du pilote ; dans la cabine : la mer à
+   travers la coque, l'eau contre la coque, la pluie sur le toit, la tempête entendue de
+   l'intérieur, le vent qui hurle) et 5 planches de sons brefs (16 craquements du bois et
+   des cordages, 11 vagues qui frappent, 6 tonnerres, 2 cornes de paquebot, 4 parasites de
+   radio). Boucles sans couture : la fin se fond dans le début, et 0,25 s de marge de part et
+   d'autre (les MP3 commencent par un silence que les navigateurs n'enlèvent pas tous) ;
+   raccords vérifiés. **Le mélange** (`src/son/audio.js`) suit le vent, la pluie, la mer,
+   les voiles qui faseyent, le pilote qui pousse la barre ; le bois craque d'autant plus
+   que le bateau est secoué ; trois bus : *dehors* (étouffé par la coque quand on descend),
+   *dedans* (avec l'écho d'une petite pièce en bois), *bord* ; les sons calculés d'avant
+   restent pour le reste (et tant que les enregistrements chargent). **L'atelier du son**
+   (`atelier-son.html`) : 9 situations à écouter, les curseurs, le mélange en direct,
+   la sonothèque et ses auteurs, et **la mesure du volume ressenti** (LUFS, la norme des
+   radios, calculée sans jouer : `src/son/mesure.js`, vérifiée contre ffmpeg à 0,2 près) :
+   du matin calme (−28) à la tempête sur le pont (−15), la cabine 4 à 6 points plus bas.
 10. **La trombe**, refaite : immense, sombre, audible de loin, et qui frappe vraiment le
     bateau (un atelier de la trombe pour la régler).
 11. **La peur** : une nuit plus noire, le faisceau de la lampe dans la pluie, le bateau

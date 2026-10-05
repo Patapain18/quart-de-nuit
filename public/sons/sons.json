@@ -1,0 +1,641 @@
+{
+ "licence": "Tous ces enregistrements sont dans le domaine public (CC0 1.0).",
+ "sons": {
+  "vent-doux": {
+   "fichier": "vent-doux.mp3",
+   "sorte": "boucle",
+   "role": "le vent, de la brise au vent frais",
+   "boucle": [
+    0.25,
+    30.25
+   ],
+   "duree": 30.5,
+   "credits": [
+    {
+     "titre": "Wind",
+     "auteur": "Joseph Sardin",
+     "site": "BigSoundBank",
+     "page": "https://bigsoundbank.com/wind-s0595.html",
+     "licence": "CC0 1.0"
+    }
+   ]
+  },
+  "vent-fort": {
+   "fichier": "vent-fort.mp3",
+   "sorte": "boucle",
+   "role": "le vent de tempête, régulier",
+   "boucle": [
+    0.25,
+    24.25
+   ],
+   "duree": 24.5,
+   "credits": [
+    {
+     "titre": "storm_sea_close.WAV",
+     "auteur": "frodeims",
+     "site": "Freesound",
+     "page": "https://freesound.org/people/frodeims/sounds/616222/",
+     "licence": "CC0 1.0"
+    }
+   ]
+  },
+  "vent-rafales": {
+   "fichier": "vent-rafales.mp3",
+   "sorte": "boucle",
+   "role": "le vent de tempête, par rafales",
+   "boucle": [
+    0.25,
+    54.25
+   ],
+   "duree": 54.5,
+   "credits": [
+    {
+     "titre": "Blowing storm.wav",
+     "auteur": "SiriusParsec",
+     "site": "Freesound",
+     "page": "https://freesound.org/people/SiriusParsec/sounds/529017/",
+     "licence": "CC0 1.0"
+    }
+   ]
+  },
+  "greement": {
+   "fichier": "greement.mp3",
+   "sorte": "boucle",
+   "role": "le vent qui siffle dans le gréement",
+   "boucle": [
+    0.25,
+    30.25
+   ],
+   "duree": 30.5,
+   "credits": [
+    {
+     "titre": "Masts Whistling #1",
+     "auteur": "Joseph Sardin",
+     "site": "BigSoundBank",
+     "page": "https://bigsoundbank.com/masts-whistling-1-s2443.html",
+     "licence": "CC0 1.0"
+    }
+   ]
+  },
+  "greement-aigu": {
+   "fichier": "greement-aigu.mp3",
+   "sorte": "boucle",
+   "role": "le gréement qui hurle, au plus fort",
+   "boucle": [
+    0.25,
+    32.25
+   ],
+   "duree": 32.5,
+   "credits": [
+    {
+     "titre": "Masts Whistling #2",
+     "auteur": "Joseph Sardin",
+     "site": "BigSoundBank",
+     "page": "https://bigsoundbank.com/masts-whistling-2-s2444.html",
+     "licence": "CC0 1.0"
+    }
+   ]
+  },
+  "mer-forte": {
+   "fichier": "mer-forte.mp3",
+   "sorte": "boucle",
+   "role": "la mer qui déferle tout autour",
+   "boucle": [
+    0.25,
+    30.25
+   ],
+   "duree": 30.5,
+   "credits": [
+    {
+     "titre": "Storm waves breaking on sandy beach in Bournemouth",
+     "auteur": "chris_dagorne",
+     "site": "Freesound",
+     "page": "https://freesound.org/people/chris_dagorne/sounds/426076/",
+     "licence": "CC0 1.0"
+    }
+   ]
+  },
+  "cockpit-jour": {
+   "fichier": "cockpit-jour.mp3",
+   "sorte": "boucle",
+   "role": "le cockpit par beau temps : l'eau, les écoutes, la brise",
+   "boucle": [
+    0.25,
+    40.25
+   ],
+   "duree": 40.5,
+   "credits": [
+    {
+     "titre": "Sailboat, cockpit at 12kn wind speed",
+     "auteur": "borralbi",
+     "site": "Freesound",
+     "page": "https://freesound.org/people/borralbi/sounds/371172/",
+     "licence": "CC0 1.0"
+    }
+   ]
+  },
+  "sous-voiles": {
+   "fichier": "sous-voiles.mp3",
+   "sorte": "boucle",
+   "role": "les voiles pleines, les bouts qui tirent",
+   "boucle": [
+    0.25,
+    36.25
+   ],
+   "duree": 36.5,
+   "credits": [
+    {
+     "titre": "sailboat underway.wav",
+     "auteur": "canoeCG",
+     "site": "Freesound",
+     "page": "https://freesound.org/people/canoeCG/sounds/460061/",
+     "licence": "CC0 1.0"
+    }
+   ]
+  },
+  "pluie-pont": {
+   "fichier": "pluie-pont.mp3",
+   "sorte": "boucle",
+   "role": "la pluie sur le pont et sur les cirés",
+   "boucle": [
+    0.25,
+    20.25
+   ],
+   "duree": 20.5,
+   "credits": [
+    {
+     "titre": "Rain on plastic tarpaulin",
+     "auteur": "Joseph Sardin",
+     "site": "BigSoundBank",
+     "page": "https://bigsoundbank.com/rain-on-plastic-tarpaulin-s1292.html",
+     "licence": "CC0 1.0"
+    }
+   ]
+  },
+  "voile-bat": {
+   "fichier": "voile-bat.mp3",
+   "sorte": "boucle",
+   "role": "une voile qui faseye (qui bat comme un drapeau)",
+   "boucle": [
+    0.25,
+    34.25
+   ],
+   "duree": 34.5,
+   "credits": [
+    {
+     "titre": "Flag in the Wind #1",
+     "auteur": "Joseph Sardin",
+     "site": "BigSoundBank",
+     "page": "https://bigsoundbank.com/flag-in-the-wind-1-s1632.html",
+     "licence": "CC0 1.0"
+    }
+   ]
+  },
+  "pilote": {
+   "fichier": "pilote.mp3",
+   "sorte": "boucle",
+   "role": "le moteur du pilote automatique",
+   "boucle": [
+    0.25,
+    20.25
+   ],
+   "duree": 20.5,
+   "credits": [
+    {
+     "titre": "Sail boat_Autopilot (contact mic).wav",
+     "auteur": "KaleidacousticsAudio",
+     "site": "Freesound",
+     "page": "https://freesound.org/people/KaleidacousticsAudio/sounds/630431/",
+     "licence": "CC0 1.0"
+    }
+   ]
+  },
+  "cabine-mer": {
+   "fichier": "cabine-mer.mp3",
+   "sorte": "boucle",
+   "role": "la mer entendue de la couchette, à travers la coque",
+   "boucle": [
+    0.25,
+    40.25
+   ],
+   "duree": 40.5,
+   "credits": [
+    {
+     "titre": "Havlyd fra køje",
+     "auteur": "Supertyv2",
+     "site": "Freesound",
+     "page": "https://freesound.org/people/Supertyv2/sounds/166753/",
+     "licence": "CC0 1.0"
+    }
+   ]
+  },
+  "coque": {
+   "fichier": "coque.mp3",
+   "sorte": "boucle",
+   "role": "l'eau contre la coque (micros collés à la coque)",
+   "boucle": [
+    0.25,
+    30.25
+   ],
+   "duree": 30.5,
+   "credits": [
+    {
+     "titre": "sailboat contact mics",
+     "auteur": "bruno.auzet",
+     "site": "Freesound",
+     "page": "https://freesound.org/people/bruno.auzet/sounds/760338/",
+     "licence": "CC0 1.0"
+    }
+   ]
+  },
+  "pluie-toit": {
+   "fichier": "pluie-toit.mp3",
+   "sorte": "boucle",
+   "role": "la pluie sur le toit de la cabine",
+   "boucle": [
+    0.25,
+    28.25
+   ],
+   "duree": 28.500658,
+   "credits": [
+    {
+     "titre": "Rainfall on roof of sailboat at the dock",
+     "auteur": "douglasbruce@look.ca",
+     "site": "Freesound",
+     "page": "https://freesound.org/people/douglasbruce%40look.ca/sounds/849790/",
+     "licence": "CC0 1.0"
+    }
+   ]
+  },
+  "vent-dedans": {
+   "fichier": "vent-dedans.mp3",
+   "sorte": "boucle",
+   "role": "la tempête entendue de l'intérieur",
+   "boucle": [
+    0.25,
+    40.25
+   ],
+   "duree": 40.5,
+   "credits": [
+    {
+     "titre": "Wind from inside #2",
+     "auteur": "Joseph Sardin",
+     "site": "BigSoundBank",
+     "page": "https://bigsoundbank.com/wind-from-inside-2-s1715.html",
+     "licence": "CC0 1.0"
+    }
+   ]
+  },
+  "hurlement": {
+   "fichier": "hurlement.mp3",
+   "sorte": "boucle",
+   "role": "le vent qui hurle dans les ouvertures",
+   "boucle": [
+    0.25,
+    27.25
+   ],
+   "duree": 27.5,
+   "credits": [
+    {
+     "titre": "wind_howl2_stereo.wav",
+     "auteur": "swiftoid",
+     "site": "Freesound",
+     "page": "https://freesound.org/people/swiftoid/sounds/117611/",
+     "licence": "CC0 1.0"
+    }
+   ]
+  },
+  "craquements": {
+   "fichier": "craquements.mp3",
+   "sorte": "coups",
+   "role": "le bois et les cordages qui travaillent",
+   "morceaux": [
+    [
+     0.2,
+     1.2
+    ],
+    [
+     1.8,
+     1.3
+    ],
+    [
+     3.5,
+     1.4
+    ],
+    [
+     5.3,
+     1.2
+    ],
+    [
+     6.9,
+     1.4
+    ],
+    [
+     8.7,
+     1.3
+    ],
+    [
+     10.4,
+     1.2
+    ],
+    [
+     12,
+     1.4
+    ],
+    [
+     13.8,
+     0.7
+    ],
+    [
+     14.9,
+     0.9
+    ],
+    [
+     16.2,
+     1
+    ],
+    [
+     17.6,
+     0.7
+    ],
+    [
+     18.7,
+     2
+    ],
+    [
+     21.1,
+     2.2
+    ],
+    [
+     23.7,
+     2
+    ],
+    [
+     26.1,
+     2.4
+    ]
+   ],
+   "duree": 28.9,
+   "credits": [
+    {
+     "titre": "Swing, Lightly Loaded",
+     "auteur": "Joseph Sardin",
+     "site": "BigSoundBank",
+     "page": "https://bigsoundbank.com/swing-lightly-loaded-s1094.html",
+     "licence": "CC0 1.0"
+    },
+    {
+     "titre": "Floating Floor Squeaks",
+     "auteur": "Joseph Sardin",
+     "site": "BigSoundBank",
+     "page": "https://bigsoundbank.com/floating-floor-squeaks-s0518.html",
+     "licence": "CC0 1.0"
+    },
+    {
+     "titre": "Big Rope",
+     "auteur": "Joseph Sardin",
+     "site": "BigSoundBank",
+     "page": "https://bigsoundbank.com/big-rope-s3426.html",
+     "licence": "CC0 1.0"
+    }
+   ]
+  },
+  "vagues": {
+   "fichier": "vagues.mp3",
+   "sorte": "coups",
+   "role": "les vagues qui frappent la coque et s'écrasent sur le pont",
+   "morceaux": [
+    [
+     0.2,
+     4.5
+    ],
+    [
+     5.1,
+     4.4
+    ],
+    [
+     9.9,
+     4.4
+    ],
+    [
+     14.7,
+     4.5
+    ],
+    [
+     19.6,
+     4.4
+    ],
+    [
+     24.4,
+     8
+    ],
+    [
+     32.8,
+     9
+    ],
+    [
+     42.2,
+     8
+    ],
+    [
+     50.6,
+     8
+    ],
+    [
+     59,
+     2.4
+    ],
+    [
+     61.8,
+     2.6
+    ]
+   ],
+   "duree": 64.8,
+   "credits": [
+    {
+     "titre": "Waves Crashing Against Wall/Breakwater.wav",
+     "auteur": "Ali_6868",
+     "site": "Freesound",
+     "page": "https://freesound.org/people/Ali_6868/sounds/384359/",
+     "licence": "CC0 1.0"
+    },
+    {
+     "titre": "Cliff #1",
+     "auteur": "Joseph Sardin",
+     "site": "BigSoundBank",
+     "page": "https://bigsoundbank.com/cliff-1-s2570.html",
+     "licence": "CC0 1.0"
+    },
+    {
+     "titre": "Kayaking in rough weather",
+     "auteur": "AugustSandberg",
+     "site": "Freesound",
+     "page": "https://freesound.org/people/AugustSandberg/sounds/509322/",
+     "licence": "CC0 1.0"
+    }
+   ]
+  },
+  "tonnerres": {
+   "fichier": "tonnerres.mp3",
+   "sorte": "coups",
+   "role": "les coups de tonnerre, proches et lointains",
+   "morceaux": [
+    [
+     0.2,
+     5
+    ],
+    [
+     5.6,
+     17
+    ],
+    [
+     23,
+     22
+    ],
+    [
+     45.4,
+     22
+    ],
+    [
+     67.8,
+     25
+    ],
+    [
+     93.2,
+     26
+    ]
+   ],
+   "duree": 119.6,
+   "credits": [
+    {
+     "titre": "Thunder #2",
+     "auteur": "Joseph Sardin",
+     "site": "BigSoundBank",
+     "page": "https://bigsoundbank.com/thunder-2-s3113.html",
+     "licence": "CC0 1.0"
+    },
+    {
+     "titre": "Thunder #4",
+     "auteur": "Joseph Sardin",
+     "site": "BigSoundBank",
+     "page": "https://bigsoundbank.com/thunder-4-s3115.html",
+     "licence": "CC0 1.0"
+    },
+    {
+     "titre": "Thunder #1",
+     "auteur": "Joseph Sardin",
+     "site": "BigSoundBank",
+     "page": "https://bigsoundbank.com/thunder-s2718.html",
+     "licence": "CC0 1.0"
+    },
+    {
+     "titre": "Thunder #9",
+     "auteur": "Joseph Sardin",
+     "site": "BigSoundBank",
+     "page": "https://bigsoundbank.com/thunder-9-s3182.html",
+     "licence": "CC0 1.0"
+    },
+    {
+     "titre": "Thunder #11",
+     "auteur": "Joseph Sardin",
+     "site": "BigSoundBank",
+     "page": "https://bigsoundbank.com/thunder-11-s3184.html",
+     "licence": "CC0 1.0"
+    },
+    {
+     "titre": "Thunder #8",
+     "auteur": "Joseph Sardin",
+     "site": "BigSoundBank",
+     "page": "https://bigsoundbank.com/thunder-8-s3181.html",
+     "licence": "CC0 1.0"
+    }
+   ]
+  },
+  "cornes": {
+   "fichier": "cornes.mp3",
+   "sorte": "coups",
+   "role": "la corne du cargo",
+   "morceaux": [
+    [
+     0.2,
+     4.5
+    ],
+    [
+     5.1,
+     8.5
+    ]
+   ],
+   "duree": 14,
+   "credits": [
+    {
+     "titre": "Ocean Liner Horn #3",
+     "auteur": "Joseph Sardin",
+     "site": "BigSoundBank",
+     "page": "https://bigsoundbank.com/ocean-liner-horn-3-s3507.html",
+     "licence": "CC0 1.0"
+    },
+    {
+     "titre": "Ocean Liner Horn #1",
+     "auteur": "Joseph Sardin",
+     "site": "BigSoundBank",
+     "page": "https://bigsoundbank.com/horn-of-a-ship-1-s0261.html",
+     "licence": "CC0 1.0"
+    }
+   ]
+  },
+  "radio": {
+   "fichier": "radio.mp3",
+   "sorte": "coups",
+   "role": "la radio qui grésille",
+   "morceaux": [
+    [
+     0.2,
+     4.4
+    ],
+    [
+     5,
+     3.8
+    ],
+    [
+     9.2,
+     5.8
+    ],
+    [
+     15.4,
+     8
+    ]
+   ],
+   "duree": 23.8,
+   "credits": [
+    {
+     "titre": "Crackling Radio #1",
+     "auteur": "Joseph Sardin",
+     "site": "BigSoundBank",
+     "page": "https://bigsoundbank.com/crackling-radio-1-s0312.html",
+     "licence": "CC0 1.0"
+    },
+    {
+     "titre": "Crackling Radio #2",
+     "auteur": "Joseph Sardin",
+     "site": "BigSoundBank",
+     "page": "https://bigsoundbank.com/crackling-radio-2-s0313.html",
+     "licence": "CC0 1.0"
+    },
+    {
+     "titre": "Radio Interference #2",
+     "auteur": "Joseph Sardin",
+     "site": "BigSoundBank",
+     "page": "https://bigsoundbank.com/radio-interference-2-s0311.html",
+     "licence": "CC0 1.0"
+    },
+    {
+     "titre": "Radio Interference #1",
+     "auteur": "Joseph Sardin",
+     "site": "BigSoundBank",
+     "page": "https://bigsoundbank.com/radio-interference-1-s0310.html",
+     "licence": "CC0 1.0"
+    }
+   ]
+  }
+ }
+}

@@ -2,7 +2,7 @@
 
 Un voilier, vu à la première personne. **Une journée pour apprendre à le mener, une nuit de tempête à tenir.** Si le bateau est encore à flot quand le soleil se lève, on a gagné.
 
-> Où on en est (octobre 2026) : le jeu complet, environ 35 minutes. **La journée** : Jos, le vieux marin du sémaphore de Kervalen, t'apprend à la radio à mener le voilier *Morgane*, en 8 leçons, de 9 heures au coucher du soleil (barrer, lire le vent, régler les voiles, virer, empanner, prendre un ris, préparer la nuit). **La nuit** : de 18 h 45 à l'aube, le vent monte jusqu'à 42 nœuds et 55 en rafales, les vagues font 6 mètres et déferlent ; il faut réduire la toile, fuir devant le temps, pomper l'eau qui embarque, réparer ce qui casse, éviter une trombe marine et un cargo. Tout est calculé par le code, sans aucun fichier d'image ni de son : la mer, le ciel, le voilier et sa physique, la côte, les bruits du bord.
+> Où on en est (octobre 2026) : le jeu complet, environ 35 minutes. **La journée** : Jos, le vieux marin du sémaphore de Kervalen, t'apprend à la radio à mener le voilier *Morgane*, en 8 leçons, de 9 heures au coucher du soleil (barrer, lire le vent, régler les voiles, virer, empanner, prendre un ris, préparer la nuit). **La nuit** : de 18 h 45 à l'aube, le vent monte jusqu'à 42 nœuds et 55 en rafales, les vagues font 6 mètres et déferlent ; il faut réduire la toile, fuir devant le temps, pomper l'eau qui embarque, réparer ce qui casse, éviter une trombe marine et un cargo. L'image est entièrement calculée par le code, sans aucun fichier d'image : la mer, le ciel, le voilier et sa physique, la côte. Le son est fait de vrais enregistrements du domaine public (CC0), mélangés en direct.
 
 **Jouer en ligne : https://patapain18.github.io/quart-de-nuit/**
 
@@ -13,7 +13,7 @@ npm install
 npm run dev
 ```
 
-Puis ouvrir http://localhost:5190/jeu.html. Les ateliers (les coulisses) : `atelier-mer.html` (la mer, le ciel et la lumière), `atelier-bateau.html` (la polaire du voilier), `atelier-tempete.html` (la nuit rejouée en accéléré par des marins automatiques).
+Puis ouvrir http://localhost:5190/jeu.html. Les ateliers (les coulisses) : `atelier-mer.html` (la mer, le ciel et la lumière), `atelier-bateau.html` (la polaire du voilier), `atelier-tempete.html` (la nuit rejouée en accéléré par des marins automatiques), `atelier-son.html` (écouter et mesurer le son de chaque situation).
 
 Dans le jeu, deux outils de vérification, à lancer dans la console du navigateur : `__jeu.inspecterPont()` (le plan où l'on marche colle-t-il au modèle 3D ? une carte du pont et de la cabine, tous les 4 cm) et `__jeu.essayerLaMarche()` (un marin automatique fait le tour du bord et manie chaque chose).
 
@@ -58,6 +58,6 @@ Le cahier de conception, étape par étape, avec ce qu'on a appris en route : [D
 - **Le ciel** : une atmosphère physique, des nuages en volume, la lune, ~5 000 étoiles, les éclairs (`src/rendu/ciel.js`).
 - **Le voilier** : construit par le code (`src/bateau/`), et sa physique (`src/physique/voilier.js`) : 346 morceaux de coque qui flottent, les voiles et la quille comme des ailes, le safran qui décroche ou sort de l'eau, l'eau embarquée qui pèse.
 - **La journée et la nuit** : deux moteurs sans écran (`src/jeu/journee.js`, `src/jeu/nuit.js`), que des programmes peuvent jouer de bout en bout (`src/jeu/marins.js`).
-- **Le son** : tout est synthétisé avec la Web Audio API (`src/son/audio.js`) ; la voix de Jos est celle du navigateur.
+- **Le son** : de vrais enregistrements, tous dans le domaine public (CC0 : BigSoundBank de Joseph Sardin, et Freesound), coupés et réglés par `npm run sons` d'après la recette `scripts/sons/recette.mjs` (8 Mo dans `public/sons/`), puis mélangés en direct par la Web Audio API selon le vent, la pluie, la mer, et selon qu'on est dehors ou dans la cabine (`src/son/audio.js`) ; quelques sons calculés font le reste. La voix de Jos est celle du navigateur. L'**atelier du son** (`atelier-son.html`) fait écouter et mesure le volume ressenti de chaque situation.
 
 Fait avec Three.js (licence MIT) et Vite. Inspiré d'une vidéo d'Isaac Johnson (un voilier sous l'orage, en Three.js). Kervalen, *Morgane*, Jos et le cargo *Ar Men* sont inventés.

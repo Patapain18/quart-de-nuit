@@ -56,6 +56,7 @@ export default defineConfig({
         atelierMer: path.resolve('atelier-mer.html'),
         atelierBateau: path.resolve('atelier-bateau.html'),
         atelierTempete: path.resolve('atelier-tempete.html'),
+        atelierSon: path.resolve('atelier-son.html'),
       },
     },
   },

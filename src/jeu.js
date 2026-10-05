@@ -47,6 +47,9 @@ const physique = new PhysiqueVoilier();
 const vent = new Vent(5);
 const commandes = new Commandes(canvas);
 const audio = new Audio();
+// (les vrais enregistrements se chargent en arrière-plan dès maintenant ; le son ne
+// démarre qu'au premier clic, comme l'exigent les navigateurs)
+audio.precharger(`${import.meta.env.BASE_URL}sons/`);
 const marin = new Marin();
 // (ce qui est dur à bord, tiré du modèle 3D : le marin n'y entre pas, la caméra non plus)
 marin.encombrement = construireEncombrement(bateau);
@@ -562,8 +565,21 @@ function simuler(dt) {
   monde.etatTrombe = nuit?.trombe ?? null;
 
   // le son du bord
+  // (le bateau secoué : la vitesse de rotation qui change d'un coup, lissée ; le vérin du
+  // pilote : la barre qu'il pousse)
+  const rot = physique.rotation;
+  etat.rotationAvant ??= rot.clone();
+  const secousseBateau = Math.min(1, rot.distanceTo(etat.rotationAvant) / Math.max(dt, 1e-3) / 1.2);
+  etat.rotationAvant.copy(rot);
+  etat.mouvement = (etat.mouvement ?? 0) + (secousseBateau - (etat.mouvement ?? 0)) * Math.min(1, dt * 4);
+  const vitesseBarre = Math.abs(physique.barre - (etat.barreAvant ?? physique.barre)) / Math.max(dt, 1e-3);
+  etat.barreAvant = physique.barre;
   audio.dansLaCabine(dedans);
   audio.maj(dt, {
+    nuit: monde.ecl.nuit,
+    mouvement: etat.mouvement,
+    pilote: etat.pilote !== null ? Math.min(1, vitesseBarre / 0.35) : 0,
+    voiles: (physique.ris >= 3 ? 0.2 : 1 - 0.2 * physique.ris) * (0.4 + 0.6 * physique.deroule),
     ventApparent: m.ventApparent,
     vitesse: m.vitesse,
     faseyement: Math.max(r.faseyement, r.faseyementFoc * physique.deroule),

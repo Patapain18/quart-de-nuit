@@ -1,0 +1,44 @@
+/* Atelier du son : les curseurs, le mélange en direct (des jauges), les mesures (des
+   barres de volume, une seule couleur ; la bande claire = la cible), la sonothèque. */
+h3 { font-size: 14px; color: var(--texte-doux); font-weight: 600; margin: var(--e5) 0 var(--e2); }
+.note { color: var(--texte-doux); font-size: 13px; margin: var(--e2) 0 0; }
+.note:empty { display: none; }
+.ligne { margin-top: var(--e4); }
+.curseurs { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: var(--e3) var(--e5); margin-top: var(--e4); }
+.curseurs label { display: grid; gap: 2px; font-size: 13px; color: var(--texte-2); }
+.curseurs output { color: var(--texte); font-variant-numeric: tabular-nums; }
+.curseurs input[type="range"] { width: 100%; accent-color: var(--ambre); }
+.curseurs .case { display: flex; align-items: center; gap: var(--e2); }
+
+.melange { display: grid; gap: 4px; }
+.jauge-son { display: grid; grid-template-columns: 150px 1fr 44px; align-items: center; gap: var(--e3); font-size: 13px; }
+.jauge-son .nom { color: var(--texte-2); }
+.jauge-son .fond { height: 10px; background: var(--surface-2); border-radius: 0 5px 5px 0; overflow: hidden; }
+.jauge-son .fond i { display: block; height: 100%; width: 0; background: var(--vent); border-radius: 0 4px 4px 0; transition: width 0.12s; }
+.jauge-son[data-bus="dedans"] .fond i { background: #86b6ef; }
+.jauge-son .valeur { color: var(--texte-doux); font-variant-numeric: tabular-nums; text-align: right; }
+
+.mesures { margin-top: var(--e4); display: grid; gap: var(--e2); }
+.mesure { display: grid; grid-template-columns: 210px 1fr; gap: var(--e3); align-items: center; font-size: 13px; }
+.mesure .nom { color: var(--texte-2); }
+.mesure .piste { position: relative; height: 26px; background: var(--surface-2); border-radius: 4px; }
+.mesure .cible { position: absolute; top: 0; bottom: 0; background: rgba(255, 255, 255, 0.10); border-left: 1px dashed rgba(255, 255, 255, 0.35); border-right: 1px dashed rgba(255, 255, 255, 0.35); }
+.mesure .barre { position: absolute; left: 0; top: 7px; height: 12px; background: var(--vent); border-radius: 0 4px 4px 0; }
+.mesure .chiffre { position: absolute; top: 4px; font-variant-numeric: tabular-nums; color: var(--texte); white-space: nowrap; }
+.mesure .detail { grid-column: 2; color: var(--texte-doux); font-size: 12px; margin-top: -4px; }
+.echelle { display: grid; grid-template-columns: 210px 1fr; gap: var(--e3); font-size: 11px; color: var(--texte-doux); }
+.echelle .graduations { position: relative; height: 14px; }
+.echelle span { position: absolute; transform: translateX(-50%); }
+
+.sonotheque { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--e3); }
+.sonotheque li { display: grid; grid-template-columns: auto 1fr; gap: 2px var(--e3); align-items: start; }
+.sonotheque button { min-width: 38px; text-align: center; grid-row: span 2; }
+.sonotheque .titre { font-weight: 600; }
+.sonotheque .titre small { color: var(--texte-doux); font-weight: 400; margin-left: var(--e2); }
+.sonotheque .origine { color: var(--texte-doux); font-size: 13px; }
+.sonotheque a { color: var(--focus); }
+@media (max-width: 640px) {
+  .mesure, .echelle { grid-template-columns: 1fr; }
+  .mesure .detail { grid-column: 1; }
+  .jauge-son { grid-template-columns: 110px 1fr 40px; }
+}

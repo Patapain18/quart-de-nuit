@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Atelier du son · Quart de nuit</title>
+  <meta name="description" content="Écouter et mesurer le son du jeu : chaque situation de la journée et de la nuit de tempête, le mélange en direct des vrais enregistrements, et d'où vient chacun.">
+  <link rel="stylesheet" href="./src/atelier-tempete.css">
+  <link rel="stylesheet" href="./src/atelier-son.css">
+</head>
+<body>
+  <main class="viz-root">
+    <header>
+      <h1>Atelier du son</h1>
+      <p class="chapeau">Le son du jeu est fait de <strong>vrais enregistrements</strong> (le vent, la mer,
+        la pluie, le bois qui craque…), tous dans le domaine public, que le jeu mélange en direct
+        selon ce qui se passe. Ici, on écoute chaque situation, on joue avec les réglages, et on
+        <strong>mesure</strong> le volume ressenti, pour que la tempête fasse peur sans faire mal aux oreilles.</p>
+    </header>
+
+    <section class="carte" aria-labelledby="titre-ecouter">
+      <h2 id="titre-ecouter">Écouter une situation</h2>
+      <p class="aide">Choisis une situation, puis « Écouter ». Les curseurs changent ce que le jeu donne au son, comme pendant une partie.</p>
+      <div class="boutons-choix" id="situations"></div>
+      <div class="curseurs" id="curseurs"></div>
+      <div class="ligne">
+        <button type="button" class="principal" id="ecouter">Écouter</button>
+      </div>
+      <h3>Des événements</h3>
+      <div class="boutons-choix" id="evenements"></div>
+    </section>
+
+    <section class="carte" aria-labelledby="titre-melange">
+      <h2 id="titre-melange">Le mélange, en direct</h2>
+      <p class="aide">Le volume que le jeu donne à chaque enregistrement qui tourne en boucle (0 : muet, 1 : plein volume). Dans la cabine, ce qui est dehors passe à travers la coque : étouffé.</p>
+      <div id="melange" class="melange" role="list"></div>
+    </section>
+
+    <section class="carte" aria-labelledby="titre-mesurer">
+      <h2 id="titre-mesurer">Mesurer</h2>
+      <p class="aide">Le jeu calcule 9 secondes de chaque situation, sans les jouer, et mesure leur volume ressenti
+        (en LUFS : −14, la musique en ligne ; −23, la télévision ; −30, très calme). La bande claire : ce que
+        l'on vise pour cette situation.</p>
+      <button type="button" id="mesurer">Mesurer toutes les situations</button>
+      <p class="note" id="etat-mesure"></p>
+      <div id="mesures" class="mesures" hidden></div>
+    </section>
+
+    <section class="carte" aria-labelledby="titre-sonotheque">
+      <h2 id="titre-sonotheque">La sonothèque</h2>
+      <p class="aide">Chaque son du jeu, d'où il vient, et à quoi il sert. Tous sont dans le domaine public
+        (licence CC0) : on peut les copier, les couper, les publier. On les a coupés et réglés avec
+        <code>npm run sons</code> (la recette : <code>scripts/sons/recette.mjs</code>).</p>
+      <ul id="sonotheque" class="sonotheque"></ul>
+    </section>
+  </main>
+  <script type="module" src="./src/atelier-son.js"></script>
+</body>
+</html>
