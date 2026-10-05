@@ -393,17 +393,29 @@ qui ne répond plus) ; ce qui est dur, c'est **barrer, tenir un cap** ; l'élect
     une vingtaine de secondes (il nous suit), puis disparaît. Jos : « Sur le mien, il n'y a
     que toi ».
 
+13. ✅ **Le sillage** (`src/rendu/eau.js`) — le bateau laisse enfin une trace. Le long de
+    la coque, l'eau qu'il fend blanchit (plus fort à l'étrave et quand il va vite : la
+    « moustache »), en traînées qui filent vers l'arrière. Derrière lui, des remous : on
+    garde où était sa poupe toutes les 2,5 s (une minute en tout), et le shader de la mer
+    cherche, pour chaque point d'eau, le morceau de route le plus proche : son âge donne la
+    largeur (les remous s'étalent) et la force (ils s'effacent). L'écume du sillage a son
+    propre motif, étiré le long de la route (des plaques, des veines, un grain de bulles),
+    sur une eau turquoise pleine de bulles qui s'éteint plus vite ; puis une traînée d'eau
+    lisse (moins de petites rides : elle brille autrement). La nuit, le plancton remué
+    s'allume : une lueur bleu-verte et de fines étincelles qui clignotent. Le sillage suit
+    la vraie route (les virages aussi) et ne coûte rien de mesurable (120 images/s).
+
 Et en passant : sous la pluie et dans les embruns, **le pont ruisselle** (le gelcoat et
 l'antidérapant deviennent brillants, le teck fonce : seulement la rugosité et la teinte des
 matériaux, sans rien recompiler) ; le navigateur qui refuse un instant de capturer la souris
 (juste après Échap) ne laisse plus d'erreur. Images : `docs/etape7-inspection-du-pont.jpg`,
 `docs/etape8-le-compas-et-le-radar-du-cockpit.jpg`, `docs/etape10-*.jpg` (la trombe),
-`docs/etape11-la-nuit-noire-et-la-lampe.jpg`, `docs/etape12-*.jpg` (le radar).
+`docs/etape11-la-nuit-noire-et-la-lampe.jpg`, `docs/etape12-*.jpg` (le radar),
+`docs/etape13-*.jpg` (le sillage).
 
 ## 4. Pistes graphiques notées pour plus tard
 
-- Le front orageux du coucher de soleil (un mur de cumulonimbus d'un côté du ciel).
-- Le sillage et l'écume le long de la coque (et celui du cargo).
 - Le mur de cumulonimbus du front orageux, d'un côté du ciel, au coucher du soleil.
+- Le sillage du cargo (celui du voilier est fait : étape 13).
 - L'eau verte qui balaie le pont quand une très grosse déferlante passe dessus.
 - Le bruit de la mer calculé dans un « worker » (fil de calcul séparé) pour libérer 3 ms par image.

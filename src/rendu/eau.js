@@ -15,6 +15,9 @@ import * as THREE from 'three';
 import { PassePleinEcran, SOMMET_PLEIN_ECRAN } from './outils.js';
 import { GLSL_CARTE_CIEL } from './ciel.js';
 import { GLSL_COQUE } from '../bateau/glsl-coque.js';
+import { COQUE } from '../bateau/forme.js';
+
+const N_SILLAGE = 24; // points du sillage (le premier : la poupe ; puis un toutes les 2,5 s)
 
 const FRAGMENT_PREPARATION = /* glsl */ `
 in vec2 vUv;
@@ -112,12 +115,89 @@ uniform float uForceEcume;
 uniform float uSeuilEcume;
 uniform vec2 uDirVent;
 uniform vec4 uTrombe; // la trombe : x, z, rayon de son cœur (m), force (0 : pas de trombe)
+// le sillage : où était la poupe (x, z), à quel instant (s), à quelle vitesse (m/s) ; le
+// premier point est la poupe elle-même ; et la boîte qui les contient tous (pour aller vite)
+uniform vec4 uSillage[${N_SILLAGE}];
+uniform int uSillageN;
+uniform vec4 uSillageBoite;
+uniform float uVitesseBateau; // m/s
+uniform float uPlancton;      // la nuit, l'écume remuée par le bateau s'illumine (0 → 1)
 
 const float PI = 3.14159265359;
 ${GLSL_CARTE_CIEL}
 ${GLSL_COQUE}
 
 float saturer(float x) { return clamp(x, 0.0, 1.0); }
+
+// L'écume que fait le bateau : le long de la coque (l'eau qu'il fend, plus forte à l'étrave
+// et quand il va vite : la « moustache »), puis derrière lui, son sillage : des remous blancs
+// qui s'élargissent et s'effacent, puis une traînée d'eau lisse (les petites rides ont été
+// effacées : elle brille autrement que la mer autour). Le sillage suit la vraie route du
+// bateau (ses virages aussi). Rend (force, voile d'écume, lisse, bulles), de 0 à 1.
+// (son motif est étiré le long de la route, pas dans le sens du vent comme celui des vagues)
+float motifEcume(float force, float motif) {
+  return smoothstep(1.0 - force, 1.0 - force + 0.35, motif) * (0.3 + 0.6 * force);
+}
+vec4 ecumeDuBateau(vec3 pMonde) {
+  if (uClipCoque < 0.5) return vec4(0.0);
+  float force = 0.0;
+  float bulles = 0.0;
+  float voile = 0.0;
+  float lisse = 0.0;
+  float v = clamp(uVitesseBateau / 3.0, 0.0, 1.3);
+  // le long de la coque (dans le repère du bateau)
+  vec3 p = (uBateauInverse * vec4(pMonde, 1.0)).xyz;
+  float u = (p.z - ${COQUE.zArriere.toFixed(3)}) / ${(COQUE.zAvant - COQUE.zArriere).toFixed(3)};
+  if (u > -0.1 && u < 1.08) {
+    float w = coqueDemiLargeur(clamp(u, 0.0, 1.0)) * 0.94;
+    float d = abs(p.x) - w;
+    float proue = smoothstep(0.6, 0.97, u);
+    float largeur = 0.3 + (0.5 + 1.2 * proue) * v;
+    float bande = (1.0 - smoothstep(0.0, largeur, d)) * smoothstep(-0.6, 0.0, d + 0.3);
+    force = saturer(bande * (0.25 + 0.9 * v) * (0.7 + 0.8 * proue));
+    bulles = force;
+    // des traînées qui filent vers l'arrière à la vitesse du bateau
+    float zEau = p.z + uTemps * uVitesseBateau;
+    float stries = texture(uBruit, vec3(p.x * 0.5, zEau * 0.1, 0.33)).a * 0.65 + texture(uBruit, vec3(p.x * 1.6, zEau * 0.35, 0.71)).b * 0.35;
+    voile = motifEcume(force, stries + proue * 0.15);
+  }
+  // le sillage
+  if (uSillageN > 1 && pMonde.x > uSillageBoite.x && pMonde.x < uSillageBoite.z && pMonde.z > uSillageBoite.y && pMonde.z < uSillageBoite.w) {
+    float meilleur = 1e9;
+    float age = 0.0;
+    float vit = 0.0;
+    vec2 sens = vec2(0.0, 1.0);
+    for (int i = 0; i < ${N_SILLAGE - 1}; i++) {
+      if (i + 1 >= uSillageN) break;
+      vec4 a = uSillage[i];
+      vec4 b = uSillage[i + 1];
+      vec2 ab = b.xy - a.xy;
+      vec2 ap = pMonde.xz - a.xy;
+      float t = clamp(dot(ap, ab) / max(dot(ab, ab), 1e-3), 0.0, 1.0);
+      float d = length(ap - ab * t);
+      if (d < meilleur) { meilleur = d; age = uTemps - mix(a.z, b.z, t); vit = mix(a.w, b.w, t); sens = ab; }
+    }
+    sens = length(sens) > 1e-3 ? normalize(sens) : vec2(0.0, 1.0);
+    float allure = clamp(vit / 4.0, 0.0, 1.2);
+    // les remous : larges comme le bateau à la poupe, puis ils s'étalent et s'effacent
+    float largeur = 1.1 + 0.22 * age;
+    float coeur = (1.0 - smoothstep(largeur * 0.25, largeur, meilleur)) * allure;
+    float fs = coeur * exp(-age / 14.0);
+    bulles = max(bulles, coeur * exp(-age / 6.0));
+    // (le motif est fixe dans l'eau : on le lit dans le repère de la route)
+    vec2 q = vec2(dot(pMonde.xz, sens), dot(pMonde.xz, vec2(-sens.y, sens.x)));
+    // de grandes plaques, des veines qui les marbrent, et un grain fin de bulles
+    float plaques = texture(uBruit, vec3(q.x * 0.07, q.y * 0.3, 0.47 + age * 0.004)).a;
+    float veines = 1.0 - abs(texture(uBruit, vec3(q.x * 0.22, q.y * 0.8, 0.81 - age * 0.006)).b * 2.0 - 1.0);
+    float grain = texture(uBruit, vec3(q.x * 0.9, q.y * 2.2, 0.13 + age * 0.01)).a;
+    float remous = plaques * 0.5 + veines * veines * 0.32 + grain * 0.18;
+    force = max(force, saturer(fs));
+    voile = max(voile, motifEcume(saturer(fs), remous));
+    // la traînée lisse, plus large et plus longue
+    lisse = (1.0 - smoothstep(largeur * 0.8, largeur * 1.9, meilleur)) * exp(-age / 50.0) * allure;
+  }
+  return vec4(force, voile, saturer(lisse), saturer(bulles));
+}
 
 // Reflet d'un astre (modèle GGX : la tache de lumière s'élargit quand l'eau est agitée)
 float eclat(vec3 n, vec3 v, vec3 l, float a) {
@@ -148,6 +228,11 @@ ${cascades.map((_, i) => `  p = texture(uPentes${i}, vSource / uGrille${i}.x);
   pente += p.xy; variance += max(p.z - dot(p.xy, p.xy), 0.0); ecume += p.w * ${(POIDS_ECUME[i] ?? 0).toFixed(2)};`).join('\n')}
   ecume *= uForceEcume;
 
+  // le bateau : son écume, et l'eau qu'il a lissée derrière lui (moins de petites rides)
+  vec4 bateau = ecumeDuBateau(vMonde);
+  pente *= 1.0 - 0.35 * bateau.z;
+  variance *= 1.0 - 0.7 * bateau.z;
+
   vec3 n = normalize(vec3(-pente.x, 1.0, -pente.y));
   vec3 versOeil = cameraPosition - vMonde;
   float distance = length(versOeil);
@@ -160,7 +245,7 @@ ${cascades.map((_, i) => `  p = texture(uPentes${i}, vSource / uGrille${i}.x);
   } else {
     float nv = max(dot(n, v), 1e-4);
     float fresnel = 0.02 + 0.98 * pow(1.0 - nv, 5.0);
-    float a = clamp(sqrt(variance * 0.5 + uRugosite * uRugosite), 0.02, 0.6);
+    float a = clamp(sqrt(variance * 0.5 + uRugosite * uRugosite * (1.0 - 0.6 * bateau.z)), 0.02, 0.6);
 
     // le reflet du ciel (jamais sous l'horizon : on reflète alors le ciel bas)
     vec3 r = reflect(-v, n);
@@ -181,6 +266,8 @@ ${cascades.map((_, i) => `  p = texture(uPentes${i}, vSource / uGrille${i}.x);
     corps += uCouleurTranslucide * (uSoleil * contreJour * 1.4 + uAmbiance * 0.35) * crete * crete * dosVague;
 
     couleur = corps * (1.0 - fresnel) + reflet * fresnel + eclats;
+    // sous les remous du bateau, l'eau pleine de bulles s'éclaircit, turquoise
+    couleur += uCouleurTranslucide * lumiere * bateau.w * 0.4 * (1.0 - fresnel);
 
     // l'écume : fraîche et épaisse sur la crête qui déferle, puis une dentelle de bulles
     // qui s'étire dans le sens du vent et s'efface
@@ -204,12 +291,24 @@ ${cascades.map((_, i) => `  p = texture(uPentes${i}, vSource / uGrille${i}.x);
       fraiche = max(fraiche, anneau * smoothstep(0.38, 0.62, spirale + anneau * 0.25) * uTrombe.w);
     }
     float voile = smoothstep(1.0 - fraiche, 1.0 - fraiche + 0.22, dentelle) * (0.35 + 0.65 * fraiche);
+    // (l'écume du bateau a son propre motif)
+    voile = max(voile, bateau.y);
+    fraiche = max(fraiche, bateau.x);
     // au loin, le motif devient une teinte moyenne (sinon il scintille)
     voile = mix(voile, fraiche * 0.5, saturer(distance / 250.0));
     vec3 lumiereEcume = uAmbiance * 0.9 + uSoleil * (0.25 + 0.75 * max(dot(n, uDirSoleil), 0.0)) + uLune * 0.8 + vec3(uEclair * 0.5);
     // l'écume épaisse est blanche, la dentelle laisse voir l'eau verte en dessous
     vec3 couleurEcume = mix(vec3(0.55, 0.72, 0.72), vec3(0.88, 0.9, 0.92), fraiche) * lumiereEcume;
     couleur = mix(couleur, couleurEcume, voile);
+    // la nuit, le plancton remué par l'étrave et le sillage s'allume : une lueur bleu-verte
+    // et des étincelles qui s'éteignent derrière le bateau
+    if (uPlancton > 0.01 && bateau.x > 0.01) {
+      // (de toutes petites, qui clignotent ; au loin il n'en reste que la lueur)
+      float etincelles = smoothstep(0.7, 0.9, texture(uBruit, vec3(vMonde.xz * 7.0, uTemps * 1.6)).a)
+                       + 0.6 * smoothstep(0.74, 0.92, texture(uBruit, vec3(vMonde.zx * 3.3 + 7.0, uTemps * 1.1)).b);
+      etincelles *= 1.0 - smoothstep(15.0, 60.0, distance);
+      couleur += vec3(0.03, 0.4, 0.42) * uPlancton * (bateau.y * 0.05 + bateau.x * (etincelles * 0.14 + 0.01));
+    }
   }
 
   // la brume : au loin, la mer se fond dans le ciel de l'horizon
@@ -314,6 +413,11 @@ export class Eau {
       uCouleurTranslucide: { value: new THREE.Vector3(0.025, 0.16, 0.13) },
       uForceEcume: { value: 1 },
       uTrombe: { value: new THREE.Vector4(0, 0, 30, 0) },
+      uSillage: { value: Array.from({ length: N_SILLAGE }, () => new THREE.Vector4()) },
+      uSillageN: { value: 0 },
+      uSillageBoite: { value: new THREE.Vector4() },
+      uVitesseBateau: { value: 0 },
+      uPlancton: { value: 0 },
       uSeuilEcume: { value: 0.2 },
       uDirVent: { value: new THREE.Vector2(1, 0) },
       uBateauInverse: { value: new THREE.Matrix4() },
@@ -366,10 +470,35 @@ export class Eau {
     this.uniforms.uPasAngulaire.value = (2 * Math.PI) / segments;
   }
 
-  // Le bateau creuse la mer (il faut connaître sa position à chaque image)
-  suivreBateau(groupe) {
-    this.uniforms.uBateauInverse.value.copy(groupe.matrixWorld).invert();
-    this.uniforms.uClipCoque.value = 1;
+  // Le bateau creuse la mer (il faut connaître sa position à chaque image), et laisse son
+  // sillage : on garde où était sa poupe toutes les 2,5 s (une minute en tout)
+  suivreBateau(groupe, temps = 0, dt = 1 / 60) {
+    const u = this.uniforms;
+    u.uBateauInverse.value.copy(groupe.matrixWorld).invert();
+    u.uClipCoque.value = 1;
+    const poupe = (this._poupe ??= new THREE.Vector3()).set(0, 0, COQUE.zArriere).applyMatrix4(groupe.matrixWorld);
+    const avant = this._poupeAvant;
+    const h = (this.historique ??= []);
+    // (un saut de plus de 30 m : le bateau a été replacé ; ou l'horloge est repartie de zéro :
+    // on efface)
+    if ((avant && avant.distanceTo(poupe) > 30) || (h.length && temps < h[0].t)) h.length = 0;
+    const vitesse = avant && dt > 0 ? Math.min(12, Math.hypot(poupe.x - avant.x, poupe.z - avant.z) / dt) : 0;
+    this.vitesse = (this.vitesse ?? 0) + (vitesse - (this.vitesse ?? 0)) * Math.min(1, dt * 2);
+    (this._poupeAvant ??= new THREE.Vector3()).copy(poupe);
+    if (!h.length || temps - h[0].t > 2.5) {
+      h.unshift({ x: poupe.x, z: poupe.z, t: temps, v: this.vitesse });
+      if (h.length > N_SILLAGE - 1) h.length = N_SILLAGE - 1;
+    }
+    const points = u.uSillage.value;
+    points[0].set(poupe.x, poupe.z, temps, this.vitesse);
+    let x0 = poupe.x, x1 = poupe.x, z0 = poupe.z, z1 = poupe.z;
+    h.forEach((q, k) => {
+      points[k + 1].set(q.x, q.z, q.t, q.v);
+      x0 = Math.min(x0, q.x); x1 = Math.max(x1, q.x); z0 = Math.min(z0, q.z); z1 = Math.max(z1, q.z);
+    });
+    u.uSillageN.value = h.length + 1;
+    u.uSillageBoite.value.set(x0 - 25, z0 - 25, x1 + 25, z1 + 25);
+    u.uVitesseBateau.value = this.vitesse;
   }
 
   // Lumières et ambiance (voir monde/meteo.js)
