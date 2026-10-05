@@ -364,6 +364,7 @@ export class Monde3D {
         this.bateau.maj(dt);
         this.bateau.groupe.updateMatrixWorld();
         this.eau.suivreBateau(this.bateau.groupe, this.temps, dt);
+        this.bateau.paquet?.maj(dt, this.bateau.groupe, this.ecl.nuit);
         this.eau.uniforms.uPlancton.value = this.ecl.nuit;
         // la cabine : ses lumières sont dans le repère du bateau
         this.bateau.interieur.suivre(this.bateau.groupe);

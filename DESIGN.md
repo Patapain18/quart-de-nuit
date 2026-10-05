@@ -402,7 +402,8 @@ qui ne répond plus) ; ce qui est dur, c'est **barrer, tenir un cap** ; l'élect
     propre motif, étiré le long de la route (des plaques, des veines, un grain de bulles),
     sur une eau turquoise pleine de bulles qui s'éteint plus vite ; puis une traînée d'eau
     lisse (moins de petites rides : elle brille autrement). La nuit, le plancton remué
-    s'allume : une lueur bleu-verte et de fines étincelles qui clignotent. Le sillage suit
+    s'allume : une lueur bleu-verte et de fines étincelles qui clignotent, seulement dans
+    les remous frais (elle s'éteint en quelques secondes). Le sillage suit
     la vraie route (les virages aussi) et ne coûte rien de mesurable (120 images/s).
 
 14. ✅ **Le front orageux** (`src/rendu/glsl/front.js`) — le coucher de soleil était joli,
@@ -423,16 +424,26 @@ qui ne répond plus) ; ce qui est dur, c'est **barrer, tenir un cap** ; l'élect
     s'éloigne dans l'aube (pas devant le soleil levant : il ne gâche pas l'aube). Réglable dans l'atelier de la mer (« Front orageux »). Coût
     mesuré : rien de visible (120 images/s).
 
+15. ✅ **Le paquet de mer** (`src/bateau/paquet-de-mer.js`) — quand une grosse déferlante
+    frappe (ou la trombe), une nappe d'eau verte passe par-dessus le livet et balaie le
+    pont d'un bord à l'autre en moins d'une seconde, avec sa ligne d'écume en tête, de
+    l'eau blanche pleine d'air au début puis des traînées qui filent, et s'écoule
+    par-dessus bord en deux secondes. Elle frappe d'où vient la vague : par l'arrière, c'est
+    le cockpit qui la prend. Elle est peinte dans le shader des matériaux du pont
+    (antidérapant, teck, gelcoat) : elle épouse le passavant, le rouf et le cockpit sans
+    rien traverser, efface le relief de l'antidérapant et reflète le ciel ; la nuit, son
+    écume s'allume du plancton. (Le pont est dessiné des deux côtés : on tient compte de la
+    face vue, sinon la nappe ignorait le passavant.)
+
 Et en passant : sous la pluie et dans les embruns, **le pont ruisselle** (le gelcoat et
 l'antidérapant deviennent brillants, le teck fonce : seulement la rugosité et la teinte des
 matériaux, sans rien recompiler) ; le navigateur qui refuse un instant de capturer la souris
 (juste après Échap) ne laisse plus d'erreur. Images : `docs/etape7-inspection-du-pont.jpg`,
 `docs/etape8-le-compas-et-le-radar-du-cockpit.jpg`, `docs/etape10-*.jpg` (la trombe),
 `docs/etape11-la-nuit-noire-et-la-lampe.jpg`, `docs/etape12-*.jpg` (le radar),
-`docs/etape13-*.jpg` (le sillage), `docs/etape14-*.jpg` (le front orageux).
+`docs/etape13-*.jpg` (le sillage), `docs/etape14-*.jpg` (le front orageux), `docs/etape15-*.jpg` (le paquet de mer).
 
 ## 4. Pistes graphiques notées pour plus tard
 
 - Le sillage du cargo (celui du voilier est fait : étape 13).
-- L'eau verte qui balaie le pont quand une très grosse déferlante passe dessus.
 - Le bruit de la mer calculé dans un « worker » (fil de calcul séparé) pour libérer 3 ms par image.

@@ -304,12 +304,13 @@ ${cascades.map((_, i) => `  p = texture(uPentes${i}, vSource / uGrille${i}.x);
     couleur = mix(couleur, couleurEcume, voile);
     // la nuit, le plancton remué par l'étrave et le sillage s'allume : une lueur bleu-verte
     // et des étincelles qui s'éteignent derrière le bateau
-    if (uPlancton > 0.01 && bateau.x > 0.01) {
+    // (seulement dans les remous frais : la lueur s'éteint en quelques secondes)
+    if (uPlancton > 0.01 && bateau.w > 0.01) {
       // (de toutes petites, qui clignotent ; au loin il n'en reste que la lueur)
       float etincelles = smoothstep(0.7, 0.9, texture(uBruit, vec3(vMonde.xz * 7.0, uTemps * 1.6)).a)
                        + 0.6 * smoothstep(0.74, 0.92, texture(uBruit, vec3(vMonde.zx * 3.3 + 7.0, uTemps * 1.1)).b);
       etincelles *= 1.0 - smoothstep(15.0, 60.0, distance);
-      couleur += vec3(0.03, 0.4, 0.42) * uPlancton * (bateau.y * 0.05 + bateau.x * (etincelles * 0.14 + 0.01));
+      couleur += vec3(0.03, 0.4, 0.42) * uPlancton * bateau.w * (bateau.y * 0.05 + etincelles * 0.12 + 0.01);
     }
   }
 

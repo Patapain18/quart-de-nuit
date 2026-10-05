@@ -1028,6 +1028,8 @@ function commencerNuit({ depuisJournee = false, bateau: bateauGarde = null, repr
       enregistrement?.deferlantes.push({ heure: nuit.heure, force: f.force, angle: f.angle, gite: 0, suivi: 4 });
       secousse(0.35 + f.force * 0.9);
       monde.embruns.gerbe(f, physique);
+      // l'eau verte passe par-dessus le livet et balaie le pont
+      bateau.paquet.frapper(f.vers.clone().transformDirection(bateau.groupe.matrixWorld.clone().invert()), f.force);
       if (!monde.dansLaCabine) monde.gouttes.eclabousser(0.4 + f.force);
       // l'eau balaie le pont : elle pousse le marin (s'il ne se tient pas)
       if (etat.mode === 'pied' && marin.dehors && !commandes.maj) {
@@ -1059,6 +1061,7 @@ function commencerNuit({ depuisJournee = false, bateau: bateauGarde = null, repr
       if (vt.lengthSq() > 0.01) physique.deferlante(vt, 1.1 * force);
       physique.rotation.y += (Math.random() < 0.5 ? -1 : 1) * 0.8 * force;
       physique.eauCockpit = Math.min(EAU.cockpitMax, physique.eauCockpit + 220 * force);
+      if (vt.lengthSq() > 0.01) bateau.paquet.frapper(vt.clone().normalize().transformDirection(bateau.groupe.matrixWorld.clone().invert()), force);
       secousse(1);
       audio.deferlante?.(1, 0.05);
       if (!monde.dansLaCabine) monde.gouttes.eclabousser(1.3);
