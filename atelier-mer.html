@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Atelier de la mer · Quart de nuit</title>
+  <meta name="description" content="Régler et comparer la mer, le ciel et la lumière du jeu, de midi à la nuit de tempête.">
+  <link rel="stylesheet" href="./src/atelier-mer.css">
+</head>
+<body>
+  <canvas id="scene" aria-label="La mer vue depuis le voilier"></canvas>
+  <aside id="panneau" aria-label="Réglages de l'atelier">
+    <header>
+      <h1>Atelier de la mer</h1>
+      <button type="button" id="replier" aria-expanded="true" aria-controls="contenu">Replier</button>
+    </header>
+    <div id="contenu">
+      <section aria-labelledby="titre-ambiances">
+        <h2 id="titre-ambiances">Ambiances</h2>
+        <div id="ambiances" class="grille-boutons"></div>
+      </section>
+      <section aria-labelledby="titre-temps">
+        <h2 id="titre-temps">Le temps qu'il fait</h2>
+        <div id="curseurs"></div>
+      </section>
+      <section aria-labelledby="titre-vue">
+        <h2 id="titre-vue">Point de vue</h2>
+        <div id="vues" class="grille-boutons"></div>
+        <p class="aide">Glisse sur l'image pour regarder autour de toi. Barre avec ← → (ou Q et D).</p>
+      </section>
+      <section aria-labelledby="titre-mesures">
+        <h2 id="titre-mesures">Mesures</h2>
+        <dl id="mesures"></dl>
+        <div class="grille-boutons">
+          <button type="button" id="photo">Photo</button>
+          <button type="button" id="planche">Planche des ambiances</button>
+        </div>
+        <p id="etat" class="aide" role="status"></p>
+      </section>
+    </div>
+  </aside>
+  <script type="module" src="./src/atelier-mer.js"></script>
+</body>
+</html>

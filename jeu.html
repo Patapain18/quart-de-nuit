@@ -1,0 +1,193 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Quart de nuit</title>
+  <meta name="description" content="Un voilier à la première personne : une journée pour apprendre à naviguer, une nuit de tempête à tenir jusqu'à l'aube.">
+  <link rel="stylesheet" href="./src/jeu.css">
+</head>
+<body>
+  <canvas id="scene" aria-label="Le voilier et la mer"></canvas>
+
+  <section id="accueil" aria-labelledby="titre-jeu">
+    <div class="carte">
+      <h1 id="titre-jeu">Quart de nuit</h1>
+      <p class="sous-titre">Un voilier, une journée pour apprendre à le mener,<br>une nuit de tempête à tenir jusqu'à l'aube.</p>
+      <p id="chargement" class="chargement" aria-live="polite">Préparation de la mer…</p>
+      <button type="button" id="reprendre-partie" class="principal deux-lignes" hidden>Reprendre ta partie<small id="reprendre-detail"></small></button>
+      <button type="button" id="commencer-journee" class="principal">Commencer la journée</button>
+      <p class="note">Jos, le vieux marin du sémaphore de Kervalen, t'apprend à mener le voilier à la radio, leçon par leçon, de 9 heures jusqu'au coucher du soleil. Puis vient la nuit.</p>
+      <details id="nuit-seule">
+        <summary>Ou directement la nuit de tempête</summary>
+        <fieldset>
+          <legend>Difficulté</legend>
+          <div class="choix-difficulte"></div>
+        </fieldset>
+        <button type="button" id="nuit-directe">Prendre la mer au coucher du soleil</button>
+        <p class="note">Le bateau ne sera pas préparé : il faudra faire vite.</p>
+      </details>
+      <details id="navigation-libre">
+        <summary>Ou naviguer librement</summary>
+        <fieldset>
+          <legend>Partir…</legend>
+          <div id="choix-ambiance" class="choix"></div>
+        </fieldset>
+        <button type="button" id="embarquer">Embarquer</button>
+      </details>
+      <div class="liens-bas">
+        <button type="button" id="ouvrir-options">Options</button>
+        <button type="button" id="ouvrir-apropos">À propos</button>
+      </div>
+      <p id="telephone" class="note avertissement" hidden>Quart de nuit se joue sur un ordinateur, au clavier et à la souris. Sur un téléphone, tu peux regarder la mer… mais pas encore barrer.</p>
+    </div>
+  </section>
+
+  <div id="hud" hidden>
+    <div id="instruments" aria-live="off"></div>
+    <div id="reglages" aria-hidden="true">
+      <div class="jauge" id="jauge-gv"><span class="nom">Grand-voile</span><span class="barre"><i></i></span><span class="etat"></span></div>
+      <div class="jauge" id="jauge-foc"><span class="nom">Foc</span><span class="barre"><i></i></span><span class="etat"></span></div>
+    </div>
+    <dl id="aide-touches"></dl>
+    <div id="viseur" hidden aria-hidden="true"></div>
+    <div id="geste" hidden></div>
+    <div id="colonne">
+      <section id="lecon" hidden aria-live="polite">
+        <p class="numero"></p>
+        <h3 class="titre"></h3>
+        <p class="objectif"></p>
+        <ul class="liste"></ul>
+        <div class="progression" hidden><i></i></div>
+      </section>
+      <p id="etat-bord"><span id="harnais" hidden></span><span id="pilote"></span><span id="regleur"></span><span id="gilet" hidden></span></p>
+    </div>
+    <div id="cible" hidden aria-hidden="true"><span class="losange"></span><span class="nom"></span></div>
+    <aside id="carnet" hidden aria-label="Carnet de bord">
+      <div class="page gauche">
+        <h2>Carnet de bord</h2>
+        <p class="bateau">Voilier <em>Morgane</em> · au large de Kervalen</p>
+        <h3>Les leçons de Jos</h3>
+        <ol id="carnet-lecons"></ol>
+        <h3>Les réflexes à retenir</h3>
+        <ul id="carnet-reflexes"></ul>
+      </div>
+      <div class="page droite">
+        <h3>Journal de bord</h3>
+        <ol id="carnet-journal"></ol>
+        <p class="fermer"><kbd>L</kbd> fermer le carnet</p>
+      </div>
+    </aside>
+    <p id="annonce" aria-hidden="true"></p>
+    <p id="sous-titres" hidden aria-live="polite"></p>
+    <p id="message" role="status"></p>
+  </div>
+
+  <section id="fin" hidden aria-labelledby="titre-fin">
+    <div class="carte">
+      <h2 id="titre-fin">Un homme à la mer</h2>
+      <p id="texte-fin" class="sous-titre"></p>
+      <button type="button" id="recommencer" class="principal">Reprendre la mer</button>
+    </div>
+  </section>
+
+  <section id="soir" hidden aria-labelledby="titre-soir">
+    <div class="carte large">
+      <h2 id="titre-soir">Le soleil se couche</h2>
+      <p class="sous-titre">Ton bateau est paré pour la nuit. Jos reste à l'écoute sur le canal 72.</p>
+      <dl id="bilan" class="bilan"></dl>
+      <fieldset class="difficulte-soir">
+        <legend>La nuit de tempête : difficulté</legend>
+        <div class="choix-difficulte"></div>
+      </fieldset>
+      <div class="boutons">
+        <button type="button" id="commencer-nuit" class="principal">Commencer la nuit</button>
+        <button type="button" id="continuer">Continuer à naviguer sans la tempête</button>
+        <button type="button" id="rejouer-journee">Recommencer la journée</button>
+      </div>
+    </div>
+  </section>
+
+  <section id="aube" hidden aria-labelledby="titre-aube">
+    <div class="carte large">
+      <h2 id="titre-aube">Le jour se lève</h2>
+      <p class="sous-titre">Tu as tenu toute la nuit. Morgane est à flot, et toi à bord. Jos t'attend au sémaphore avec un café. <span class="niveau">Difficulté : <span id="difficulte-aube"></span></span></p>
+      <div class="note-jos" id="note-jos">
+        <p class="etoiles" id="etoiles-aube" aria-label=""></p>
+        <p class="titre-note" id="titre-note"></p>
+        <p class="mot-jos" id="mot-jos"></p>
+      </div>
+      <dl id="bilan-nuit" class="bilan"></dl>
+      <div class="boutons">
+        <button type="button" id="rejouer-nuit" class="principal">Rejouer la nuit</button>
+        <button type="button" id="continuer-aube">Naviguer sur la mer qui se calme</button>
+        <button type="button" id="rejouer-journee-aube">Recommencer la journée</button>
+      </div>
+    </div>
+  </section>
+
+  <section id="pause" hidden aria-labelledby="titre-pause">
+    <div class="carte">
+      <h2 id="titre-pause">Pause</h2>
+      <p id="pause-ou" class="sous-titre"></p>
+      <button type="button" id="reprendre" class="principal">Reprendre</button>
+      <div class="boutons">
+        <button type="button" id="passer-lecon" hidden>Passer cette leçon</button>
+        <button type="button" id="recommencer-ici" hidden>Recommencer la leçon</button>
+        <button type="button" id="pause-carnet">Le carnet de bord</button>
+        <button type="button" id="pause-options">Options</button>
+        <button type="button" id="quitter">Quitter (la partie est gardée)</button>
+      </div>
+      <fieldset id="temps-pause">
+        <legend>Changer de temps</legend>
+        <div id="choix-ambiance-pause" class="choix"></div>
+      </fieldset>
+      <p class="note">Clique sur l'image pour reprendre : la souris tourne la tête.</p>
+    </div>
+  </section>
+
+  <dialog id="options" aria-labelledby="titre-options">
+    <form method="dialog" class="carte large">
+      <h2 id="titre-options">Options</h2>
+      <fieldset>
+        <legend>Image</legend>
+        <div class="choix-qualite" id="choix-qualite"></div>
+        <p class="note" id="note-qualite"></p>
+      </fieldset>
+      <fieldset>
+        <legend>Souris et vue</legend>
+        <label class="curseur">Sensibilité de la souris <output id="v-sensibilite"></output><input type="range" id="o-sensibilite" min="0.3" max="2.5" step="0.1"></label>
+        <label class="curseur">Champ de vision <output id="v-champ"></output><input type="range" id="o-champ" min="60" max="90" step="1"></label>
+        <label class="case"><input type="checkbox" id="o-inverser"> Inverser le regard (haut et bas)</label>
+      </fieldset>
+      <fieldset>
+        <legend>Confort</legend>
+        <label class="curseur">Horizon stable, contre le mal de mer <output id="v-stabilisation"></output><input type="range" id="o-stabilisation" min="0" max="1" step="0.1"></label>
+        <label class="case"><input type="checkbox" id="o-secousses"> La vue tremble quand une vague frappe</label>
+        <label class="case"><input type="checkbox" id="o-gouttes"> Des gouttes d'eau sur l'écran</label>
+      </fieldset>
+      <fieldset>
+        <legend>Son</legend>
+        <label class="curseur">Volume <output id="v-volume"></output><input type="range" id="o-volume" min="0" max="1" step="0.05"></label>
+        <label class="case"><input type="checkbox" id="o-voix"> Jos parle (la voix de ton navigateur)</label>
+        <label class="case"><input type="checkbox" id="o-sousTitres"> Les sous-titres de la radio</label>
+      </fieldset>
+      <button type="submit" class="principal" value="fermer">Fermer</button>
+    </form>
+  </dialog>
+
+  <dialog id="apropos" aria-labelledby="titre-apropos">
+    <form method="dialog" class="carte large">
+      <h2 id="titre-apropos">À propos</h2>
+      <p><strong>Quart de nuit</strong> : un jeu de Mathis, fait avec Claude (Anthropic). « Prendre le quart », c'est prendre son tour de garde à la barre ; le quart de nuit est le plus dur.</p>
+      <p>Tout est calculé par le jeu, sans aucun fichier d'image ni de son : la mer (la méthode de Tessendorf, celle des films), le ciel, les nuages et les étoiles, le voilier et sa physique (346 morceaux de coque qui flottent), la côte de Kervalen, le vent, les vagues qui déferlent, et tous les bruits du bord. La voix de Jos est celle de ton navigateur.</p>
+      <p>Inspiré d'une vidéo d'Isaac Johnson : un voilier sous l'orage, en Three.js. Outils : Three.js (licence MIT) et Vite.</p>
+      <p>Kervalen, Morgane, Jos et le cargo <em>Ar Men</em> sont inventés ; la mer, le vent et les règles de navigation sont vrais.</p>
+      <p class="note">Les coulisses : <a href="./atelier-mer.html">l'atelier de la mer</a>, <a href="./atelier-bateau.html">l'atelier du bateau</a>, <a href="./atelier-tempete.html">l'atelier de la tempête</a>.</p>
+      <button type="submit" class="principal" value="fermer">Fermer</button>
+    </form>
+  </dialog>
+
+  <script type="module" src="./src/jeu.js"></script>
+</body>
+</html>

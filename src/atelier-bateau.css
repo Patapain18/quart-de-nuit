@@ -1,0 +1,72 @@
+/* Atelier du bateau : une page d'outils, sombre comme l'atelier de la mer.
+   Les couleurs des courbes sont une rampe d'un seul bleu, du plus sombre (vent faible)
+   au plus clair (vent fort), vérifiée sur ce fond (contraste, écarts entre crans). */
+.viz-root {
+  color-scheme: dark;
+  --fond: #0b1316;
+  --surface-1: #111c21;
+  --texte: #eef3f4;
+  --texte-2: #b6c4c7;
+  --texte-doux: #8b9a9d;
+  --grille: #22323a;
+  --axe: #3a4c55;
+  --bordure: rgba(255, 255, 255, 0.1);
+  --focus: #ffd38a;
+  --vent-1: #1c5cab;
+  --vent-2: #2a78d6;
+  --vent-3: #5598e7;
+  --vent-4: #86b6ef;
+  --vent-5: #b7d3f6;
+  --e2: 8px;
+  --e3: 12px;
+  --e4: 16px;
+  --e5: 24px;
+  --e6: 32px;
+  --rayon: 8px;
+}
+* { box-sizing: border-box; }
+html { background: #0b1316; }
+body { margin: 0; color: #eef3f4; font: 15px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; }
+main { max-width: 760px; margin: 0 auto; padding: var(--e6) var(--e4) 64px; background: var(--fond); }
+h1 { font-size: 26px; margin: 0 0 var(--e2); }
+h2 { font-size: 17px; margin: 0 0 var(--e2); }
+.chapeau { color: var(--texte-2); margin: 0 0 var(--e5); max-width: 68ch; text-wrap: pretty; }
+code { font-size: 13px; background: rgba(255, 255, 255, 0.07); padding: 1px 5px; border-radius: 4px; }
+.carte { background: var(--surface-1); border: 1px solid var(--bordure); border-radius: var(--rayon); padding: var(--e5); margin-bottom: var(--e5); }
+.aide { color: var(--texte-2); font-size: 14px; margin: 0 0 var(--e4); max-width: 68ch; }
+
+.legende { display: flex; flex-wrap: wrap; gap: var(--e2) var(--e4); list-style: none; padding: 0; margin: 0 0 var(--e3); font-size: 13px; color: var(--texte-2); }
+.legende li { display: flex; align-items: center; gap: 6px; }
+.legende i { display: inline-block; width: 18px; height: 3px; border-radius: 2px; }
+
+.graphe { position: relative; }
+#polaire { width: 100%; height: auto; display: block; }
+#polaire .grille { stroke: var(--grille); stroke-width: 1; fill: none; }
+#polaire .axe { stroke: var(--axe); stroke-width: 1; }
+#polaire .etiquette { fill: var(--texte-doux); font-size: 12px; font-variant-numeric: tabular-nums; }
+#polaire .etiquette-forte { fill: var(--texte-2); font-size: 12px; }
+#polaire .courbe { fill: none; stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
+#polaire .point { stroke: var(--surface-1); stroke-width: 2; }
+#polaire .cible { fill: transparent; cursor: crosshair; }
+#polaire .zone-morte { fill: rgba(255, 255, 255, 0.035); }
+#polaire .vmg { fill: none; stroke: var(--texte); stroke-width: 1.5; }
+
+.bulle {
+  position: absolute; pointer-events: none; transform: translate(-50%, calc(-100% - 12px));
+  background: #18262d; border: 1px solid var(--bordure); border-radius: 6px;
+  padding: 6px 10px; font-size: 13px; white-space: nowrap; color: var(--texte);
+}
+.bulle .detail { color: var(--texte-2); }
+
+details { margin-top: var(--e4); }
+summary { cursor: pointer; color: var(--texte-2); }
+summary:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+.tableau-defilant { overflow-x: auto; margin-top: var(--e3); }
+table { border-collapse: collapse; font-size: 13px; font-variant-numeric: tabular-nums; }
+th, td { padding: 4px 8px; text-align: right; border-bottom: 1px solid var(--grille); }
+th { color: var(--texte-2); font-weight: 600; }
+td.mieux { color: var(--texte); font-weight: 650; }
+
+.lecons { margin: 0; padding-left: 20px; color: var(--texte-2); }
+.lecons li { margin-bottom: var(--e2); }
+.lecons strong { color: var(--texte); }

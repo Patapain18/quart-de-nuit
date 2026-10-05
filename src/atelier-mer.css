@@ -1,0 +1,98 @@
+/* Atelier de la mer : l'image en plein écran, les réglages dans un panneau à droite */
+:root {
+  --fond: #0c1418;
+  --panneau: rgba(10, 18, 22, 0.82);
+  --bordure: rgba(160, 196, 205, 0.18);
+  --texte: #e6eef0;
+  --texte-doux: #9fb3b8;
+  --accent: #e8a24a;
+  --focus: #ffd38a;
+  --espace-1: 4px;
+  --espace-2: 8px;
+  --espace-3: 12px;
+  --espace-4: 16px;
+  --rayon: 6px;
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  height: 100%;
+  overflow: hidden;
+  background: var(--fond);
+  color: var(--texte);
+  font: 14px/1.4 system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+
+#scene {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+  cursor: grab;
+  touch-action: none;
+}
+#scene:active { cursor: grabbing; }
+
+#panneau {
+  position: fixed;
+  top: var(--espace-3);
+  right: var(--espace-3);
+  width: min(320px, calc(100vw - 2 * var(--espace-3)));
+  max-height: calc(100vh - 2 * var(--espace-3));
+  overflow: auto;
+  background: var(--panneau);
+  border: 1px solid var(--bordure);
+  border-radius: var(--rayon);
+  padding: var(--espace-3) var(--espace-4);
+  backdrop-filter: blur(6px);
+}
+
+#panneau header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--espace-2);
+}
+
+h1 { font-size: 16px; margin: 0; font-weight: 650; }
+h2 { font-size: 13px; margin: var(--espace-4) 0 var(--espace-2); color: var(--texte-doux); font-weight: 600; }
+
+.grille-boutons {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--espace-2);
+}
+
+button {
+  font: inherit;
+  color: var(--texte);
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid var(--bordure);
+  border-radius: var(--rayon);
+  padding: var(--espace-2) var(--espace-2);
+  min-height: 32px;
+  cursor: pointer;
+  text-align: left;
+}
+button:hover { background: rgba(255, 255, 255, 0.12); }
+button:active { transform: translateY(1px); }
+button:focus-visible, input:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+button[aria-pressed="true"] { border-color: var(--accent); background: rgba(232, 162, 74, 0.16); }
+button:disabled { opacity: 0.5; cursor: progress; }
+
+.curseur { display: grid; grid-template-columns: 1fr auto; gap: 0 var(--espace-2); margin-bottom: var(--espace-2); }
+.curseur label { font-size: 13px; }
+.curseur output { font-variant-numeric: tabular-nums; color: var(--texte-doux); font-size: 13px; }
+.curseur input { grid-column: 1 / -1; width: 100%; accent-color: var(--accent); }
+
+dl { display: grid; grid-template-columns: auto 1fr; gap: var(--espace-1) var(--espace-3); margin: 0 0 var(--espace-3); font-size: 13px; }
+dt { color: var(--texte-doux); }
+dd { margin: 0; font-variant-numeric: tabular-nums; text-align: right; }
+
+.aide { color: var(--texte-doux); font-size: 12px; margin: var(--espace-2) 0 0; }
+
+#panneau.replie #contenu { display: none; }

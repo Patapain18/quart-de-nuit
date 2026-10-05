@@ -1,0 +1,56 @@
+# Quart de nuit
+
+Un voilier, vu à la première personne. **Une journée pour apprendre à le mener, une nuit de tempête à tenir.** Si le bateau est encore à flot quand le soleil se lève, on a gagné.
+
+> Où on en est (octobre 2026) : le jeu complet, environ 35 minutes. **La journée** : Jos, le vieux marin du sémaphore de Kervalen, t'apprend à la radio à mener le voilier *Morgane*, en 8 leçons, de 9 heures au coucher du soleil (barrer, lire le vent, régler les voiles, virer, empanner, prendre un ris, préparer la nuit). **La nuit** : de 18 h 45 à l'aube, le vent monte jusqu'à 42 nœuds et 55 en rafales, les vagues font 6 mètres et déferlent ; il faut réduire la toile, fuir devant le temps, pomper l'eau qui embarque, réparer ce qui casse, éviter une trombe marine et un cargo. Tout est calculé par le code, sans aucun fichier d'image ni de son : la mer, le ciel, le voilier et sa physique, la côte, les bruits du bord.
+
+## Lancer le jeu
+
+```bash
+npm install
+npm run dev
+```
+
+Puis ouvrir http://localhost:5190/jeu.html. Les ateliers (les coulisses) : `atelier-mer.html` (la mer, le ciel et la lumière), `atelier-bateau.html` (la polaire du voilier), `atelier-tempete.html` (la nuit rejouée en accéléré par des marins automatiques).
+
+## Comment on joue
+
+Au clavier (français) et à la souris. La souris tourne la tête.
+
+- **À la barre** : Q / D la barre, Z / S la grand-voile (border, choquer), A / E le foc, C / V l'enrouleur du foc, P le pilote automatique, T le réglage automatique des voiles, X le harnais, Espace pour se lever.
+- **À pied** : Z Q S D pour marcher, E pour agir sur ce que l'on regarde (Maj + E : l'action inverse), Maj pour se tenir, C pour s'accroupir, X le harnais.
+- **Partout** : F la lampe frontale, L le carnet de bord, Entrée pour passer une phrase de la radio, H pour cacher l'aide, Échap la pause (les options, quitter : la partie est gardée, on la reprend depuis l'accueil).
+
+**La nuit, ce qui sauve** : au plus fort (plus de 34 nœuds), affaler la grand-voile au pied du mât et fuir sous un mouchoir de foc, les vagues bien dans l'arrière (le vent à 160-170°) ; jamais les déferlantes de travers ; le harnais toujours accroché ; la descente fermée ; pomper (la pompe est dans le cockpit, à bâbord) ; et quand un cargo arrive, l'appeler à la radio (canal 16, à la table à cartes).
+
+Les **options** (accueil ou pause) : la qualité de l'image (économique, moyenne, haute, superbe), la sensibilité de la souris, le champ de vision, un **horizon stable** contre le mal de mer, les secousses, les gouttes sur l'écran, le volume, la voix de Jos et les sous-titres.
+
+## Les tests
+
+Tout ce qui ne dépend pas de l'écran se vérifie sans navigateur :
+
+```bash
+npm run test-physique   # le voilier flotte, se redresse, avance
+npm run test-houle      # la hauteur des vagues selon le vent
+npm run test-pont       # on marche partout à bord sans rester coincé
+npm run test-journee    # un élève automatique fait toute la journée (≈ 1 min)
+npm run test-tempete    # dans la tempête, la bonne tactique protège vraiment (≈ 2 min)
+npm run test-nuit       # trois marins automatiques font la nuit : le prudent voit l'aube (≈ 1 min)
+npm run polaire         # la vitesse du voilier selon le vent (src/physique/polaire.json)
+```
+
+## Mettre en ligne
+
+`npm run build` fabrique le site dans `dist/` (adresses relatives : il marche aussi dans un sous-dossier). La recette `.github/workflows/mettre-en-ligne.yml` le publie sur GitHub Pages à chaque envoi sur la branche `main`. Les options, la partie en cours et les nuits enregistrées sont gardées par chaque navigateur, sur son ordinateur.
+
+## Comment c'est fait
+
+Le cahier de conception, étape par étape, avec ce qu'on a appris en route : [DESIGN.md](DESIGN.md). En bref :
+
+- **La mer** : 5 grilles de vagues calculées par FFT (la méthode de Tessendorf, celle des films), le même calcul pour l'image et pour faire flotter le bateau (`src/mer/`, `src/rendu/eau.js`).
+- **Le ciel** : une atmosphère physique, des nuages en volume, la lune, ~5 000 étoiles, les éclairs (`src/rendu/ciel.js`).
+- **Le voilier** : construit par le code (`src/bateau/`), et sa physique (`src/physique/voilier.js`) : 346 morceaux de coque qui flottent, les voiles et la quille comme des ailes, le safran qui décroche ou sort de l'eau, l'eau embarquée qui pèse.
+- **La journée et la nuit** : deux moteurs sans écran (`src/jeu/journee.js`, `src/jeu/nuit.js`), que des programmes peuvent jouer de bout en bout (`src/jeu/marins.js`).
+- **Le son** : tout est synthétisé avec la Web Audio API (`src/son/audio.js`) ; la voix de Jos est celle du navigateur.
+
+Fait avec Three.js (licence MIT) et Vite. Inspiré d'une vidéo d'Isaac Johnson (un voilier sous l'orage, en Three.js). Kervalen, *Morgane*, Jos et le cargo *Ar Men* sont inventés.

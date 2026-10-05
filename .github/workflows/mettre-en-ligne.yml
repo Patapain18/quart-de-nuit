@@ -1,0 +1,45 @@
+# Met le jeu en ligne sur GitHub Pages à chaque envoi sur la branche « main » :
+# un ordinateur de GitHub installe les outils, fabrique le site (npm run build),
+# puis publie le dossier dist/.
+name: Mettre en ligne
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch: # pour pouvoir le relancer à la main, depuis l'onglet « Actions »
+
+# les droits dont il a besoin : lire le code, publier sur Pages
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# si on envoie deux fois de suite, la publication la plus récente gagne
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  fabriquer:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - uses: actions/upload-pages-artifact@v5
+        with:
+          path: dist
+
+  publier:
+    needs: fabriquer
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.publication.outputs.page_url }}
+    steps:
+      - id: publication
+        uses: actions/deploy-pages@v5

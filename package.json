@@ -1,0 +1,24 @@
+{
+  "name": "quart-de-nuit",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "test-houle": "node scripts/test-houle.js",
+    "polaire": "node scripts/polaire.js --json",
+    "test-physique": "node scripts/test-physique.js",
+    "test-tempete": "node scripts/test-tempete.js",
+    "test-pont": "node scripts/test-pont.js",
+    "test-journee": "node scripts/test-journee.js",
+    "test-nuit": "node scripts/test-nuit.js"
+  },
+  "dependencies": {
+    "three": "^0.186.1"
+  },
+  "devDependencies": {
+    "vite": "^8.3.2"
+  }
+}
