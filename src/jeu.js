@@ -1661,10 +1661,18 @@ if (matchMedia('(pointer: coarse)').matches && Math.min(screen.width, screen.hei
     for (const b of boutons) b.disabled = false;
     chargement.textContent = '';
   };
-  // (après deux images : le ciel et la lumière sont en place)
-  requestAnimationFrame(() => requestAnimationFrame(() => {
+  // (après deux images : le ciel et la lumière sont en place ; mais un onglet resté en
+  // arrière-plan ne dessine pas d'image : une minuterie prend le relais. Et quoi qu'il
+  // arrive, au bout de 10 s, on peut jouer.)
+  let lance = false;
+  const lancer = () => {
+    if (lance) return;
+    lance = true;
     monde.precompiler().then(pret, pret);
-  }));
+  };
+  requestAnimationFrame(() => requestAnimationFrame(lancer));
+  setTimeout(lancer, 1500);
+  setTimeout(pret, 10000);
 }
 
 // ---------- La boucle ----------

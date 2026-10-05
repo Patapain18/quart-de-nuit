@@ -230,7 +230,8 @@ Une étape = un résultat visible ; je ne lance la suivante qu'après ton feu ve
    les messages urgents coupent la parole. 6) Quand la mer change d'un coup, la vitesse de
    l'eau calculée entre deux images explosait : elle est bornée, et un garde-fou ramène le
    bateau à son dernier état sain (les tests vérifient qu'il ne sert jamais).
-6. ✅ **Finitions** (la mise en ligne est prête et attend le feu vert de Mathis) —
+6. ✅ **Finitions**, et **en ligne** depuis le 2026-10-05 : https://patapain18.github.io/quart-de-nuit/
+   (dépôt public `Patapain18/quart-de-nuit`, publié par GitHub Pages à chaque envoi sur `main`) —
    **L'accueil**, sur le coucher de soleil menaçant, avec « Reprendre ta partie » : le
    navigateur garde où l'on en est au début de chaque leçon, au coucher du soleil et au
    début de chaque chapitre de la nuit (et l'état du bateau : ris, foc, feux, gilet,
@@ -253,6 +254,9 @@ Une étape = un résultat visible ; je ne lance la suivante qu'après ton feu ve
    site fabriqué pèse 1,1 Mo (tout est calculé).
    Mesures (une petite fenêtre, carte graphique synchronisée) : de 4,1 ms (Économique) à
    5 ms (Superbe) par image au plus fort de la tempête.
+   Appris en ligne : la préparation des shaders attendait deux images du navigateur, qui
+   n'arrivent pas dans un onglet resté en arrière-plan ; une minuterie prend le relais, et
+   l'accueil se débloque au bout de 10 s quoi qu'il arrive.
 
 ## 4. Pistes graphiques notées pour plus tard
 

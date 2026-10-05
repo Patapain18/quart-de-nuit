@@ -4,6 +4,8 @@ Un voilier, vu à la première personne. **Une journée pour apprendre à le men
 
 > Où on en est (octobre 2026) : le jeu complet, environ 35 minutes. **La journée** : Jos, le vieux marin du sémaphore de Kervalen, t'apprend à la radio à mener le voilier *Morgane*, en 8 leçons, de 9 heures au coucher du soleil (barrer, lire le vent, régler les voiles, virer, empanner, prendre un ris, préparer la nuit). **La nuit** : de 18 h 45 à l'aube, le vent monte jusqu'à 42 nœuds et 55 en rafales, les vagues font 6 mètres et déferlent ; il faut réduire la toile, fuir devant le temps, pomper l'eau qui embarque, réparer ce qui casse, éviter une trombe marine et un cargo. Tout est calculé par le code, sans aucun fichier d'image ni de son : la mer, le ciel, le voilier et sa physique, la côte, les bruits du bord.
 
+**Jouer en ligne : https://patapain18.github.io/quart-de-nuit/**
+
 ## Lancer le jeu
 
 ```bash
@@ -41,7 +43,7 @@ npm run polaire         # la vitesse du voilier selon le vent (src/physique/pola
 
 ## Mettre en ligne
 
-`npm run build` fabrique le site dans `dist/` (adresses relatives : il marche aussi dans un sous-dossier). La recette `.github/workflows/mettre-en-ligne.yml` le publie sur GitHub Pages à chaque envoi sur la branche `main`. Les options, la partie en cours et les nuits enregistrées sont gardées par chaque navigateur, sur son ordinateur.
+Le jeu est publié sur **GitHub Pages**, à l'adresse https://patapain18.github.io/quart-de-nuit/. Il n'y a rien à faire à la main : à chaque envoi (« push ») sur la branche `main`, un ordinateur de GitHub suit la recette `.github/workflows/mettre-en-ligne.yml` : il installe les outils (`npm ci`), fabrique le site (`npm run build`, qui crée le dossier `dist/`, avec des adresses relatives : il vit dans un sous-dossier), puis le publie. On suit son travail dans l'onglet « Actions » du dépôt. Les options, la partie en cours et les nuits enregistrées sont gardées par chaque navigateur, sur son ordinateur.
 
 ## Comment c'est fait
 
