@@ -379,8 +379,19 @@ qui ne répond plus) ; ce qui est dur, c'est **barrer, tenir un cap** ; l'élect
     signalé dans le secteur, à part toi »). Le carnet le note à sa façon. Pour les
     entendre et les voir : l'atelier du son (la voix, les coups, le cœur), et dans le jeu
     `__jeu.peur('lumiere' | 'voix16' | 'coups' | 'sansReponse')`.
-12. **Le radar**, à la table à cartes : le balayage, la côte, les grains, le cargo, le
-    fouillis de la mer, la portée et le gain… et un écho qui n'existe pas.
+12. ✅ **Le radar** (`src/bateau/radar.js`) — un écran à la table à cartes, et son
+    répétiteur dans le cockpit, au-dessus du compas (la même image). L'antenne fait un tour
+    en 2,5 s ; un rayon tous les 0,7°, 150 cases de distance ; les échos s'allument au
+    passage du balayage puis s'estompent (gardés en nombres à virgule : pas de traînées
+    grises). Il voit la côte de Kervalen (un rivage brillant, les premières collines, puis
+    l'ombre), l'île, les bouées, le cargo, la trombe (une masse dense), les grains (des
+    taches de pluie qui dérivent avec le vent) et le fouillis de mer autour du bateau,
+    d'autant plus loin que les vagues sont hautes (le filtre de mer l'atténue près du
+    bateau). Portées 0,75 / 1,5 / 3 / 6 milles (E sur l'écran), filtre de mer (Maj + E).
+    Jos le présente au début de la nuit, et en parle quand le cargo arrive. *Et l'étrange* :
+    vers 1 h, un écho par le travers, à 1,2-1,6 mille, qui garde la même distance pendant
+    une vingtaine de secondes (il nous suit), puis disparaît. Jos : « Sur le mien, il n'y a
+    que toi ».
 
 ## 4. Pistes graphiques notées pour plus tard
 

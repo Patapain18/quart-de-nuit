@@ -128,6 +128,16 @@ export function creerGestes(jeu, interieur) {
       titre: () => 'Ton ciré et ton gilet de sauvetage',
       principal: { texte: () => (jeu.etat.gilet ? 'les ôter' : 'les enfiler'), faire: () => jeu.basculerGilet() },
     },
+    // le radar : l'écran de la table à cartes, et son répétiteur dans le cockpit
+    ...[['radar', jeu.bateau.radar.positionPrincipal, 0.14, 'Radar (table à cartes)'], ['radar-cockpit', jeu.bateau.radar.positionRepetiteur, 0.12, 'Radar (répétiteur du cockpit)']]
+      .map(([id, point, rayon, nom]) => ({
+        id,
+        point: point.clone(),
+        rayon,
+        titre: () => `${nom} : ${String(jeu.bateau.radar.milles).replace('.', ',')} milles`,
+        principal: { texte: 'changer de portée', faire: () => jeu.radarPortee() },
+        secondaire: { texte: () => (jeu.bateau.radar.filtreMer ? 'couper le filtre de mer' : 'remettre le filtre de mer'), faire: () => jeu.radarFiltre() },
+      })),
     {
       id: 'tableau',
       point: interieur.positionTableau.clone(),

@@ -11,6 +11,7 @@ import { Cordages } from './cordages.js';
 import { Instruments } from './instruments.js';
 import { Interieur } from './interieur.js';
 import { EauABord } from './eau-a-bord.js';
+import { Radar } from './radar.js';
 import { zDe, demiLargeur, COCKPIT, DESCENTE_ROUF, hauteurLivet, hauteurPont } from './forme.js';
 
 export class Bateau {
@@ -32,6 +33,7 @@ export class Bateau {
     this.cordages = new Cordages(this);
     this.instruments = new Instruments(this);
     this.interieur = new Interieur(this);
+    this.radar = new Radar(this, this.interieur); // (à la table à cartes, et son répétiteur dans le cockpit)
     this.eauABord = new EauABord(this); // l'eau embarquée (la nuit de tempête)
     this.descenteOuverte = true;
     this.ouvrirDescente(true);

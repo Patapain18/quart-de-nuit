@@ -66,6 +66,8 @@ const MOMENTS = [
   { heure: 26.05, dire: ['Ici, sur la pointe, l\'anémomètre vient de marquer cinquante-cinq nœuds. C\'est le plus fort. Tiens bon.'] },
   { heure: 28.9, dire: ['Regarde vers l\'ouest : on revoit des étoiles. Le plus dur est derrière toi.'] },
   { heure: 29.55, dire: ['À l\'est, le ciel pâlit. Encore un petit effort.'] },
+  // (à la fin de la liste : les nuits gardées avant le radar retrouvent leurs moments)
+  { heure: 20.9, dire: ['Une chose encore : la nuit, regarde ton radar. L\'écran est à la table à cartes, et il y en a un petit dans le cockpit, au-dessus du compas.', 'Tu y verras les grains arriver, et les bateaux. Ce qui est près de toi, c\'est le fouillis des vagues : ne t\'en inquiète pas.'] },
 ];
 
 // La difficulté (l'atelier de la tempête sert à la régler)
@@ -183,7 +185,10 @@ export class Nuit {
       voix16: 24.55 + etrange() * 0.45,
       silence: 25.6 + etrange() * 0.4,
       coups: 26.9 + etrange() * 0.5,
+      echo: 25.05 + etrange() * 0.4,
     });
+    this.echoFantome = null; // { distance, releve (rad, dans le monde), age, duree } : sur le radar
+    this.hasardEtrange = etrange;
     this.silence = false; // (Jos ne répond plus)
     this.dernierEtrange = null; // { nom, heure } : ce que Jos tentera d'expliquer si on l'appelle
     this.faits = new Set(); // les moments et les imprévus déjà passés
@@ -617,7 +622,7 @@ export class Nuit {
     this.ecrire('Un cargo en route de collision.');
     this.dire([
       `${NOM_BATEAU}, ici ${JOS}. Je vois sur mon radar un cargo à ${milles < 1.3 ? 'un mille' : `${Math.round(milles)} milles`} de toi, ${directionRelative(ecartAngle(releve, ctx.m.cap))}. Il fait route au ${directionEnMots(cap)}, droit sur toi.`,
-      'Dans cette mer, il ne t\'a sûrement pas vu. Appelle-le sur le canal seize : la radio, en bas, à la table à cartes !',
+      'Dans cette mer, il ne t\'a sûrement pas vu. Appelle-le sur le canal seize : la radio, en bas, à la table à cartes ! Tu le verras aussi sur ton radar.',
     ], { urgent: true });
     this.emettre('cargo', c);
   }
@@ -692,6 +697,19 @@ export class Nuit {
         'Il s\'est passé… enfin, peu importe. Tout va bien, à bord ?',
       ]);
     }
+    // un écho sur le radar, par le travers, qui garde la même distance (il nous suit), puis
+    // disparaît. (On ne le voit que si l'on regarde le radar : on ne le dira pas.)
+    if (pret('echo')) {
+      this.faits.add('echo');
+      const cap = (ctx.m.cap * Math.PI) / 180;
+      const hasard = this.hasardEtrange ?? Math.random;
+      this.echoFantome = { distance: 2200 + hasard() * 700, releve: cap + (hasard() < 0.5 ? -1 : 1) * (1.2 + hasard() * 0.6), age: 0, duree: 24 };
+      this.dernierEtrange = { nom: 'echo', heure: h };
+    }
+    if (this.echoFantome) {
+      this.echoFantome.age += dt;
+      if (this.echoFantome.age > this.echoFantome.duree) this.echoFantome = null;
+    }
     // des coups contre la coque : on ne les entend que dans la cabine
     if (pret('coups')) {
       if (!ctx.aBord.dehors) arrive('coups', 'Des coups contre la coque, à l\'avant. Trois.');
@@ -718,6 +736,7 @@ export class Nuit {
         lumiere: ['Une lumière ? Le cargo est loin dans le nord, maintenant. Sur mon radar, il n\'y a que toi.', 'Un reflet, sans doute. Ou la fatigue. Garde les yeux sur tes vagues.'],
         voix16: ['Un appel sur le seize ? Non… Je n\'ai rien reçu, moi. Et il n\'y a aucun bateau signalé dans le secteur, à part toi.', 'La fatigue joue des tours, la nuit. Reste concentré, matelot.'],
         coups: ['Des coups contre la coque ? Un tronc, une épave… ça arrive, par gros temps.', 'Regarde si tu ne prends pas l\'eau à l\'avant. Et écoute si ça recommence.'],
+        echo: ['Un écho sur ton radar ? Sur le mien, il n\'y a que toi.', 'Du fouillis de mer, sans doute. Ou un grain. Ne te laisse pas impressionner, matelot.'],
       };
       if (explications[e.nom]) {
         this.dire(explications[e.nom]);
@@ -906,7 +925,7 @@ export class Nuit {
     this.commence = true;
     this.tReprise = this.t;
     MOMENTS.forEach((mo, k) => { if (mo.heure <= this.heure) this.faits.add(`moment-${k}`); });
-    for (const nom of ['trombe', 'cargo', 'lumiere', 'voix16', 'silence', 'coups']) if (this.prevu[nom] < this.heure) this.faits.add(nom);
+    for (const nom of ['trombe', 'cargo', 'lumiere', 'voix16', 'silence', 'coups', 'echo']) if (this.prevu[nom] < this.heure) this.faits.add(nom);
     for (const nom of ['ecouteFoc', 'pilote']) if (this.prevu[nom] < this.heure) this.prevu[nom] = Infinity;
     this.silence = this.faits.has('silence') && this.heure < this.prevu.silence + 0.55;
     this.meteo = meteoDeLaNuit(this.heure, this.niveau);
@@ -956,7 +975,7 @@ export class Nuit {
       etat: 'nuit', raison: null, cargo: null, trombe: null, suiviCoup: null, renverse: 0, annonceVue: null, commence: true,
     });
     this.sauvegarde = { ...s, faits: new Set(s.faits) };
-    for (const nom of ['trombe', 'cargo', 'ecouteFoc', 'pilote', 'lumiere', 'voix16', 'silence', 'coups']) this.prevu[nom] ??= Infinity; // (JSON : Infinity devient null)
+    for (const nom of ['trombe', 'cargo', 'ecouteFoc', 'pilote', 'lumiere', 'voix16', 'silence', 'coups', 'echo']) this.prevu[nom] ??= Infinity; // (JSON : Infinity devient null)
     this.silence = this.faits.has('silence') && this.heure < this.prevu.silence + 0.55;
     this.dernierEtrange = null;
     this.deferlantes.annonce = null;

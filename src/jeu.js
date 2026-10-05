@@ -137,6 +137,15 @@ const jeu = {
       ? `Ici ${JOS}, je te reçois. Pour l'instant : ${objectif.charAt(0).toLowerCase()}${objectif.slice(1)}.`
       : `Ici ${JOS}, je te reçois cinq sur cinq. Tout va bien à bord ?`]);
   },
+  // le radar : la portée suivante, le filtre de mer
+  radarPortee() {
+    bateau.radar.changerPortee(1);
+    afficherMessage(`Radar : portée ${String(bateau.radar.milles).replace('.', ',')} milles`);
+  },
+  radarFiltre() {
+    bateau.radar.filtreMer = !bateau.radar.filtreMer;
+    afficherMessage(bateau.radar.filtreMer ? 'Radar : filtre de mer (le fouillis des vagues proches est atténué)' : 'Radar : filtre de mer coupé (attention au fouillis près du bateau)');
+  },
   prendreBarre() {
     etat.mode = 'barre';
     etat.action = null;
@@ -539,6 +548,7 @@ function simuler(dt) {
   r.deroule = Math.max(0.02, physique.deroule);
   r.angleSafran = physique.barre;
   bateau.instruments.maj(dt, m, monde.ecl.nuit);
+  majRadar(dt);
   // l'eau embarquée : dans le cockpit, et dans la cabine au-dessus des planchers
   bateau.eauABord.maj(dt, bateau.groupe, {
     litresCockpit: physique.eauCockpit,
@@ -865,6 +875,31 @@ function vivreLaNuit(dt) {
     jeu.meteo = meteo;
     monde.regler(meteo, { recalculerMer: mer, brusque: false });
   }
+}
+
+// ---------- Le radar ----------
+// ce qu'il voit : la côte, les bouées, le cargo, la trombe, les grains, la mer… et parfois
+// un écho que personne d'autre ne voit
+const radarMonde = { hs: 1, pluie: 0, vent: { x: 0, z: 0 }, temps: 0, terre: distanceALaTerre, cibles: [] };
+function majRadar(dt) {
+  const r = radarMonde;
+  r.hs = monde.houle.hauteurSignificative;
+  r.pluie = meteo.pluie;
+  const versOu = THREE.MathUtils.degToRad(meteo.directionVent + 180);
+  const vitesseGrains = meteo.vent * 0.5144 * 0.6;
+  r.vent.x = Math.sin(versOu) * vitesseGrains;
+  r.vent.z = -Math.cos(versOu) * vitesseGrains;
+  r.temps = monde.temps;
+  r.cibles.length = 0;
+  for (const b of journee?.bouees?.values() ?? []) r.cibles.push({ x: b.x, z: b.z, rayon: 6, force: 0.75 });
+  if (nuit?.cargo) r.cibles.push({ x: nuit.cargo.x, z: nuit.cargo.z, rayon: 90, force: 1 });
+  if (nuit?.trombe?.force > 0.1) r.cibles.push({ x: nuit.trombe.x, z: nuit.trombe.z, rayon: 170, force: 0.4 + 0.45 * nuit.trombe.force });
+  const e = nuit?.echoFantome;
+  if (e) {
+    const fondu = THREE.MathUtils.smoothstep(e.age, 0, 3) * (1 - THREE.MathUtils.smoothstep(e.age, e.duree - 4, e.duree));
+    r.cibles.push({ x: physique.position.x + Math.sin(e.releve) * e.distance, z: physique.position.z - Math.cos(e.releve) * e.distance, rayon: 22, force: 0.7 * fondu });
+  }
+  bateau.radar.maj(dt, { x: physique.position.x, z: physique.position.z, cap: physique.mesures.cap }, r, monde.ecl.nuit);
 }
 
 // ---------- L'étrange (jamais expliqué) ----------
