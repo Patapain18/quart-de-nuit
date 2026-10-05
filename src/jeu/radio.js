@@ -47,6 +47,9 @@ export class Radio {
     this.file = []; // les messages qui attendent leur tour
     this.canal = 16;
     this.muette = false; // (les options : sans la voix de Jos, on lit les sous-titres)
+    // la tempête brouille les transmissions (0 → 1) : des mots se perdent dans les
+    // parasites, la voix faiblit
+    this.brouillage = 0;
     if ('speechSynthesis' in window) {
       const choisir = () => {
         const voix = speechSynthesis.getVoices().filter((v) => v.lang?.startsWith('fr'));
@@ -72,17 +75,37 @@ export class Radio {
     });
   }
 
+  // Une transmission que personne n'explique : une voix, trop faible et trop brouillée
+  // pour comprendre (pas de synthèse vocale : un son), et ce que l'on croit en saisir
+  fantome(texte, { canal = 16, duree = 7 } = {}) {
+    return new Promise((fini) => {
+      this.file.push({ fantome: true, texte, canal, duree, fini });
+      if (!this.occupee) this.lireLaFile();
+    });
+  }
+
   async lireLaFile() {
     this.occupee = true;
     while (this.file.length) {
-      const { phrases, emetteur, canal, fini } = this.file.shift();
+      const message = this.file.shift();
+      const { phrases, emetteur, canal, fini } = message;
       this.interrompu = false;
       this.canal = canal;
       this.ecran?.dessiner(`CH ${canal}`, 'RX', true);
+      if (message.fantome) {
+        this.audio?.voixFantome?.(message.duree);
+        this.afficher(message.texte);
+        await new Promise((r) => { this.finPhrase = r; setTimeout(r, message.duree * 1000); });
+        this.afficher('');
+        this.ecran?.dessiner(`CH ${canal}`, FREQUENCES[canal] ?? '');
+        fini(true);
+        continue;
+      }
       this.audio?.gresillement?.();
       for (const phrase of phrases) {
         if (this.interrompu) break;
-        this.afficher(`${emetteur} : « ${phrase} »`);
+        this.afficher(`${emetteur} : « ${this.brouiller(phrase)} »`);
+        if (this.brouillage > 0.15 && Math.random() < this.brouillage) this.audio?.parasites?.(0.6 + Math.random() * 1.2, 0.35 * this.brouillage);
         await this.dire(phrase);
       }
       this.audio?.gresillement?.();
@@ -109,6 +132,18 @@ export class Radio {
     this.finPhrase?.();
   }
 
+  // Dans les sous-titres, les mots que les parasites ont mangés (jamais le premier)
+  brouiller(phrase) {
+    if (this.brouillage < 0.1) return phrase;
+    let avant = false;
+    return phrase.split(' ').map((mot, k) => {
+      const perdu = k > 0 && Math.random() < this.brouillage * 0.3;
+      const texte = perdu ? (avant ? '' : '…') : mot;
+      avant = perdu;
+      return texte;
+    }).filter((m) => m !== '').join(' ');
+  }
+
   dire(phrase) {
     return new Promise((resoudre) => {
       this.finPhrase = resoudre;
@@ -121,6 +156,7 @@ export class Radio {
       u.lang = 'fr-FR';
       u.rate = 1.02;
       u.pitch = 0.9;
+      u.volume = 1 - 0.45 * this.brouillage; // (la voix faiblit dans les parasites)
       // (la synthèse vocale des navigateurs reste parfois bloquée sans jamais dire qu'elle
       // a fini : au-delà du temps qu'il faut pour lire la phrase, on passe à la suite)
       const secours = setTimeout(() => {

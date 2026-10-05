@@ -69,6 +69,7 @@ uniform float uGrain;
 uniform float uTemps;
 uniform float uFlash;       // éclair : tout blanchit un instant
 uniform float uEmbruns;     // dans les embruns d'une trombe : un voile d'eau pulvérisée
+uniform float uLampeVoile;  // le faisceau de la lampe frontale, dans l'eau qui flotte dans l'air
 uniform sampler2D uGouttes; // les gouttes sur l'objectif (normale en rg, épaisseur en b, eau en a)
 uniform float uForceGouttes;
 
@@ -111,6 +112,11 @@ void main() {
   c = mix(c, halo, eau * 0.2);
   c *= 1.0 - eau * 0.65 * smoothstep(0.6, 0.0, goutte.b);
   c += halo * uForceHalo;
+  // (la lampe éclaire les gouttes et les embruns devant les yeux : une lueur au centre de
+  // la vue, qui bouge avec le regard, et qui grésille avec la pluie)
+  vec2 versCentre = vUv - 0.5;
+  float faisceau = exp(-dot(versCentre, versCentre) * 7.0) * (0.85 + 0.15 * hasard(floor(vUv * 160.0) + floor(uTemps * 24.0)));
+  c += vec3(1.0, 0.93, 0.82) * uLampeVoile * faisceau;
   c *= uExposition * uBalance;
   c += uTeinteOmbres * 0.02 * uExposition;
   c += vec3(uFlash);
@@ -169,6 +175,7 @@ export class Post {
       uTemps: { value: 0 },
       uFlash: { value: 0 },
       uEmbruns: { value: 0 },
+      uLampeVoile: { value: 0 },
       uGouttes: { value: Post.textureVide() },
       uForceGouttes: { value: 0 },
     };

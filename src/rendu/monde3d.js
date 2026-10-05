@@ -15,6 +15,7 @@ import { Deferlantes3D } from './deferlantes.js';
 import { Gouttes } from './gouttes.js';
 import { Cargo3D } from './cargo.js';
 import { Trombe3D } from './trombe.js';
+import { LumiereEtrange } from './lumiere-etrange.js';
 
 // Les niveaux de qualité de l'image (les options du jeu) : la finesse de l'image (au plus
 // tant de pixels par point de l'écran), l'anticrénelage, la taille de la carte des
@@ -82,6 +83,8 @@ export class Monde3D {
     // le cargo et la trombe de la nuit (le jeu donne leur état : jeu/nuit.js)
     this.cargo = new Cargo3D(this.scene, this.houle, this.eau);
     this.trombe = new Trombe3D(this.scene, this.houle, this.eau, this.ciel, this.embruns);
+    // (l'étrange : une lumière sur l'eau, au loin, que personne n'explique)
+    this.lumiereEtrange = new LumiereEtrange(this.scene, this.houle);
     this.etatCargo = null;
     this.etatTrombe = null;
     this.bateau = null;
@@ -128,7 +131,7 @@ export class Monde3D {
         o.visible = true;
       }
     };
-    for (const o of [this.cargo.groupe, this.trombe.groupe, this.embruns.mesh, ...this.deferlantes.cretes.map((c) => c.mesh)]) montrer(o);
+    for (const o of [this.cargo.groupe, this.trombe.groupe, this.embruns.mesh, this.lumiereEtrange.sprite, ...this.deferlantes.cretes.map((c) => c.mesh)]) montrer(o);
     if (this.bateau) {
       montrer(this.bateau.eauABord.cockpit.mesh);
       montrer(this.bateau.eauABord.cabine.mesh);
@@ -354,6 +357,10 @@ export class Monde3D {
     this.trombe.maj(dt, this.etatTrombe, { temps: this.temps, directionVent: angleVers(m.directionVent), camera: this.camera });
     if (this.eau.brumeDeBase) this.eau.uniforms.uBrume.value = this.eau.brumeDeBase * (1 + 160 * this.trombe.brouillard ** 1.5);
     this.post.reglages.uEmbruns.value = this.dansLaCabine ? 0 : this.trombe.brouillard ** 1.5;
+    this.lumiereEtrange.maj(dt, this.camera);
+    // le faisceau de la lampe frontale se voit dans la pluie, les embruns, la brume
+    const eauDansLAir = Math.min(1, m.pluie * 0.8 + (this.embruns.densiteAutour ?? 0) + this.trombe.brouillard + m.brume * 0.3);
+    this.post.reglages.uLampeVoile.value = this.lampe.intensity > 0 && !this.dansLaCabine ? 0.0045 * eauDansLAir * this.lampe.intensity : 0;
     const face = Math.max(0, -regard.dot(vent.clone().normalize()));
     this.gouttes.maj(dt, { pluie: m.pluie * Math.min(1, m.vent / 20), face, dehors: !this.dansLaCabine });
     this.post.reglages.uForceGouttes.value = this.dansLaCabine || !this.gouttesActives ? 0 : 1;

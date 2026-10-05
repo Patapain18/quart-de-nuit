@@ -836,6 +836,20 @@ function vivreLaNuit(dt) {
   if (nuit) enregistrer(dt);
   etat.evenements = new Set();
   if (!nuit) return;
+  // la tempête brouille la radio (et Jos revient de son silence dans les parasites)
+  const brouillage = THREE.MathUtils.smoothstep(nuit.meteo.vent, 30, 42) * 0.55;
+  etat.retourJos = nuit.faits.has('silence') && !nuit.silence ? Math.max(0, (etat.retourJos ?? 1) - dt / 60) : (etat.retourJos ?? 1);
+  jeu.radio.brouillage = Math.min(1, brouillage + (nuit.faits.has('silence') && !nuit.silence ? 0.35 * etat.retourJos : 0));
+  // le cœur qui bat, quand ça devient grave : couché sur l'eau, la trombe sur nous, le
+  // bateau qui se remplit
+  const m = physique.mesures;
+  const trombe = nuit.trombe ? nuit.trombe.force * (1 - THREE.MathUtils.smoothstep(nuit.trombe.distance, 60, 260)) : 0;
+  const danger = Math.max(THREE.MathUtils.smoothstep(Math.abs(m.gite), 48, 80), trombe, THREE.MathUtils.smoothstep(etat.eauCale ?? 0, 1100, 1700));
+  etat.attenteCoeur = (etat.attenteCoeur ?? 0) - dt;
+  if (danger > 0.25 && etat.attenteCoeur <= 0) {
+    audio.battement?.(danger);
+    etat.attenteCoeur = 60 / (72 + 70 * danger);
+  }
   etat.eauCale = nuit.eau.cale;
   // le pilote a lâché : plus personne ne tient la barre
   if (nuit.avaries.pilote === 'panne' && etat.pilote !== null) etat.pilote = null;
@@ -850,6 +864,24 @@ function vivreLaNuit(dt) {
     meteo = nuit.meteo;
     jeu.meteo = meteo;
     monde.regler(meteo, { recalculerMer: mer, brusque: false });
+  }
+}
+
+// ---------- L'étrange (jamais expliqué) ----------
+// nuit.js décide quand ; ici, ce que l'on voit et entend
+function vivreEtrange(nom) {
+  if (nom === 'lumiere') {
+    // un feu blanc, au loin, par le travers (d'un côté ou de l'autre), dans le creux des vagues
+    const cap = THREE.MathUtils.degToRad(physique.mesures.cap + (Math.random() < 0.5 ? -1 : 1) * (45 + Math.random() * 40));
+    const d = 650 + Math.random() * 300;
+    monde.lumiereEtrange.montrer(physique.position.x + Math.sin(cap) * d, physique.position.z - Math.cos(cap) * d, 11);
+  } else if (nom === 'voix16') {
+    jeu.radio.fantome('Canal 16 : une voix, très faible, noyée dans les parasites… « …ayday… mayday… ici… » … puis plus rien.', { duree: 7.5 });
+  } else if (nom === 'sansReponse') {
+    audio.parasites?.(2.5, 0.6);
+    afficherMessage('Pas de réponse. Rien que des parasites.');
+  } else if (nom === 'coups') {
+    audio.coupsCoque?.();
   }
 }
 
@@ -955,6 +987,7 @@ function commencerNuit({ depuisJournee = false, bateau: bateauGarde = null, repr
         pilote: 'Alarme : le pilote automatique a lâché ! Prends la barre (Q ou D)',
       }[nom]);
     })
+    .on('etrange', (nom) => vivreEtrange(nom))
     .on('cargo', () => afficherMessage('Un cargo en route de collision ! Appelle-le à la radio (canal 16), à la table à cartes'))
     .on('cargo-klaxon', () => audio.corne?.(5))
     .on('trombe', () => afficherMessage('Une trombe marine ! Écarte-toi de sa route : lofe et file de travers au vent'))
@@ -1846,6 +1879,8 @@ window.__jeu = {
   commencerNuit, get nuit() { return nuit; }, contexteNuit, regarder, profiler,
   uneImage: (dt = 1 / 60) => monde.image(dt, { simuler, placerCamera }),
   // (l'inspection du pont : le plan où l'on marche colle-t-il au modèle 3D ?)
+  // (l'étrange, à la demande, pour l'entendre et le voir : 'lumiere', 'voix16', 'coups', 'sansReponse')
+  peur: (nom) => vivreEtrange(nom),
   inspecterPont: async (o) => (await import('./atelier/inspection-pont.js')).inspecterPont(bateau, { encombrement: marin.encombrement, ...o }),
   // (les essais de marche : un marin automatique fait le tour du bord et manie chaque chose)
   essayerLaMarche: async (o) => {

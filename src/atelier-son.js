@@ -43,6 +43,11 @@ const EVENEMENTS = [
   ['La corne du cargo', (a) => a.corne(5)],
   ['La radio grésille', (a) => a.gresillement()],
   ['Des parasites sur la radio', (a) => a.parasites(2.5)],
+  // l'étrange de la nuit (jamais expliqué)
+  ['Une voix sur le 16', (a) => a.voixFantome(7.5)],
+  // (on ne les entend que dans la cabine : on y descend)
+  ['Des coups contre la coque', (a) => { dedans = true; majCurseurs(); a.dansLaCabine(true); a.coupsCoque(); }],
+  ['Le cœur qui bat', (a) => { for (let k = 0; k < 8; k++) setTimeout(() => a.battement(0.4 + k * 0.08), k * 650); }],
 ];
 
 // L'état des réglages (la situation choisie, modifiable aux curseurs)

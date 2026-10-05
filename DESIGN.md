@@ -360,9 +360,25 @@ qui ne répond plus) ; ce qui est dur, c'est **barrer, tenir un cap** ; l'élect
     force, sa fin en corde) ; adresse directe : `atelier-mer.html?ambiance=coucher-menacant&trombe=900`.
     Mesuré en temps réel (2400×1500) : la trombe ne coûte rien de visible (8,3 ms par image
     avec ou sans elle).
-11. **La peur** : une nuit plus noire, le faisceau de la lampe dans la pluie, le bateau
-    qui gémit, la radio qui grésille et Jos qui se tait ; et une touche d'étrange, jamais
-    expliquée (un atelier de la peur pour régler l'ambiance chapitre par chapitre).
+11. ✅ **La peur** — *Le réel* : la nuit d'orage est plus noire (l'exposition ne monte plus
+    au-dessus de 2,5 : on n'y voit que ce qu'éclairent la lampe, les éclairs et les feux du
+    bord) ; le faisceau de la lampe se voit dans la pluie et les embruns ; le bois et les
+    cordages craquent sans cesse dans la tempête, le gréement hurle, le vent hurle dans les
+    ouvertures ; au plus fort, la radio se brouille (des mots se perdent dans les parasites,
+    la voix de Jos faiblit) ; quand ça devient grave (couché sur l'eau, la trombe sur nous,
+    le bateau qui se remplit), **le cœur bat**, de plus en plus vite. *L'étrange*, jamais
+    expliqué ni confirmé (`suivreEtrange` dans `nuit.js`, un hasard à part pour ne rien
+    changer aux nuits déjà jouées) : vers minuit, **une lumière sur l'eau**, en tête de mât,
+    qui apparaît et disparaît dans le creux des vagues, puis plus rien (il faut être
+    dehors) ; vers 0 h 45, **une voix sur le 16**, trop faible et trop brouillée pour
+    comprendre (un son calculé, pas la synthèse vocale : une voix sans visage) ; vers 1 h
+    40, **Jos ne répond plus** (que des parasites) pendant une demi-heure, puis revient :
+    « Il s'est passé… enfin, peu importe » ; vers 3 h, **des coups contre la coque**, à
+    l'avant, trois puis un quatrième (seulement si l'on est dans la cabine). Appelé
+    juste après, Jos cherche une explication, sans conviction (« Il n'y a aucun bateau
+    signalé dans le secteur, à part toi »). Le carnet le note à sa façon. Pour les
+    entendre et les voir : l'atelier du son (la voix, les coups, le cœur), et dans le jeu
+    `__jeu.peur('lumiere' | 'voix16' | 'coups' | 'sansReponse')`.
 12. **Le radar**, à la table à cartes : le balayage, la côte, les grains, le cargo, le
     fouillis de la mer, la portée et le gain… et un écho qui n'existe pas.
 

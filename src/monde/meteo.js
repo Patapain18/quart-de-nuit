@@ -149,7 +149,9 @@ export function eclairage(meteo) {
   // Exposition : comme l'œil (ou l'appareil photo) qui s'habitue à la pénombre ;
   // mais la nuit doit rester la nuit : l'œil ne compense pas tout
   const luminance = 0.2126 * ambiance[0] + 0.7152 * ambiance[1] + 0.0722 * ambiance[2];
-  const expositionMax = 14 + (4 - 14) * nuit;
+  // (et la nuit d'orage est plus noire encore : on n'y voit que ce qu'éclairent la lampe,
+  // les éclairs et les feux du bord ; c'est là qu'elle fait peur)
+  const expositionMax = 14 + (4 - 14) * nuit - 1.5 * nuit * lisse(0.6, 0.95, meteo.orage);
   const exposition = Math.min(expositionMax, Math.max(0.55, 0.5 / Math.pow(luminance + 0.004, 0.72)));
 
   // Couleur du ciel au zénith et à l'horizon (pour le brouillard et l'éclairage des nuages)

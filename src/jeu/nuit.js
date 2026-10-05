@@ -174,6 +174,18 @@ export class Nuit {
       ecouteFoc: 24.8 + this.hasard() * 1.2,
       pilote: 26.0 + this.hasard() * 0.9,
     };
+    // l'étrange (jamais expliqué : la nuit, la fatigue, la peur ?) — une lumière sur l'eau,
+    // une voix sur le 16, Jos qui ne répond plus, des coups contre la coque. (Un hasard à
+    // part : les nuits déjà jouées et les tests gardent leurs imprévus.)
+    const etrange = generateur(graine * 104729 + 7);
+    Object.assign(this.prevu, {
+      lumiere: 23.6 + etrange() * 0.5,
+      voix16: 24.55 + etrange() * 0.45,
+      silence: 25.6 + etrange() * 0.4,
+      coups: 26.9 + etrange() * 0.5,
+    });
+    this.silence = false; // (Jos ne répond plus)
+    this.dernierEtrange = null; // { nom, heure } : ce que Jos tentera d'expliquer si on l'appelle
     this.faits = new Set(); // les moments et les imprévus déjà passés
     this.cargo = null;
     this.trombe = null;
@@ -208,6 +220,8 @@ export class Nuit {
   // urgent : on coupe ce qui se dit (une avarie, la trombe, le cargo n'attendent pas la
   // fin d'un long message)
   dire(phrases, { emetteur = JOS, canal = 72, siLibre = false, urgent = false } = {}) {
+    // (pendant le silence, Jos n'arrive plus jusqu'au bateau)
+    if (this.silence && emetteur === JOS) return Promise.resolve(false);
     if (urgent) this.radio.taire?.();
     return this.radio.parler(phrases, { emetteur, canal, siLibre });
   }
@@ -239,6 +253,7 @@ export class Nuit {
     this.suivreAvaries(dt, ctx);
     this.suivreTrombe(dt, ctx);
     this.suivreCargo(dt, ctx);
+    this.suivreEtrange(dt, ctx);
     this.suivreBateau(dt, ctx);
     if (this.etat !== 'nuit') return;
     this.suivreMoments();
@@ -642,8 +657,73 @@ export class Nuit {
     return true;
   }
 
+  // ---------- L'étrange ----------
+  // Rien n'est jamais expliqué ni confirmé. Chaque chose arrive une fois, et seulement si
+  // le marin est là pour la voir ou l'entendre (sinon, elle attend un peu, puis passe).
+  suivreEtrange(dt, ctx) {
+    const h = this.heure;
+    const pret = (nom) => !this.faits.has(nom) && h >= this.prevu[nom];
+    const arrive = (nom, journal) => {
+      this.faits.add(nom);
+      if (journal) this.ecrire(journal);
+      this.dernierEtrange = { nom, heure: h };
+      this.emettre('etrange', nom);
+    };
+    // une lumière sur l'eau, au loin, dans le creux des vagues : il faut être dehors
+    if (pret('lumiere')) {
+      if (ctx.aBord.dehors) arrive('lumiere', 'Une lumière sur l\'eau, au loin. Puis plus rien.');
+      else if (h > this.prevu.lumiere + 0.6) this.faits.add('lumiere');
+    }
+    // une voix sur le 16 (le haut-parleur de la VHF s'entend de partout)
+    if (pret('voix16')) arrive('voix16', 'Une voix sur le 16. Trop brouillée pour comprendre.');
+    // Jos ne répond plus (on le découvre en l'appelant), puis il revient
+    if (pret('silence')) {
+      this.faits.add('silence');
+      this.silence = true;
+      this.emettre('etrange', 'silence');
+    }
+    if (this.silence && h >= this.prevu.silence + 0.55) {
+      this.silence = false;
+      this.ecrire('Jos est revenu.');
+      this.dernierEtrange = { nom: 'retour', heure: h };
+      this.emettre('etrange', 'retour');
+      this.dire([
+        `${NOM_BATEAU}, ${NOM_BATEAU}, ici ${JOS}… Tu me reçois ? Je t'ai perdu un long moment.`,
+        'Il s\'est passé… enfin, peu importe. Tout va bien, à bord ?',
+      ]);
+    }
+    // des coups contre la coque : on ne les entend que dans la cabine
+    if (pret('coups')) {
+      if (!ctx.aBord.dehors) arrive('coups', 'Des coups contre la coque, à l\'avant. Trois.');
+      else if (h > this.prevu.coups + 1.2) this.faits.add('coups');
+    }
+  }
+
   // Appeler Jos (radio, canal 72) : il donne des nouvelles, ou le conseil le plus urgent
   appelerJos(ctx) {
+    // pendant le silence : rien que des parasites
+    if (this.silence) {
+      if (!this.faits.has('sansReponse')) {
+        this.faits.add('sansReponse');
+        this.ecrire('Jos ne répond plus.');
+      }
+      this.emettre('etrange', 'sansReponse');
+      return;
+    }
+    // ce qu'on vient de voir ou d'entendre : Jos cherche une explication (sans conviction)
+    const e = this.dernierEtrange;
+    if (e && this.heure - e.heure < 0.5 && !e.explique) {
+      e.explique = true;
+      const explications = {
+        lumiere: ['Une lumière ? Le cargo est loin dans le nord, maintenant. Sur mon radar, il n\'y a que toi.', 'Un reflet, sans doute. Ou la fatigue. Garde les yeux sur tes vagues.'],
+        voix16: ['Un appel sur le seize ? Non… Je n\'ai rien reçu, moi. Et il n\'y a aucun bateau signalé dans le secteur, à part toi.', 'La fatigue joue des tours, la nuit. Reste concentré, matelot.'],
+        coups: ['Des coups contre la coque ? Un tronc, une épave… ça arrive, par gros temps.', 'Regarde si tu ne prends pas l\'eau à l\'avant. Et écoute si ça recommence.'],
+      };
+      if (explications[e.nom]) {
+        this.dire(explications[e.nom]);
+        return;
+      }
+    }
     const urgent = this.conseilUrgent(ctx);
     const m = this.meteo;
     const reste = HEURE_AUBE - this.heure;
@@ -826,8 +906,9 @@ export class Nuit {
     this.commence = true;
     this.tReprise = this.t;
     MOMENTS.forEach((mo, k) => { if (mo.heure <= this.heure) this.faits.add(`moment-${k}`); });
-    for (const nom of ['trombe', 'cargo']) if (this.prevu[nom] < this.heure) this.faits.add(nom);
+    for (const nom of ['trombe', 'cargo', 'lumiere', 'voix16', 'silence', 'coups']) if (this.prevu[nom] < this.heure) this.faits.add(nom);
     for (const nom of ['ecouteFoc', 'pilote']) if (this.prevu[nom] < this.heure) this.prevu[nom] = Infinity;
+    this.silence = this.faits.has('silence') && this.heure < this.prevu.silence + 0.55;
     this.meteo = meteoDeLaNuit(this.heure, this.niveau);
   }
 
@@ -875,7 +956,9 @@ export class Nuit {
       etat: 'nuit', raison: null, cargo: null, trombe: null, suiviCoup: null, renverse: 0, annonceVue: null, commence: true,
     });
     this.sauvegarde = { ...s, faits: new Set(s.faits) };
-    for (const nom of ['trombe', 'cargo', 'ecouteFoc', 'pilote']) this.prevu[nom] ??= Infinity; // (JSON : Infinity devient null)
+    for (const nom of ['trombe', 'cargo', 'ecouteFoc', 'pilote', 'lumiere', 'voix16', 'silence', 'coups']) this.prevu[nom] ??= Infinity; // (JSON : Infinity devient null)
+    this.silence = this.faits.has('silence') && this.heure < this.prevu.silence + 0.55;
+    this.dernierEtrange = null;
     this.deferlantes.annonce = null;
     this.deferlantes.attente = 8;
     this.conseils = {};

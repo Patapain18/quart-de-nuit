@@ -561,6 +561,128 @@ export class Audio {
     this.jouer('radio', { index: 2 + Math.floor(Math.random() * 2), gain: force, duree, bus: 'radio' });
   }
 
+  // ----- l'étrange -----
+  // Une voix sur la radio, trop faible et trop brouillée pour la comprendre : un
+  // bourdonnement de cordes vocales (une dent de scie qui tremble), passé dans deux
+  // « formants » qui changent à chaque syllabe (les voyelles), haché en syllabes, rogné
+  // comme par un poste de radio, et noyé dans les parasites. duree : en secondes
+  voixFantome(duree = 6.5) {
+    if (!this.actif()) return;
+    const ctx = this.ctx;
+    const t0 = ctx.currentTime + 0.1;
+    const fin = t0 + duree;
+    const voix = ctx.createOscillator();
+    voix.type = 'sawtooth';
+    voix.frequency.setValueAtTime(118, t0);
+    const syllabes = ctx.createGain();
+    syllabes.gain.value = 0;
+    const f1 = ctx.createBiquadFilter();
+    const f2 = ctx.createBiquadFilter();
+    for (const f of [f1, f2]) { f.type = 'bandpass'; f.Q.value = 7; }
+    let t = t0;
+    while (t < fin - 0.2) {
+      // une syllabe : une voyelle (deux formants), une hauteur, un souffle ; parfois un trou
+      const d = 0.13 + Math.random() * 0.2;
+      const [a, b] = [[700, 1200], [400, 2000], [300, 900], [550, 1700], [350, 2300]][Math.floor(Math.random() * 5)];
+      f1.frequency.setTargetAtTime(a, t, 0.02);
+      f2.frequency.setTargetAtTime(b, t, 0.02);
+      voix.frequency.setTargetAtTime(105 + Math.random() * 30, t, 0.05);
+      const fort = Math.random() < 0.15 ? 0 : 0.5 + Math.random() * 0.5;
+      syllabes.gain.setTargetAtTime(fort, t, 0.015);
+      syllabes.gain.setTargetAtTime(0, t + d * 0.8, 0.03);
+      t += d + (Math.random() < 0.2 ? 0.3 + Math.random() * 0.4 : 0.03);
+    }
+    const poste = ctx.createBiquadFilter();
+    poste.type = 'bandpass';
+    poste.frequency.value = 1300;
+    poste.Q.value = 0.9;
+    const sature = ctx.createWaveShaper();
+    const courbe = new Float32Array(256);
+    for (let i = 0; i < 256; i++) { const x = (i / 255) * 2 - 1; courbe[i] = Math.tanh(x * 3); }
+    sature.curve = courbe;
+    const niveau = ctx.createGain();
+    niveau.gain.setValueAtTime(0, t0);
+    niveau.gain.linearRampToValueAtTime(0.16, t0 + 0.8);
+    niveau.gain.setValueAtTime(0.16, fin - 1);
+    niveau.gain.linearRampToValueAtTime(0, fin);
+    // (la voix va et vient, comme un émetteur trop loin)
+    const evanouit = ctx.createGain();
+    for (let k = 0; t0 + k * 0.4 < fin; k++) evanouit.gain.setTargetAtTime(Math.random() < 0.25 ? 0.15 : 1, t0 + k * 0.4, 0.08);
+    voix.connect(f1);
+    voix.connect(f2);
+    f1.connect(syllabes);
+    f2.connect(syllabes);
+    syllabes.connect(sature).connect(poste).connect(evanouit).connect(niveau).connect(this.bus.radio);
+    voix.start(t0);
+    voix.stop(fin + 0.1);
+    this.parasites(duree + 0.6, 0.55);
+  }
+
+  // Des coups contre la coque, à l'avant, sous la flottaison : trois, puis un quatrième,
+  // plus faible. (Un tronc ? Une épave ? On ne saura pas.)
+  coupsCoque() {
+    if (!this.actif()) return;
+    const ctx = this.ctx;
+    const t0 = ctx.currentTime + 0.2;
+    [[0, 1], [0.72, 0.95], [1.4, 1.05], [5.2, 0.45]].forEach(([dans, force]) => {
+      const t = t0 + dans;
+      // le choc sourd du bois et du polyester : un coup bref qui fait résonner la coque
+      const s = ctx.createBufferSource();
+      s.buffer = this.brun;
+      const passe = ctx.createBiquadFilter();
+      passe.type = 'lowpass';
+      passe.frequency.value = 260;
+      const coque = ctx.createBiquadFilter();
+      coque.type = 'peaking';
+      coque.frequency.value = 85;
+      coque.Q.value = 6;
+      coque.gain.value = 14;
+      const g = ctx.createGain();
+      g.gain.setValueAtTime(0, t);
+      g.gain.linearRampToValueAtTime(1.6 * force, t + 0.006);
+      g.gain.exponentialRampToValueAtTime(0.001, t + 0.45);
+      const p = ctx.createStereoPanner();
+      p.pan.value = -0.15;
+      s.connect(passe).connect(coque).connect(g).connect(p).connect(this.bus.dedans);
+      s.start(t, Math.random() * 2, 0.5);
+      // et le petit claquement du contact
+      const c = ctx.createBufferSource();
+      c.buffer = this.blanc;
+      const fc = ctx.createBiquadFilter();
+      fc.type = 'bandpass';
+      fc.frequency.value = 900;
+      fc.Q.value = 2;
+      const gc = ctx.createGain();
+      gc.gain.setValueAtTime(0, t);
+      gc.gain.linearRampToValueAtTime(0.25 * force, t + 0.002);
+      gc.gain.exponentialRampToValueAtTime(0.001, t + 0.05);
+      c.connect(fc).connect(gc).connect(p);
+      c.start(t, Math.random(), 0.08);
+    });
+  }
+
+  // Le cœur qui bat (force 0 → 1 : de plus en plus vite et fort quand le danger monte) ;
+  // appelé à chaque battement
+  battement(force = 0.5) {
+    if (!this.actif()) return;
+    const ctx = this.ctx;
+    const t0 = ctx.currentTime;
+    for (const [dans, f] of [[0, 1], [0.24 - 0.06 * force, 0.7]]) {
+      const t = t0 + dans;
+      const o = ctx.createOscillator();
+      o.type = 'sine';
+      o.frequency.setValueAtTime(62, t);
+      o.frequency.exponentialRampToValueAtTime(38, t + 0.12);
+      const g = ctx.createGain();
+      g.gain.setValueAtTime(0, t);
+      g.gain.linearRampToValueAtTime(0.55 * f * (0.4 + 0.6 * force), t + 0.012);
+      g.gain.exponentialRampToValueAtTime(0.001, t + 0.18);
+      o.connect(g).connect(this.bus.radio);
+      o.start(t);
+      o.stop(t + 0.22);
+    }
+  }
+
   // un coup de pompe de cale (un « glouglou » sourd ; à sec, elle aspire de l'air)
   coupDePompe(avecEau = true) {
     if (!this.actif()) return;
