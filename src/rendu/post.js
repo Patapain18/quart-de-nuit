@@ -68,6 +68,7 @@ uniform float uVignettage;
 uniform float uGrain;
 uniform float uTemps;
 uniform float uFlash;       // éclair : tout blanchit un instant
+uniform float uEmbruns;     // dans les embruns d'une trombe : un voile d'eau pulvérisée
 uniform sampler2D uGouttes; // les gouttes sur l'objectif (normale en rg, épaisseur en b, eau en a)
 uniform float uForceGouttes;
 
@@ -118,6 +119,9 @@ void main() {
   float l = dot(c, vec3(0.2126, 0.7152, 0.0722));
   c = mix(vec3(l), c, uSaturation);
   c = (c - 0.5) * uContraste + 0.5;
+  // (l'eau pulvérisée diffuse la lumière : tout se noie dans un gris laiteux qui bouge)
+  float nuee = 0.75 + 0.25 * hasard(floor(vUv * 18.0 + vec2(uTemps * 9.0, uTemps * 4.0)) * 0.37);
+  c = mix(c, vec3(0.42, 0.47, 0.52) * nuee, uEmbruns * 0.7);
   // vignettage
   vec2 centre = vUv - 0.5;
   c *= 1.0 - uVignettage * dot(centre, centre) * 1.6;
@@ -164,6 +168,7 @@ export class Post {
       uGrain: { value: 0.018 },
       uTemps: { value: 0 },
       uFlash: { value: 0 },
+      uEmbruns: { value: 0 },
       uGouttes: { value: Post.textureVide() },
       uForceGouttes: { value: 0 },
     };

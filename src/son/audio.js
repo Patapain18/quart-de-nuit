@@ -254,6 +254,23 @@ export class Audio {
     // (chaque boucle part d'un endroit au hasard : deux parties ne sonnent pas pareil)
     s.start(0, infos.boucle[0] + Math.random() * (infos.boucle[1] - infos.boucle[0]));
     this.boucles[nom] = { source: s, gain: g };
+    // la trombe : les mêmes enregistrements, ralentis (plus graves), font son grondement de
+    // train de marchandises (le vent de tempête à mi-vitesse) et le fracas de l'eau arrachée
+    if (nom === 'vent-rafales' || nom === 'mer-forte') {
+      const t = ctx.createBufferSource();
+      t.buffer = s.buffer;
+      t.loop = true;
+      [t.loopStart, t.loopEnd] = infos.boucle;
+      t.playbackRate.value = nom === 'vent-rafales' ? 0.5 : 0.72;
+      const f = ctx.createBiquadFilter();
+      f.type = 'lowpass';
+      f.frequency.value = 400;
+      const gt = ctx.createGain();
+      gt.gain.value = 0;
+      t.connect(f).connect(gt).connect(this.bus.dehors);
+      t.start(0, infos.boucle[0] + Math.random() * (infos.boucle[1] - infos.boucle[0]));
+      this.boucles[`trombe-${nom}`] = { source: t, gain: gt, filtre: f };
+    }
   }
 
   a(nom) { return !!this.boucles[nom]; }
@@ -340,9 +357,21 @@ export class Audio {
     const roule = Math.min(1, Math.abs(e.roulis ?? 0) / 0.4);
     this.vers(this.clapotis.gain.gain, cale * (0.12 + 0.5 * roule), 0.15);
     this.vers(this.gargouille.gain.gain, Math.min(0.22, (e.eauCockpit ?? 0) / 900), 0.4);
-    // la trombe et le cargo, selon leur distance (0 : loin, 1 : sur nous)
+    // la trombe et le cargo, selon leur distance (0 : loin, 1 : sur nous) : la trombe
+    // gronde de loin, de plus en plus aigu en approchant, puis hurle
     const tr = e.trombe ?? 0;
-    this.vers(this.trombe.gain.gain, 0.9 * tr * tr, 0.5);
+    const grondement = this.boucles['trombe-vent-rafales'];
+    const fracas = this.boucles['trombe-mer-forte'];
+    if (grondement) {
+      this.niveaux.trombe = 1.2 * tr ** 1.4;
+      this.vers(grondement.gain.gain, 1.2 * tr ** 1.4, 0.6);
+      this.vers(grondement.filtre.frequency, 260 + 3200 * tr * tr, 0.6);
+    }
+    if (fracas) {
+      this.vers(fracas.gain.gain, 0.9 * tr ** 3, 0.6);
+      this.vers(fracas.filtre.frequency, 600 + 5000 * tr * tr, 0.6);
+    }
+    this.vers(this.trombe.gain.gain, 0.9 * tr * tr * (grondement ? 0.5 : 1), 0.5);
     this.vers(this.trombe.gainSifflement.gain, 0.12 * tr * tr * tr, 0.5);
     this.vers(this.moteur.gain.gain, 0.5 * (e.cargo ?? 0) ** 2, 0.8);
     // le bois et les cordages travaillent : d'autant plus que le bateau est secoué et que

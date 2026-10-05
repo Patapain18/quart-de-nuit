@@ -464,8 +464,23 @@ function simuler(dt) {
     if (nuit) vivreLaNuit(dt);
   }
   const v = vent.maj(monde.temps, dt, meteo);
-  // (au crépuscule, le tourbillon de la trombe, quand elle passe près)
-  if (nuit?.trombe) v.add(nuit.ventTrombe(physique.position.x, physique.position.z, _trombe));
+  // (au crépuscule, le tourbillon de la trombe, quand elle passe près : il souffle sur le
+  // bateau, le secoue, et lui jette l'eau qu'il arrache à la mer)
+  if (nuit?.trombe) {
+    v.add(nuit.ventTrombe(physique.position.x, physique.position.z, _trombe));
+    const fort = _trombe.length();
+    if (fort > 6) {
+      secousse(Math.min(0.55, fort / 55));
+      const n = Math.floor(fort * dt * 6);
+      for (let k = 0; k < n; k++) {
+        const a = Math.random() * Math.PI * 2;
+        const r = 4 + Math.random() * 14;
+        _origine.set(physique.position.x + Math.cos(a) * r, physique.position.y + 0.5 + Math.random() * 3, physique.position.z + Math.sin(a) * r);
+        monde.embruns.emettre(_origine, { vx: _trombe.x + v.x * 0.3, vy: 1 + Math.random() * 4, vz: _trombe.z + v.z * 0.3, vie: 1 + Math.random(), taille: 0.4 + Math.random() * 1.2, opacite: 0.18 });
+      }
+      if (fort > 18 && !monde.dansLaCabine && Math.random() < dt * 2) monde.gouttes.eclabousser(0.4);
+    }
+  }
   monde.mesurer('physique', () => physique.avancer(dt, monde.houle, v, Math.max(2, Math.ceil(dt * 240))));
 
   // à pied : le marin bouge, sent le bateau, vise et agit
@@ -552,6 +567,8 @@ function simuler(dt) {
   const reglages = monde.post.reglages;
   // (on mélange les expositions « en photographe » : en diaphragmes, pas en valeurs)
   reglages.uExposition.value = Math.exp(THREE.MathUtils.lerp(Math.log(monde.ecl.exposition), Math.log(expositionCabine), etat.adaptation));
+  // (sous le nuage-mur de la trombe, il fait sombre)
+  if (nuit?.trombe) reglages.uExposition.value *= 1 - 0.32 * nuit.trombe.force * (1 - THREE.MathUtils.smoothstep(nuit.trombe.distance, 150, 900));
   // (et les couleurs de la nuit — bleues, délavées — ne valent que dehors)
   const et = monde.etalonnage;
   reglages.uSaturation.value = THREE.MathUtils.lerp(et.saturation, 1.05, etat.adaptation);
@@ -590,7 +607,8 @@ function simuler(dt) {
     eauCale: etat.eauCale,
     eauCockpit: physique.eauCockpit,
     roulis: physique.rotation.length(),
-    trombe: nuit?.trombe ? nuit.trombe.force * (1 - THREE.MathUtils.smoothstep(nuit.trombe.distance, 40, 700)) : 0,
+    // (on l'entend gronder de loin : à 1,5 km un murmure, à 300 m un fracas)
+    trombe: nuit?.trombe ? nuit.trombe.force * (1 - THREE.MathUtils.smoothstep(nuit.trombe.distance, 60, 1600)) : 0,
     cargo: nuit?.cargo ? 1 - THREE.MathUtils.smoothstep(nuit.cargo.distance, 60, 900) : 0,
   });
   etat.attenteClaque = Math.max(0, etat.attenteClaque - dt);
@@ -940,6 +958,23 @@ function commencerNuit({ depuisJournee = false, bateau: bateauGarde = null, repr
     .on('cargo', () => afficherMessage('Un cargo en route de collision ! Appelle-le à la radio (canal 16), à la table à cartes'))
     .on('cargo-klaxon', () => audio.corne?.(5))
     .on('trombe', () => afficherMessage('Une trombe marine ! Écarte-toi de sa route : lofe et file de travers au vent'))
+    .on('trombe-proche', () => afficherMessage('La trombe arrive sur toi ! Harnais (X), et tiens-toi (Maj)'))
+    .on('trombe-touche', ({ force }) => {
+      // le tourbillon passe sur le bateau : il le couche et le fait tourner sur lui-même,
+      // l'eau arrachée à la mer s'abat sur le pont, tout craque
+      const vt = nuit.ventTrombe(physique.position.x, physique.position.z, new THREE.Vector3());
+      if (vt.lengthSq() > 0.01) physique.deferlante(vt, 1.1 * force);
+      physique.rotation.y += (Math.random() < 0.5 ? -1 : 1) * 0.8 * force;
+      physique.eauCockpit = Math.min(EAU.cockpitMax, physique.eauCockpit + 220 * force);
+      secousse(1);
+      audio.deferlante?.(1, 0.05);
+      if (!monde.dansLaCabine) monde.gouttes.eclabousser(1.3);
+      if (etat.mode === 'pied' && marin.dehors) {
+        marin.glissade.addScaledVector(vt.setY(0).normalize(), 3.5 * force);
+        if (!marin.attache) marin.etourdi = Math.max(marin.etourdi, 1.5);
+      }
+      afficherMessage('La trombe est sur le bateau !');
+    })
     .on('eau', (seuil) => afficherMessage(seuil >= 1300 ? 'Le bateau s\'alourdit : pompe, vite !' : seuil >= 700 ? 'L\'eau monte dans la cabine : pompe !' : 'De l\'eau au-dessus des planchers : pompe (dans le cockpit, à bâbord)'))
     .on('perdue', (raison) => {
       sauverEnregistrement();

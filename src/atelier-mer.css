@@ -96,3 +96,5 @@ dd { margin: 0; font-variant-numeric: tabular-nums; text-align: right; }
 .aide { color: var(--texte-doux); font-size: 12px; margin: var(--espace-2) 0 0; }
 
 #panneau.replie #contenu { display: none; }
+/* la trombe : une case à cocher */
+.case { display: flex; align-items: center; gap: 8px; font-size: 14px; margin-bottom: 8px; }

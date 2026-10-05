@@ -337,8 +337,29 @@ qui ne répond plus) ; ce qui est dur, c'est **barrer, tenir un cap** ; l'élect
    la sonothèque et ses auteurs, et **la mesure du volume ressenti** (LUFS, la norme des
    radios, calculée sans jouer : `src/son/mesure.js`, vérifiée contre ffmpeg à 0,2 près) :
    du matin calme (−28) à la tempête sur le pont (−15), la cabine 4 à 6 points plus bas.
-10. **La trombe**, refaite : immense, sombre, audible de loin, et qui frappe vraiment le
-    bateau (un atelier de la trombe pour la régler).
+10. ✅ **La trombe**, refaite (`src/rendu/trombe.js`) — Avant : un tube pâle et
+    transparent, un petit buisson d'embruns, et le bateau sentait à peine son passage.
+    Maintenant : **un nuage-mur** de 1,4 km sous la base des nuages d'orage, une soucoupe
+    noire et bosselée qui s'abaisse de 230 m vers son centre et tourne (de plus en plus
+    vite vers le centre), sa tranche éclairée par le couchant ; **l'entonnoir** sombre qui
+    en descend, évasé en trompette, strié de bandes qui tournent et montent ; à son pied,
+    **une gaine et une jupe d'embruns** de 270 m (un bruit lu dans l'espace, qui tourne
+    avec elles) et sur la mer **un anneau d'écume en spirales** (dessiné par la mer
+    elle-même) ; les **éclairs** de sa cellule tombent autour d'elle (2,5 fois plus
+    souvent) ; sous le nuage-mur, **il fait sombre** (l'exposition baisse de 30 %).
+    **On l'entend** : son grondement de train de marchandises (le vent de tempête
+    enregistré, joué deux fois plus lentement) monte dès 1,5 km et s'éclaircit en
+    approchant ; à 300 m, le fracas de l'eau arrachée. **Elle frappe** : un tourbillon de
+    74 nœuds au bord de son cœur (40 m), qui se fait sentir jusqu'à 540 m ; à 450 m, Jos
+    crie de s'accrocher ; dans ses embruns, l'image se noie dans un brouillard laiteux, des
+    gerbes traversent le pont, la vue tremble, des gouttes sur l'objectif ; si elle passe
+    sur le bateau : il est couché (56° mesurés) et tourné sur lui-même, 220 L d'eau dans le
+    cockpit, la grand-voile se déchire si elle est hissée, le pilote lâche une fois sur
+    deux et demie, et un marin détaché est assommé. Puis Jos demande si tout tient.
+    **L'atelier** : l'atelier de la mer a sa section « La trombe » (distance, décalage,
+    force, sa fin en corde) ; adresse directe : `atelier-mer.html?ambiance=coucher-menacant&trombe=900`.
+    Mesuré en temps réel (2400×1500) : la trombe ne coûte rien de visible (8,3 ms par image
+    avec ou sans elle).
 11. **La peur** : une nuit plus noire, le faisceau de la lampe dans la pluie, le bateau
     qui gémit, la radio qui grésille et Jos qui se tait ; et une touche d'étrange, jamais
     expliquée (un atelier de la peur pour régler l'ambiance chapitre par chapitre).

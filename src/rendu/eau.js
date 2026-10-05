@@ -111,6 +111,7 @@ uniform vec3 uCouleurTranslucide;
 uniform float uForceEcume;
 uniform float uSeuilEcume;
 uniform vec2 uDirVent;
+uniform vec4 uTrombe; // la trombe : x, z, rayon de son cœur (m), force (0 : pas de trombe)
 
 const float PI = 3.14159265359;
 ${GLSL_CARTE_CIEL}
@@ -190,6 +191,18 @@ ${cascades.map((_, i) => `  p = texture(uPentes${i}, vSource / uGrille${i}.x);
                    + texture(uBruit, vec3(vSource * 0.9, 0.4)).a * 0.15;
     // seuil réglé selon le vent : ~1 % de la mer blanchit par 13 nœuds, ~20 % par 48 nœuds
     float fraiche = smoothstep(uSeuilEcume, uSeuilEcume + 0.35, ecume);
+    // la trombe arrache la mer : autour de son pied, un anneau d'écume en spirales qui
+    // tournent, d'autant plus vite que l'on est près du cœur
+    if (uTrombe.w > 0.01) {
+      vec2 dt = vMonde.xz - uTrombe.xy;
+      float d = length(dt);
+      float R = uTrombe.z;
+      float angle = uTemps * 30.0 * R / max(d * d, R * R); // (30 m/s au bord du cœur)
+      vec2 tourne = mat2(cos(angle), -sin(angle), sin(angle), cos(angle)) * dt;
+      float spirale = texture(uBruit, vec3(tourne * 0.018, 0.37)).a * 0.6 + texture(uBruit, vec3(tourne * 0.06, 0.71)).b * 0.4;
+      float anneau = smoothstep(R * 0.3, R * 0.9, d) * (1.0 - smoothstep(R * 1.6, R * 4.5, d));
+      fraiche = max(fraiche, anneau * smoothstep(0.38, 0.62, spirale + anneau * 0.25) * uTrombe.w);
+    }
     float voile = smoothstep(1.0 - fraiche, 1.0 - fraiche + 0.22, dentelle) * (0.35 + 0.65 * fraiche);
     // au loin, le motif devient une teinte moyenne (sinon il scintille)
     voile = mix(voile, fraiche * 0.5, saturer(distance / 250.0));
@@ -300,6 +313,7 @@ export class Eau {
       uCouleurFond: { value: new THREE.Vector3(0.0028, 0.0125, 0.024) },
       uCouleurTranslucide: { value: new THREE.Vector3(0.025, 0.16, 0.13) },
       uForceEcume: { value: 1 },
+      uTrombe: { value: new THREE.Vector4(0, 0, 30, 0) },
       uSeuilEcume: { value: 0.2 },
       uDirVent: { value: new THREE.Vector2(1, 0) },
       uBateauInverse: { value: new THREE.Matrix4() },
@@ -374,6 +388,7 @@ export class Eau {
     u.uDirVent.value.set(Math.cos(a), Math.sin(a));
     // visibilité : 60 km par beau temps, 1,5 km sous la pluie battante
     const visibilite = THREE.MathUtils.lerp(60000, 6000, meteo.brume) * THREE.MathUtils.lerp(1, 0.25, meteo.pluie);
-    u.uBrume.value = 3 / visibilite;
+    this.brumeDeBase = 3 / visibilite;
+    u.uBrume.value = this.brumeDeBase;
   }
 }

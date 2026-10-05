@@ -257,6 +257,50 @@ for (const [id, nom] of Object.entries(VUES)) {
 function marquerVue() { for (const [id, b] of boutonsVue) b.setAttribute('aria-pressed', String(id === vue)); }
 marquerVue();
 
+// ---------- La trombe (celle de la nuit, à la demande) ----------
+const trombe = { active: parametres.has('trombe'), distance: Number(parametres.get('trombe') ?? 900), angle: 0, force: 1, fin: 0 };
+const CURSEURS_TROMBE = [
+  { cle: 'distance', nom: 'Distance', min: 40, max: 4000, pas: 10, format: (v) => `${v} m` },
+  { cle: 'angle', nom: 'Décalée du regard', min: -90, max: 90, pas: 1, format: (v) => `${v}°` },
+  { cle: 'force', nom: 'Force', min: 0, max: 1, pas: 0.01, format: (v) => `${Math.round(v * 100)} %` },
+  { cle: 'fin', nom: 'Sa fin (la corde)', min: 0, max: 1, pas: 0.01, format: (v) => `${Math.round(v * 100)} %` },
+];
+const caseTrombe = document.getElementById('trombe-active');
+caseTrombe.checked = trombe.active;
+caseTrombe.addEventListener('change', () => { trombe.active = caseTrombe.checked; });
+for (const c of CURSEURS_TROMBE) {
+  const id = `trombe-${c.cle}`;
+  const bloc = document.createElement('div');
+  bloc.className = 'curseur';
+  bloc.innerHTML = `<label for="${id}">${c.nom}</label><output for="${id}">${c.format(trombe[c.cle])}</output>
+    <input type="range" id="${id}" min="${c.min}" max="${c.max}" step="${c.pas}" value="${trombe[c.cle]}">`;
+  const champ = bloc.querySelector('input');
+  champ.addEventListener('input', () => {
+    trombe[c.cle] = Number(champ.value);
+    bloc.querySelector('output').textContent = c.format(trombe[c.cle]);
+  });
+  document.getElementById('curseurs-trombe').append(bloc);
+}
+// (là où elle est : dans la direction du regard, à la distance choisie, autour du bateau)
+const etatTrombe = { x: 0, z: 0, force: 1, age: 60, duree: 260, distance: 900 };
+function placerTrombe() {
+  if (!trombe.active) {
+    monde.etatTrombe = null;
+    return;
+  }
+  const cap = THREE.MathUtils.degToRad(regard.cap + trombe.angle);
+  const centre = bateau.groupe.position;
+  etatTrombe.x = centre.x + Math.sin(cap) * trombe.distance;
+  etatTrombe.z = centre.z - Math.cos(cap) * trombe.distance;
+  etatTrombe.force = trombe.force;
+  etatTrombe.age = trombe.fin > 0 ? etatTrombe.duree - 45 + trombe.fin * 40 : 60;
+  etatTrombe.distance = trombe.distance;
+  monde.etatTrombe = etatTrombe;
+}
+window.__trombe = trombe;
+window.__regard = regard; // (pour les photos : la direction du regard, en degrés)
+window.__vue = (v) => { vue = v; marquerVue(); };
+
 const panneau = document.getElementById('panneau');
 document.getElementById('replier').addEventListener('click', (e) => {
   const replie = panneau.classList.toggle('replie');
@@ -390,6 +434,7 @@ function boucle(maintenant) {
   }
   naviguer(dt);
   reglerVoiles();
+  placerTrombe();
   monde.image(dt, { toutLeCube, placerCamera });
   toutLeCube = false;
   ageMesures += dt;

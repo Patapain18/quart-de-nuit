@@ -485,11 +485,26 @@ export class Nuit {
     t.force = lisse(0, 15, t.age) * (1 - lisse(t.duree - 30, t.duree, t.age));
     t.distance = Math.hypot(p.x - t.x, p.z - t.z);
     this.stats.trombeDistance = Math.min(this.stats.trombeDistance, t.distance);
-    if (t.distance < 60 && t.force > 0.5 && !t.touche) {
+    // elle approche : Jos crie (une fois), puis elle frappe, ou elle passe
+    if (t.distance < 450 && t.force > 0.5 && !t.alerte) {
+      t.alerte = true;
+      this.dire(['Elle arrive sur toi ! Accroche ton harnais, et tiens-toi ! Écarte-toi d\'elle, vite !'], { urgent: true });
+      this.emettre('trombe-proche');
+    }
+    if (t.distance < 75 && t.force > 0.5 && !t.touche) {
       t.touche = true;
+      this.stats.trombeTouche = true;
       this.ecrire('La trombe est passée sur le bateau !');
-      this.emettre('trombe-touche');
-      if (ctx.physique.ris < 3 && this.avaries.grandVoile === 'ok') this.fatigue.grandVoile += 0.7;
+      this.emettre('trombe-touche', { force: t.force });
+      // (le tourbillon arrache tout : la grand-voile si elle est hissée ; le pilote, peut-être)
+      if (ctx.physique.ris < 3 && this.avaries.grandVoile === 'ok') this.fatigue.grandVoile += 1.0;
+      if (ctx.pilote && this.avaries.pilote === 'ok' && this.hasard() < 0.4) this.avarie('pilote', ctx);
+    }
+    if (t.alerte && !t.passee && t.distance > 320 && this.stats.trombeDistance < 260) {
+      t.passee = true;
+      this.dire([t.touche
+        ? 'Tu m\'entends ? Elle t\'est passée dessus… Regarde si tout tient : les voiles, le pilote. Et pompe, tu as embarqué.'
+        : 'Elle est passée tout près… Bien joué. Reprends ta route, mais garde un œil dessus.'], { siLibre: false });
     }
     if (t.age > t.duree) {
       this.trombe = null;
@@ -507,9 +522,9 @@ export class Nuit {
     const dx = x - t.x;
     const dz = z - t.z;
     const d = Math.max(1, Math.hypot(dx, dz));
-    const coeur = 30;
-    const vmax = 32 * t.force; // ~62 nœuds au bord du cœur
-    const v = (d < coeur ? (vmax * d) / coeur : (vmax * coeur) / d) * (1 - lisse(150, 320, d));
+    const coeur = 40;
+    const vmax = 38 * t.force; // ~74 nœuds au bord du cœur
+    const v = (d < coeur ? (vmax * d) / coeur : (vmax * coeur) / d) * (1 - lisse(260, 540, d));
     return sortie.set((dz / d) * v - (dx / d) * v * 0.3, 0, (-dx / d) * v - (dz / d) * v * 0.3);
   }
 

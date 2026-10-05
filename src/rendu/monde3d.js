@@ -231,15 +231,19 @@ export class Monde3D {
     const e = this.eclair;
     const orage = this.meteo.orage;
     e.intensite = 0;
+    // (la cellule orageuse de la trombe crache des éclairs autour d'elle)
+    const trombe = this.etatTrombe?.force > 0.5 ? this.etatTrombe : null;
     if (orage > 0.5) {
-      e.prochain -= dt * (orage - 0.4);
+      e.prochain -= dt * (orage - 0.4) * (trombe ? 2.5 : 1);
       if (e.prochain <= 0) {
         const angle = Math.random() * Math.PI * 2;
-        const distance = 2000 + Math.random() * 9000;
+        const autourTrombe = trombe && Math.random() < 0.6;
+        const distance = autourTrombe ? Math.random() * 700 : 2000 + Math.random() * 9000;
+        const origine = autourTrombe ? new THREE.Vector3(trombe.x, 0, trombe.z) : this.camera.position;
         const centre = new THREE.Vector3(
-          this.camera.position.x + Math.cos(angle) * distance,
-          this.ciel.uniformsNuages.uBaseNuages.value + 400 + Math.random() * 1200,
-          this.camera.position.z + Math.sin(angle) * distance,
+          origine.x + Math.cos(angle) * distance,
+          this.ciel.uniformsNuages.uBaseNuages.value + (autourTrombe ? 100 : 400) + Math.random() * 1200,
+          origine.z + Math.sin(angle) * distance,
         );
         const debut = this.temps;
         const nb = 1 + Math.floor(Math.random() * 3);
@@ -247,9 +251,11 @@ export class Monde3D {
         // restent dans le nuage, qu'ils illuminent de l'intérieur
         const cle = Math.floor(Math.random() * 1e9);
         const visible = Math.random() < 0.55;
-        this.surEclair?.(distance, visible);
+        // (le tonnerre arrive d'autant plus tard que l'éclair est loin de nous)
+        const loin = Math.hypot(centre.x - this.camera.position.x, centre.z - this.camera.position.z);
+        this.surEclair?.(loin, visible);
         for (let i = 0; i < nb; i++) {
-          e.flashs.push({ centre, cle, visible, debut: debut + i * (0.06 + Math.random() * 0.12), force: 0.6 + Math.random() * 0.9, proche: distance < 5000 });
+          e.flashs.push({ centre, cle, visible, debut: debut + i * (0.06 + Math.random() * 0.12), force: 0.6 + Math.random() * 0.9, proche: loin < 5000 });
         }
         e.prochain = 1.5 + Math.random() * 7;
       }
@@ -345,7 +351,9 @@ export class Monde3D {
       niveauEau: centre.y - 3,
     });
     this.cargo.maj(this.etatCargo, this.camera);
-    this.trombe.maj(dt, this.etatTrombe, { temps: this.temps, directionVent: angleVers(m.directionVent) });
+    this.trombe.maj(dt, this.etatTrombe, { temps: this.temps, directionVent: angleVers(m.directionVent), camera: this.camera });
+    if (this.eau.brumeDeBase) this.eau.uniforms.uBrume.value = this.eau.brumeDeBase * (1 + 160 * this.trombe.brouillard ** 1.5);
+    this.post.reglages.uEmbruns.value = this.dansLaCabine ? 0 : this.trombe.brouillard ** 1.5;
     const face = Math.max(0, -regard.dot(vent.clone().normalize()));
     this.gouttes.maj(dt, { pluie: m.pluie * Math.min(1, m.vent / 20), face, dehors: !this.dansLaCabine });
     this.post.reglages.uForceGouttes.value = this.dansLaCabine || !this.gouttesActives ? 0 : 1;
