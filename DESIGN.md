@@ -81,7 +81,9 @@ Chaque leçon réussie débloque un réflexe dont on aura besoin la nuit.
 
 ### Les commandes (clavier + souris, clavier français)
 
-- **À la barre** : Q / D la barre, Z / S la grand-voile (border, choquer), A / E le foc,
+- **À la barre** : Q / D pour tourner (avec la **barre assistée**, réglage par défaut :
+  elles donnent le cap, et le bateau le garde quand on lâche ; sans elle, c'est la vraie
+  barre), Z / S la grand-voile (border, choquer), A / E le foc,
   C / V l'enrouleur, P le pilote automatique, T le réglage automatique (aide), X le
   harnais (on s'attache aussi à la barre), Espace pour se lever.
 - **À pied** : souris pour regarder, ZQSD pour marcher, E pour agir sur ce que l'on
@@ -257,6 +259,74 @@ Une étape = un résultat visible ; je ne lance la suivante qu'après ton feu ve
    Appris en ligne : la préparation des shaders attendait deux images du navigateur, qui
    n'arrivent pas dans un onglet resté en arrière-plan ; une minuterie prend le relais, et
    l'accueil se débloque au bout de 10 s quoi qu'il arrive.
+
+### Le grand chantier (octobre 2026, après la mise en ligne)
+
+Ce que Mathis a demandé : un grand coup de neuf sur l'image, une trombe à la hauteur de la
+vidéo (et qui fasse vraiment quelque chose au joueur), un vrai son, une ambiance qui fait
+**peur**, un jeu plus facile, plus d'électronique à bord, et surtout **aucun bug** (« le
+ciel fait de petits freezes de temps en temps », « la physique du personnage a des
+défauts, notamment pour rentrer dans le cockpit »), avec des outils comme les ateliers
+pour vérifier. Ses choix : la peur **réelle, avec une touche d'étrange** (des choses
+inexpliquées, jamais confirmées : un écho radar qui n'existe pas, une voix sur le 16, Jos
+qui ne répond plus) ; ce qui est dur, c'est **barrer, tenir un cap** ; l'électronique :
+**un radar** ; le son : **de vrais enregistrements** (libres de droits, CC0).
+
+7. ✅ **Les bugs** (le personnage, les à-coups) —
+   **Le personnage.** Une *inspection du pont* (`src/atelier/inspection-pont.js`, dans le
+   jeu : `__jeu.inspecterPont()`) quadrille le bateau tous les 4 cm et compare le plan où
+   l'on marche (`src/joueur/pont.js`) au vrai modèle 3D : on marchait dans le vide
+   au-dessus de la descente ouverte, on flottait sur les bords penchés du toit, les pieds
+   entraient dans le panneau de pont, et surtout la caméra traversait la bôme (à hauteur
+   des yeux à l'avant du cockpit) et les boiseries de la cabine. Le défaut du cockpit :
+   en remontant de la cabine, tant que les pieds étaient encore sur la marche, le jeu
+   croyait le cockpit couvert d'un plafond (le pont) et la tête plongeait d'un coup.
+   Corrigé : le marin a maintenant **un corps tiré du modèle 3D** (`src/joueur/encombrement.js` :
+   les 42 000 triangles rangés dans une grille de boîtes de 12 cm ; rien n'entre dans ses
+   hanches, sa poitrine ni ses yeux, la caméra reste à 15 cm de toute paroi), il **baisse
+   la tête sous la bôme** (ou elle lui barre le passage sur le toit), regarde 35 cm devant
+   lui pour baisser la tête à temps sous un plafond, descend l'échelle plus lentement,
+   monte et descend les marches en souplesse, enjambe le bord penché du rouf ; le toit, le
+   capot (ouvert ou fermé) et le panneau ont leurs vraies hauteurs ; la cloison de la
+   descente est échancrée jusqu'au toit, comme sur un vrai bateau. Des *essais de marche*
+   (`src/atelier/essais-marche.js`, `__jeu.essayerLaMarche()`) : un marin automatique fait
+   le tour du bord dans le vrai jeu (winchs, pompe, écoute, mât, étai, radio, tableau,
+   ciré, retour à la barre) et vérifie qu'il n'est jamais bloqué, que la caméra ne frôle
+   rien (22 cm au plus près) et que la tête ne saute pas (8 cm par image au plus, sur
+   l'échelle). `test-pont` fait rentrer le vrai marin dans le cockpit depuis 7 endroits,
+   le bateau droit ou gîté à 30°.
+   **Les à-coups.** Dans le panneau du navigateur, le jeu tourne enfin à sa vraie vitesse
+   (120 images/s sur cet écran) : mesuré en temps réel, 60 s au plus fort de la tempête,
+   99,9 % des images en moins de 17 ms. Le seul à-coup régulier : le changement de forme
+   de la mer, toutes les 3 s (5 à 8 ms d'un coup) ; il est maintenant **étalé sur 14
+   images** (32 rangs de grille par image). Les shaders ne sont plus jamais compilés en
+   jeu (préparés pour la bonne cible de rendu, avec une image d'échauffement). Pour la
+   suite : `jeu.html?perf` affiche **un compteur de fluidité** (`src/atelier/fluidite.js`) :
+   le temps de chaque image, les à-coups, et ce qui les a causés.
+8. ✅ **La barre assistée** (`src/jeu/barre-assistee.js`, l'option « Barre », activée par
+   défaut) — Q et D font tourner **le cap voulu** (18° par seconde) ; lâchées, le cap
+   reste, et un barreur invisible le tient : il pousse la barre selon l'écart, la freine
+   avant de dépasser, compense le bateau ardent (l'écart qui dure) et devine le départ au
+   lof quand le bateau gîte sous une risée. Il connaît le vent : un cap voulu à moins de
+   44° du vent est ramené au près (du même bord, ou de l'autre si l'on a déjà passé le
+   vent : on finit le virement commencé). Il n'est pas plus fort que le safran : par grosse
+   mer, une vague peut encore faire partir le bateau. **Le compas**, en haut de l'écran à
+   la barre : le cap, le cap voulu (jaune ; cyan pour le pilote), d'où vient le vent, le
+   cône interdit en rouge, et la nuit au plus fort, la zone verte de la fuite (le vent dans
+   le dos). Mesuré (`test-barre`) : par bonne brise, le cap tenu à 1-4° près à toutes les
+   allures (la barre lâchée sans aide, le bateau part de 84° en 40 s) ; un virage de 60°
+   ou 120° sans dépasser de plus de 6° ; dans la tempête, en fuite, à 2-11° près.
+9. **Le son, avec de vrais enregistrements** (CC0) — le vent, la pluie, la mer, les
+   déferlantes, les coups de mer sur la coque, le tonnerre, les grincements du bois et des
+   cordages, le gréement qui siffle, la voile qui bat, la cabine étouffée, la corne du
+   cargo, la radio ; mélangés en direct selon ce qui se passe, et un atelier du son.
+10. **La trombe**, refaite : immense, sombre, audible de loin, et qui frappe vraiment le
+    bateau (un atelier de la trombe pour la régler).
+11. **La peur** : une nuit plus noire, le faisceau de la lampe dans la pluie, le bateau
+    qui gémit, la radio qui grésille et Jos qui se tait ; et une touche d'étrange, jamais
+    expliquée (un atelier de la peur pour régler l'ambiance chapitre par chapitre).
+12. **Le radar**, à la table à cartes : le balayage, la côte, les grains, le cargo, le
+    fouillis de la mer, la portée et le gain… et un écho qui n'existe pas.
 
 ## 4. Pistes graphiques notées pour plus tard
 

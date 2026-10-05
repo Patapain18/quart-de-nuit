@@ -347,3 +347,15 @@ input:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
 @media (max-width: 760px) {
   #annonce { top: auto; bottom: 28%; white-space: normal; width: 90%; }
 }
+
+/* ---------- Étape 8 : la barre assistée ---------- */
+/* le compas : une bande graduée en haut, au milieu (le cap, le cap voulu, le vent) */
+#compas {
+  position: absolute; left: 50%; top: var(--e3); transform: translateX(-50%);
+  width: min(420px, 32vw); height: 50px;
+}
+/* (fenêtre étroite : les instruments prennent le haut ; le compas descend au-dessus des
+   jauges et des sous-titres) */
+@media (max-width: 1100px) {
+  #compas { top: auto; bottom: 172px; width: min(420px, 70vw); }
+}

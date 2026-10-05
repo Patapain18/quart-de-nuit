@@ -99,13 +99,14 @@ class Cascade {
 
   // Recalcule l'amplitude de chaque vague pour un nouvel état de la mer.
   // Le hasard ne change pas : la mer « grossit » ou « se calme » sans sauter.
-  regler(mer) {
+  // (j0, j1 : seulement ces rangs de la grille, pour étaler le calcul sur plusieurs images)
+  regler(mer, j0 = 0, j1 = this.n) {
     const { n, taille, min, max } = this;
     const dk = (2 * Math.PI) / taille;
     const kMin = min * dk;
     const kMax = max * dk;
-    let energie = 0;
-    for (let j = 0; j < n; j++) {
+    let energie = j0 === 0 ? 0 : this._energie;
+    for (let j = j0; j < j1; j++) {
       for (let i = 0; i < n; i++) {
         const idx = j * n + i;
         const m = i < n / 2 ? i : i - n;
@@ -131,7 +132,8 @@ class Cascade {
         energie += s * dk * dk;
       }
     }
-    this.energie = energie; // variance de la hauteur apportée par cette cascade (m²)
+    this._energie = energie;
+    if (j1 === n) this.energie = energie; // variance de la hauteur apportée par cette cascade (m²)
   }
 
   // Calcule la surface au temps t (s). dt sert à faire vieillir l'écume.
@@ -246,9 +248,18 @@ export class Houle {
   }
 
   // Nouvel état de la mer (vent, fetch, direction, houle) : voir spectre.js
-  regler(mer) {
+  // progressif : un morceau de cascade (32 rangs) par image, au lieu des cinq cascades d'un
+  // coup (5 à 8 ms : une image ratée toutes les 3 secondes pendant la partie, quand le
+  // temps change peu à peu)
+  regler(mer, { progressif = false } = {}) {
     this.mer = mer;
-    for (const c of this.cascades) c.regler(mer);
+    if (progressif) {
+      this.aRegler = [];
+      for (const c of this.cascades) for (let j = 0; j < c.n; j += 32) this.aRegler.push([c, j, Math.min(c.n, j + 32)]);
+    } else {
+      this.aRegler = null;
+      for (const c of this.cascades) c.regler(mer);
+    }
     // L'écume : les « moutons » apparaissent vers 10 nœuds de vent et couvrent environ
     // un cinquième de la mer à 50 nœuds (mesures de Monahan) ; plus le vent est fort,
     // plus les traînées d'écume durent.
@@ -272,6 +283,10 @@ export class Houle {
 
   calculer(t, dt = 1 / 60) {
     this.temps = t;
+    if (this.aRegler?.length) {
+      const [c, j0, j1] = this.aRegler.shift();
+      c.regler(this.mer, j0, j1);
+    }
     for (const c of this.cascades) c.calculer(t, dt, this.choppy, this.ecume);
   }
 

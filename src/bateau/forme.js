@@ -159,3 +159,19 @@ export function xCoteRouf(u, y) {
   const toit = hauteurRouf(u, e - ROUF.rentree);
   return e - ROUF.rentree * 0.85 * ((y - pont) / (toit - 0.035 - pont));
 }
+
+// Les tranches du toit du rouf : 8 jusqu'au bord avant du trou de la descente, 24 ensuite
+export const U_TROU_DESCENTE = uDe(zDe(ROUF.uArriere) - DESCENTE_ROUF.longueur);
+export const trancheToit = (i) => (i <= 8
+  ? ROUF.uArriere + (U_TROU_DESCENTE - ROUF.uArriere) * (i / 8)
+  : U_TROU_DESCENTE + (ROUF.uAvant - U_TROU_DESCENTE) * ((i - 8) / 24));
+// Le panneau de pont (le « hublot » du toit) au-dessus de la table du carré : son
+// ouverture tombe sur deux tranches du toit (25 et 21) et deux de ses colonnes (±22 cm) ;
+// son cadre d'aluminium la déborde de 4 cm
+const TROU_PANNEAU = { demiLargeur: 0.22, z0: zDe(trancheToit(25)), z1: zDe(trancheToit(21)) };
+export const PANNEAU_PONT = {
+  trou: TROU_PANNEAU,
+  demiLargeur: TROU_PANNEAU.demiLargeur + 0.04,
+  z0: TROU_PANNEAU.z0 - 0.04,
+  z1: TROU_PANNEAU.z1 + 0.04,
+};

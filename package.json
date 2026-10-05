@@ -13,7 +13,8 @@
     "test-tempete": "node scripts/test-tempete.js",
     "test-pont": "node scripts/test-pont.js",
     "test-journee": "node scripts/test-journee.js",
-    "test-nuit": "node scripts/test-nuit.js"
+    "test-nuit": "node scripts/test-nuit.js",
+    "test-barre": "node scripts/test-barre.js"
   },
   "dependencies": {
     "three": "^0.186.1"

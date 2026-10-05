@@ -1,5 +1,5 @@
 // Les options du joueur : la qualité de l'image, la souris, la vue, le confort (contre le
-// mal de mer), le son et la voix de Jos.
+// mal de mer), la barre (assistée ou non), le son et la voix de Jos.
 // Toutes gardées par le navigateur, sous une seule clé. N'importe quelle page peut les
 // lire (lireOptions) et les changer (changerOptions) ; ceux qui veulent savoir quand elles
 // changent s'abonnent (quandOptionsChangent).
@@ -19,6 +19,7 @@ export const OPTIONS_DE_BASE = {
   voix: true, // Jos parle (sinon : seulement les sous-titres)
   sousTitres: true, // les sous-titres de la radio
   aide: true, // les touches, en bas à gauche
+  barreAssistee: true, // Q et D donnent le cap, la barre le tient (sinon : la vraie barre)
   difficulte: 'marin', // la dernière difficulté choisie pour la nuit
 };
 

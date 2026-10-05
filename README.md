@@ -15,17 +15,21 @@ npm run dev
 
 Puis ouvrir http://localhost:5190/jeu.html. Les ateliers (les coulisses) : `atelier-mer.html` (la mer, le ciel et la lumière), `atelier-bateau.html` (la polaire du voilier), `atelier-tempete.html` (la nuit rejouée en accéléré par des marins automatiques).
 
+Dans le jeu, deux outils de vérification, à lancer dans la console du navigateur : `__jeu.inspecterPont()` (le plan où l'on marche colle-t-il au modèle 3D ? une carte du pont et de la cabine, tous les 4 cm) et `__jeu.essayerLaMarche()` (un marin automatique fait le tour du bord et manie chaque chose).
+
 ## Comment on joue
 
 Au clavier (français) et à la souris. La souris tourne la tête.
 
-- **À la barre** : Q / D la barre, Z / S la grand-voile (border, choquer), A / E le foc, C / V l'enrouleur du foc, P le pilote automatique, T le réglage automatique des voiles, X le harnais, Espace pour se lever.
+- **À la barre** : Q / D pour tourner (la **barre assistée** garde le cap quand on lâche ; le compas, en haut, montre le cap voulu, d'où vient le vent et là où le bateau ne peut pas aller), Z / S la grand-voile (border, choquer), A / E le foc, C / V l'enrouleur du foc, P le pilote automatique, T le réglage automatique des voiles, X le harnais, Espace pour se lever.
 - **À pied** : Z Q S D pour marcher, E pour agir sur ce que l'on regarde (Maj + E : l'action inverse), Maj pour se tenir, C pour s'accroupir, X le harnais.
 - **Partout** : F la lampe frontale, L le carnet de bord, Entrée pour passer une phrase de la radio, H pour cacher l'aide, Échap la pause (les options, quitter : la partie est gardée, on la reprend depuis l'accueil).
 
 **La nuit, ce qui sauve** : au plus fort (plus de 34 nœuds), affaler la grand-voile au pied du mât et fuir sous un mouchoir de foc, les vagues bien dans l'arrière (le vent à 160-170°) ; jamais les déferlantes de travers ; le harnais toujours accroché ; la descente fermée ; pomper (la pompe est dans le cockpit, à bâbord) ; et quand un cargo arrive, l'appeler à la radio (canal 16, à la table à cartes).
 
-Les **options** (accueil ou pause) : la qualité de l'image (économique, moyenne, haute, superbe), la sensibilité de la souris, le champ de vision, un **horizon stable** contre le mal de mer, les secousses, les gouttes sur l'écran, le volume, la voix de Jos et les sous-titres.
+Les **options** (accueil ou pause) : la qualité de l'image (économique, moyenne, haute, superbe), la sensibilité de la souris, le champ de vision, la **barre assistée** (ou la vraie barre, plus dure), un **horizon stable** contre le mal de mer, les secousses, les gouttes sur l'écran, le volume, la voix de Jos et les sous-titres.
+
+Le jeu saccade ? Ouvre `jeu.html?perf` : un petit graphique, en haut à gauche, montre le temps de chaque image, compte les à-coups et dit ce qui les a causés.
 
 ## Les tests
 
@@ -34,7 +38,8 @@ Tout ce qui ne dépend pas de l'écran se vérifie sans navigateur :
 ```bash
 npm run test-physique   # le voilier flotte, se redresse, avance
 npm run test-houle      # la hauteur des vagues selon le vent
-npm run test-pont       # on marche partout à bord sans rester coincé
+npm run test-pont       # on marche partout à bord sans rester coincé, et on rentre dans le cockpit de partout
+npm run test-barre      # la barre assistée tient le cap, à toutes les allures et dans la tempête (≈ 1 min)
 npm run test-journee    # un élève automatique fait toute la journée (≈ 1 min)
 npm run test-tempete    # dans la tempête, la bonne tactique protège vraiment (≈ 2 min)
 npm run test-nuit       # trois marins automatiques font la nuit : le prudent voit l'aube (≈ 1 min)

@@ -45,6 +45,7 @@
 
   <div id="hud" hidden>
     <div id="instruments" aria-live="off"></div>
+    <canvas id="compas" hidden aria-hidden="true"></canvas>
     <div id="reglages" aria-hidden="true">
       <div class="jauge" id="jauge-gv"><span class="nom">Grand-voile</span><span class="barre"><i></i></span><span class="etat"></span></div>
       <div class="jauge" id="jauge-foc"><span class="nom">Foc</span><span class="barre"><i></i></span><span class="etat"></span></div>
@@ -159,6 +160,11 @@
         <label class="curseur">Sensibilité de la souris <output id="v-sensibilite"></output><input type="range" id="o-sensibilite" min="0.3" max="2.5" step="0.1"></label>
         <label class="curseur">Champ de vision <output id="v-champ"></output><input type="range" id="o-champ" min="60" max="90" step="1"></label>
         <label class="case"><input type="checkbox" id="o-inverser"> Inverser le regard (haut et bas)</label>
+      </fieldset>
+      <fieldset>
+        <legend>Barre</legend>
+        <label class="case"><input type="checkbox" id="o-barreAssistee"> Barre assistée : Q et D donnent le cap, et le bateau le garde quand tu lâches</label>
+        <p class="note">Sans elle, c'est la vraie barre : lâchée, elle revient au milieu et le bateau remonte au vent. Plus dur, plus vrai.</p>
       </fieldset>
       <fieldset>
         <legend>Confort</legend>

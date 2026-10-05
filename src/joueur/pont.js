@@ -9,7 +9,7 @@
 // flottaison. Les filières sont à 7 cm du bord : on ne peut pas aller plus loin que
 // 12 cm du livet (sauf… si le bateau se couche et qu'on n'est pas attaché).
 import {
-  COCKPIT, ROUF, MAT, DESCENTE_ROUF, zDe, uDe, demiLargeur, hauteurPont, bordInterieur, hauteurRouf,
+  COCKPIT, ROUF, MAT, DESCENTE_ROUF, PANNEAU_PONT, zDe, uDe, demiLargeur, hauteurPont, bordInterieur, hauteurRouf,
 } from '../bateau/forme.js';
 
 export const MARCHE_MAX = 0.45;
@@ -21,6 +21,30 @@ export const CARRE = { plancher: -0.3, zAvant: zDe(ROUF.uAvant) + 0.14, demiLarg
 export const TABLE = { demiLargeur: 0.22, z0: -1.15, z1: -0.35 };
 
 const dansCockpit = (u) => u >= COCKPIT.uArriere && u <= COCKPIT.uAvant;
+
+// Le toit du rouf : on tient debout sur sa partie plate (ses côtés penchent vers
+// l'intérieur de 10 cm, et sa face avant vers l'arrière de 12 cm : on les enjambe)
+const Z_CLOISON = zDe(ROUF.uArriere); // la cloison arrière du rouf (la porte de la descente)
+const Z_AVANT_TOIT = zDe(ROUF.uAvant) + 0.12;
+const surLeToit = (x, z, u) => u > ROUF.uArriere && z > Z_AVANT_TOIT - 0.02
+  && Math.abs(x) <= bordInterieur(u) - ROUF.rentree;
+// Le capot coulissant de la descente (7 cm au-dessus du toit) : fermé, il couvre le trou
+// du toit ; ouvert, il a glissé de 55 cm vers l'avant et découvre l'arrière du trou
+const CAPOT = { demiLargeur: 0.39, longueur: 0.84, y: hauteurRouf(ROUF.uArriere + 0.04, 0) + 0.07 };
+const capotZ = () => {
+  const z1 = Z_CLOISON + 0.02 - (descenteOuverte ? DESCENTE_ROUF.course : 0);
+  return [z1 - CAPOT.longueur, z1];
+};
+// le trou découvert, quand la descente est ouverte (on ne marche pas dedans)
+const dansLeTrou = (x, z) => descenteOuverte && Math.abs(x) < DESCENTE_ROUF.demiLargeur + 0.03
+  && z > capotZ()[1] - 0.02 && z < Z_CLOISON + 0.03;
+const surLeCapot = (x, z) => {
+  const [z0, z1] = capotZ();
+  return Math.abs(x) <= CAPOT.demiLargeur && z >= z0 && z <= Math.min(z1, Z_CLOISON);
+};
+// le panneau de pont au-dessus de la table du carré (son cadre dépasse du toit de 4,5 cm)
+const Y_PANNEAU = hauteurRouf(uDe((PANNEAU_PONT.z0 + PANNEAU_PONT.z1) / 2), 0) + 0.045;
+const surLePanneau = (x, z) => Math.abs(x) <= PANNEAU_PONT.demiLargeur && z >= PANNEAU_PONT.z0 && z <= PANNEAU_PONT.z1;
 
 // Les surfaces : nom, test d'appartenance, hauteur. (« ouverte » : l'état de la descente)
 const SURFACES = [
@@ -41,7 +65,7 @@ const SURFACES = [
   },
   {
     nom: 'pont-arriere',
-    dans: (x, z, u) => u >= 0.004 && u < COCKPIT.uArriere && Math.abs(x) < demiLargeur(u) - BORD,
+    dans: (x, z, u) => u >= 0.012 && u < COCKPIT.uArriere && Math.abs(x) < demiLargeur(u) - BORD,
     y: (x, z, u) => hauteurPont(u, x),
   },
   {
@@ -55,8 +79,18 @@ const SURFACES = [
   },
   {
     nom: 'rouf',
-    dans: (x, z, u) => u > ROUF.uArriere && u < ROUF.uAvant - 0.004 && Math.abs(x) <= bordInterieur(u),
+    dans: (x, z, u) => surLeToit(x, z, u) && !dansLeTrou(x, z) && !surLeCapot(x, z) && !surLePanneau(x, z),
     y: (x, z, u) => hauteurRouf(u, Math.min(Math.abs(x), bordInterieur(u) - ROUF.rentree)),
+  },
+  {
+    nom: 'rouf-capot',
+    dans: surLeCapot,
+    y: () => CAPOT.y,
+  },
+  {
+    nom: 'rouf-panneau',
+    dans: surLePanneau,
+    y: () => Y_PANNEAU,
   },
   {
     nom: 'pont-avant',
@@ -109,6 +143,8 @@ export function solEn(x, z, yPieds) {
   for (const o of OBSTACLES) {
     if (yPieds > o[3] && yPieds < o[4] && Math.hypot(x - o[0], z - o[1]) < o[2]) return null;
   }
+  // sur le toit, on ne met pas le pied dans le trou de la descente ouverte
+  if (yPieds > 1.0 && dansLeTrou(x, z)) return null;
   for (const s of surfacesEn(x, z)) {
     if (s.y <= yPieds + MARCHE_MAX) return s;
   }
@@ -117,11 +153,14 @@ export function solEn(x, z, yPieds) {
 
 // Hauteur du plafond au-dessus d'un point (dans la cabine) : pour baisser la tête
 export function plafondEn(x, z, yPieds) {
-  if (yPieds > 0.4) return Infinity; // dehors
+  // dehors : sur le pont, et dans le cockpit (même en remontant la dernière marche de la
+  // descente, les pieds encore bas)
+  if (yPieds > 0.4 || (dansCockpit(uDe(z)) && Math.abs(x) <= COCKPIT.demiLargeur)) return Infinity;
   // sous le capot ouvert, on peut passer la tête dehors
   if (descenteOuverte && Math.abs(x) < DESCENTE_ROUF.demiLargeur - 0.05 && z > Z_CAPOT_OUVERT) return Infinity;
   const u = uDe(z);
-  if (u >= ROUF.uArriere && u <= ROUF.uAvant) return hauteurRouf(u, 0) - 0.07;
+  // (le toit est bombé : plus bas sur les côtés)
+  if (u >= ROUF.uArriere && u <= ROUF.uAvant) return hauteurRouf(u, Math.min(Math.abs(x), bordInterieur(u) - ROUF.rentree)) - 0.07;
   return hauteurPont(u, x) - 0.06;
 }
 

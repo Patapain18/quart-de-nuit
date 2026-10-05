@@ -212,6 +212,11 @@ class Crete {
     const g = new THREE.BufferGeometry();
     g.setAttribute('position', new THREE.BufferAttribute(this.positions, 3));
     g.setAttribute('coord', new THREE.BufferAttribute(coords, 2));
+    // (des normales dès le départ : sans elles, les shaders préparés au chargement seraient
+    // ceux des « facettes plates », et il faudrait les refaire en pleine nuit)
+    const normales = new Float32Array(n * 3);
+    for (let k = 0; k < n; k++) normales[k * 3 + 1] = 1;
+    g.setAttribute('normal', new THREE.BufferAttribute(normales, 3));
     g.setIndex(indices);
     this.geometrie = g;
     this.materiau = materiau;

@@ -12,7 +12,7 @@ import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import {
   COQUE, COCKPIT, ROUF, MAT, DESCENTE_ROUF, HUBLOTS, zDe, uDe, demiLargeur, hauteurLivet, fondCoque, pointCoque,
-  hauteurPont, bordInterieur, hauteurRouf, bordsHublot, xCoteRouf,
+  hauteurPont, bordInterieur, hauteurRouf, bordsHublot, xCoteRouf, U_TROU_DESCENTE, trancheToit, PANNEAU_PONT,
 } from './forme.js';
 import { texturesTeck, texturesAntiderapant, texturesCordage } from './textures.js';
 
@@ -199,21 +199,9 @@ const repartir = (t) => 0.5 - 0.5 * Math.cos(Math.PI * t);
 
 // ---------- Les pièces ----------
 
-// Les tranches du toit du rouf : 8 jusqu'au bord avant du trou de la descente, 24 ensuite
-const U_TROU_DESCENTE = uDe(zDe(ROUF.uArriere) - DESCENTE_ROUF.longueur);
-const trancheToit = (i) => (i <= 8
-  ? ROUF.uArriere + (U_TROU_DESCENTE - ROUF.uArriere) * (i / 8)
-  : U_TROU_DESCENTE + (ROUF.uAvant - U_TROU_DESCENTE) * ((i - 8) / 24));
-// Le panneau de pont (le « hublot » du toit) au-dessus de la table du carré : son
-// ouverture tombe sur deux tranches du toit (25 et 21) et deux de ses colonnes (±22 cm) ;
-// son cadre d'aluminium la déborde de 4 cm
-const TROU_PANNEAU = { demiLargeur: 0.22, z0: zDe(trancheToit(25)), z1: zDe(trancheToit(21)) };
-export const PANNEAU_PONT = {
-  trou: TROU_PANNEAU,
-  demiLargeur: TROU_PANNEAU.demiLargeur + 0.04,
-  z0: TROU_PANNEAU.z0 - 0.04,
-  z1: TROU_PANNEAU.z1 + 0.04,
-};
+// (les tranches du toit et le panneau de pont sont mesurés dans forme.js)
+const TROU_PANNEAU = PANNEAU_PONT.trou;
+export { PANNEAU_PONT };
 
 // Une surface faite de colonnes (une par tranche u) de points [x, y] ; garder(i, j) dit
 // si la case entre les colonnes i, i+1 et les rangs j, j+1 existe (pour les trous)
@@ -395,28 +383,31 @@ function geometrieRouf() {
       ? { p: [xBas, hauteurPont(R.uAvant, xBas), zBas] }
       : { p: [xHaut, hauteurRouf(R.uAvant, xHaut), zHaut] };
   });
-  // la cloison arrière (face au cockpit), du plancher du cockpit jusqu'au toit,
-  // percée de la descente
+  // la cloison arrière (face au cockpit), du plancher du cockpit jusqu'au toit, échancrée
+  // par la descente : une fente du seuil jusqu'au toit, que prolonge le trou du toit
+  // (ouverte, on y passe debout ; fermée, les planches la bouchent et le capot la coiffe)
   const zc = zDe(R.uArriere);
   const e = bordInterieur(R.uArriere);
   const w = e - R.rentree;
+  const largeurDescente = 0.34;
+  const basDescente = D.seuil;
+  const hautDescente = largeurDescente - 0.02;
   const forme = new THREE.Shape();
   forme.moveTo(-e, COCKPIT.plancher);
   forme.lineTo(e, COCKPIT.plancher);
   forme.lineTo(e, hauteurPont(R.uArriere, e));
   for (let k = 0; k <= 16; k++) {
     const x = w - (2 * w * k) / 16;
+    if (Math.abs(x) < hautDescente) continue;
     forme.lineTo(x, hauteurRouf(R.uArriere, x));
+    if (x > 0 && w - (2 * w * (k + 1)) / 16 < hautDescente) {
+      forme.lineTo(hautDescente, hauteurRouf(R.uArriere, hautDescente));
+      forme.lineTo(largeurDescente, basDescente);
+      forme.lineTo(-largeurDescente, basDescente);
+      forme.lineTo(-hautDescente, hauteurRouf(R.uArriere, hautDescente));
+    }
   }
   forme.lineTo(-e, hauteurPont(R.uArriere, e));
-  const trou = new THREE.Path();
-  const largeurDescente = 0.34;
-  const basDescente = D.seuil;
-  trou.moveTo(-largeurDescente, basDescente);
-  trou.lineTo(-largeurDescente + 0.02, hauteurRouf(R.uArriere, 0) - 0.02);
-  trou.lineTo(largeurDescente - 0.02, hauteurRouf(R.uArriere, 0) - 0.02);
-  trou.lineTo(largeurDescente, basDescente);
-  forme.holes.push(trou);
   const cloison = new THREE.ShapeGeometry(forme, 4);
   cloison.translate(0, 0, zc);
   // les planches de la descente (en retrait de 4 cm) : du teck

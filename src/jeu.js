@@ -21,6 +21,9 @@ import { Commandes, TOUCHES } from './jeu/commandes.js';
 import { Bateau } from './bateau/bateau.js';
 import { Audio } from './son/audio.js';
 import { Marin } from './joueur/marin.js';
+import { construireEncombrement } from './joueur/encombrement.js';
+import { BarreAssistee } from './jeu/barre-assistee.js';
+import { Compas } from './jeu/compas.js';
 import { ouvrirDescente } from './joueur/pont.js';
 import { creerGestes, gesteVise } from './joueur/gestes.js';
 import { Radio } from './jeu/radio.js';
@@ -45,6 +48,10 @@ const vent = new Vent(5);
 const commandes = new Commandes(canvas);
 const audio = new Audio();
 const marin = new Marin();
+// (ce qui est dur à bord, tiré du modèle 3D : le marin n'y entre pas, la caméra non plus)
+marin.encombrement = construireEncombrement(bateau);
+// (jeu.html?perf : le compteur de fluidité, en haut à gauche)
+if (parametres.has('perf')) import('./atelier/fluidite.js').then((m) => m.afficherFluidite(monde));
 const bouees = new Bouees(monde.scene, monde.houle);
 let journee = null; // la journée d'apprentissage (null : navigation libre)
 let nuit = null; // la nuit de tempête
@@ -130,6 +137,10 @@ const jeu = {
   prendreBarre() {
     etat.mode = 'barre';
     etat.action = null;
+    barreAssistee.reprendre(physique.mesures.cap);
+    // (assis à la barre, on regarde devant soi, pas la barre que l'on vient de saisir)
+    marin.lacet = 0;
+    marin.site = -0.12;
     afficherMessage('Tu as la barre (Espace pour te lever)');
     majAide();
   },
@@ -238,13 +249,20 @@ quandOptionsChangent((o, changements) => {
 // ---------- À la barre ----------
 const VITESSE_BARRE = 0.9;
 const BARRE_MAX = 0.6;
+// la barre assistée (voir jeu/barre-assistee.js) : Q et D donnent le cap, elle le tient
+const barreAssistee = new BarreAssistee();
 function tenirLaBarre(dt) {
   const axe = commandes.axe('barreGauche', 'barreDroite');
   if (axe !== 0 && etat.pilote !== null) {
     etat.pilote = null;
+    barreAssistee.reprendre(physique.mesures.cap);
     afficherMessage('Pilote automatique débrayé : tu as la barre');
   }
-  if (axe !== 0) physique.barre = THREE.MathUtils.clamp(physique.barre + axe * VITESSE_BARRE * dt, -BARRE_MAX, BARRE_MAX);
+  if (options.barreAssistee) {
+    if (etat.pilote === null) barreAssistee.maj(dt, axe, physique);
+  } else if (axe !== 0) {
+    physique.barre = THREE.MathUtils.clamp(physique.barre + axe * VITESSE_BARRE * dt, -BARRE_MAX, BARRE_MAX);
+  }
   // (pendant la journée, les écoutes et l'enrouleur viennent au fil des leçons)
   const permis = (nom, valeur) => {
     if (valeur && !jeu.autorise(nom)) {
@@ -300,6 +318,7 @@ function touchesAppuyees() {
         continue;
       }
       etat.pilote = etat.pilote === null ? Math.round(physique.mesures.cap) : null;
+      if (etat.pilote === null) barreAssistee.reprendre(physique.mesures.cap);
       afficherMessage(etat.pilote !== null ? `Pilote automatique : il tient le cap ${String(etat.pilote).padStart(3, '0')}°` : 'Pilote automatique débrayé');
     } else if (code === TOUCHES.aide.code) {
       changerOptions({ aide: !etat.aide });
@@ -435,7 +454,8 @@ function simuler(dt) {
   } else {
     touchesAppuyees();
     if (etat.mode === 'barre') tenirLaBarre(dt);
-    piloteOuBarreLibre(dt, etat.mode === 'barre' && commandes.axe('barreGauche', 'barreDroite') !== 0);
+    // (la barre est tenue : par la main du joueur, ou par la barre assistée)
+    piloteOuBarreLibre(dt, etat.mode === 'barre' && (options.barreAssistee || commandes.axe('barreGauche', 'barreDroite') !== 0));
     if (etat.regleurAuto) reglerAutomatiquement(physique, dt);
     if (journee) vivreLaJournee(dt);
     if (nuit) vivreLaNuit(dt);
@@ -443,17 +463,23 @@ function simuler(dt) {
   const v = vent.maj(monde.temps, dt, meteo);
   // (au crépuscule, le tourbillon de la trombe, quand elle passe près)
   if (nuit?.trombe) v.add(nuit.ventTrombe(physique.position.x, physique.position.z, _trombe));
-  physique.avancer(dt, monde.houle, v, Math.max(2, Math.ceil(dt * 240)));
+  monde.mesurer('physique', () => physique.avancer(dt, monde.houle, v, Math.max(2, Math.ceil(dt * 240))));
 
   // à pied : le marin bouge, sent le bateau, vise et agit
   const ressentie = sentirLeBateau(dt);
   if (etat.mode === 'pied') {
     const avance = (commandes.enfoncee('avancer') ? 1 : 0) - (commandes.enfoncee('reculer') ? 1 : 0);
     const lateral = (commandes.enfoncee('droite') ? 1 : 0) - (commandes.enfoncee('gauche') ? 1 : 0);
+    marin.suivrePieces(bateau);
     const ev = marin.maj(dt, {
       avance, lateral, tenir: commandes.maj, accroupir: commandes.enfoncee('accroupir') || commandes.ctrl,
     }, ressentie);
     if (ev.horsBord) finir('horsBord');
+    if (ev.chute) {
+      // (sauté du toit dans le cockpit…)
+      audio.choc(Math.min(1, ev.chute * 0.5));
+      secousse(Math.min(0.6, ev.chute * 0.4));
+    }
     if (ev.retenu && !(etat.attenteRetenu > 0)) {
       afficherMessage('Le harnais t\'a retenu au bord ! Tiens-toi (Maj) et remonte vers l\'axe du bateau.');
       secousse(0.5);
@@ -1321,7 +1347,7 @@ remplirAmbiances(document.getElementById('choix-ambiance-pause'));
 
 const AIDE = {
   barre: [
-    [`${TOUCHES.barreGauche.nom} ${TOUCHES.barreDroite.nom}`, 'barre : à gauche, à droite'],
+    [`${TOUCHES.barreGauche.nom} ${TOUCHES.barreDroite.nom}`, 'tourner : à gauche, à droite'],
     [`${TOUCHES.borderGV.nom} ${TOUCHES.choquerGV.nom}`, 'grand-voile : border, choquer'],
     [`${TOUCHES.borderFoc.nom} ${TOUCHES.choquerFoc.nom}`, 'foc : border, choquer'],
     [`${TOUCHES.enrouler.nom} ${TOUCHES.derouler.nom}`, 'foc : enrouler, dérouler'],
@@ -1404,6 +1430,25 @@ function afficherInstruments() {
   afficherLecon();
 }
 
+// le compas, à la barre : le cap, le cap voulu (barre assistée ou pilote), d'où vient le
+// vent et le cône où l'on ne peut pas aller ; la nuit, au plus fort, la zone de la fuite
+const compas = new Compas(document.getElementById('compas'));
+function afficherCompas() {
+  const visible = etat.mode === 'barre';
+  const zone = document.getElementById('compas');
+  if (zone.hidden === visible) zone.hidden = !visible;
+  if (!visible) return;
+  const m = physique.mesures;
+  const pilote = etat.pilote !== null;
+  compas.dessiner({
+    cap: m.cap,
+    capVoulu: pilote ? etat.pilote : options.barreAssistee ? barreAssistee.capVoulu : null,
+    pilote,
+    vent: vent.vitesse > 2 ? BarreAssistee.origineDuVent(m) : null,
+    fuite: !!nuit && meteo.vent >= 30,
+  });
+}
+
 // ce que l'on vise (au centre de l'écran) : « E : border · Maj + E : choquer »
 let gesteAffiche = '';
 function afficherGeste() {
@@ -1438,6 +1483,7 @@ function embarquer() {
     marin.lacet = 0;
     marin.site = -0.12;
     siege.x = physique.mesures.angleVentApparent >= 0 ? 0.62 : -0.62;
+    barreAssistee.reprendre(physique.mesures.cap);
   }
   accueil.hidden = true;
   pause.hidden = true;
@@ -1575,7 +1621,8 @@ document.getElementById('passer-lecon').addEventListener('click', () => {
 });
 canvas.addEventListener('click', () => { if (etat.mode === 'pause') embarquer(); });
 document.addEventListener('pointerlockchange', () => {
-  if ((etat.mode === 'barre' || etat.mode === 'pied') && document.pointerLockElement !== canvas) {
+  // (etat.essai : les outils de mise au point jouent sans souris capturée)
+  if ((etat.mode === 'barre' || etat.mode === 'pied') && document.pointerLockElement !== canvas && !etat.essai) {
     // la souris est libérée (Échap) : pause (le bateau continue de naviguer)
     etat.avantPause = etat.mode;
     etat.mode = 'pause';
@@ -1619,7 +1666,7 @@ const TEXTES_QUALITE = {
   for (const cle of Object.keys(curseurs)) {
     document.getElementById(`o-${cle}`).addEventListener('input', (e) => changerOptions({ [cle]: Number(e.target.value) }));
   }
-  for (const cle of ['inverser', 'secousses', 'gouttes', 'voix', 'sousTitres']) {
+  for (const cle of ['inverser', 'secousses', 'gouttes', 'voix', 'sousTitres', 'barreAssistee']) {
     document.getElementById(`o-${cle}`).addEventListener('change', (e) => changerOptions({ [cle]: e.target.checked }));
   }
   majFenetreOptions.curseurs = curseurs;
@@ -1632,7 +1679,7 @@ function majFenetreOptions() {
     document.getElementById(`o-${cle}`).value = options[cle];
     document.getElementById(`v-${cle}`).textContent = texte(options[cle]);
   }
-  for (const cle of ['inverser', 'secousses', 'gouttes', 'voix', 'sousTitres']) document.getElementById(`o-${cle}`).checked = options[cle];
+  for (const cle of ['inverser', 'secousses', 'gouttes', 'voix', 'sousTitres', 'barreAssistee']) document.getElementById(`o-${cle}`).checked = options[cle];
   document.getElementById('o-sousTitres').disabled = !options.voix; // (sans la voix, les sous-titres restent)
 }
 function ouvrirFenetre(id) {
@@ -1668,7 +1715,14 @@ if (matchMedia('(pointer: coarse)').matches && Math.min(screen.width, screen.hei
   const lancer = () => {
     if (lance) return;
     lance = true;
-    monde.precompiler().then(pret, pret);
+    // (les bouées de la journée aussi : trois bouées très loin, le temps de la préparation)
+    const loin = new Map(['jaune', 'rouge', 'verte'].map((couleur, k) => [`preparation-${k}`, { couleur, x: k * 10, z: -90000 }]));
+    bouees.maj(loin, 0, 0);
+    const fin = () => {
+      bouees.maj(journee?.bouees ?? new Map(), monde.temps, monde.ecl.nuit);
+      pret();
+    };
+    monde.precompiler().then(fin, fin);
   };
   requestAnimationFrame(() => requestAnimationFrame(lancer));
   setTimeout(lancer, 1500);
@@ -1700,6 +1754,34 @@ async function avancer(secondes) {
   afficherInstruments();
   afficherCible();
 }
+// (l'atelier des performances : faire tourner le jeu quelques secondes en mesurant chaque
+// morceau du calcul ; gpu : en attendant la carte graphique après chaque morceau)
+async function profiler(secondes = 20, { gpu = true } = {}) {
+  const c = monde.chrono;
+  c.images = [];
+  c.actif = true;
+  c.gpu = gpu;
+  const images = Math.round(secondes * 60);
+  for (let i = 0; i < images; i++) {
+    monde.image(1 / 60, { simuler, placerCamera });
+    if (i % 30 === 29) await new Promise((r) => setTimeout(r, 0));
+  }
+  c.actif = false;
+  const parSection = {};
+  for (const im of c.images) {
+    for (const [k, v] of Object.entries(im)) if (k !== 'temps') (parSection[k] ??= []).push(v);
+  }
+  const arrondi = (x) => Math.round(x * 100) / 100;
+  const stats = {};
+  for (const [k, v] of Object.entries(parSection)) {
+    const tri = [...v].sort((a, b) => a - b);
+    stats[k] = { parImage: arrondi(v.reduce((a, b) => a + b, 0) / c.images.length), p95: arrondi(tri[Math.floor(tri.length * 0.95)]), max: arrondi(tri.at(-1)), fois: v.length };
+  }
+  const pires = [...c.images].sort((a, b) => b.total - a.total).slice(0, 8)
+    .map((im) => Object.fromEntries(Object.entries(im).map(([k, v]) => [k, arrondi(v)])));
+  return { stats, pires };
+}
+
 // (tourner la tête du marin vers un point du monde)
 function regarder(x, y, z) {
   const cam = monde.camera.position;
@@ -1710,11 +1792,30 @@ function regarder(x, y, z) {
 window.__jeu = {
   monde, physique, bateau, etat, marin, jeu, gestes, embarquer, choisirAmbiance, photographier, avancer, commandes, Audio, seLever, finir,
   commencerJournee, get journee() { return journee; }, passer: () => journee?.passer(contexteJournee(0)), bouees,
-  commencerNuit, get nuit() { return nuit; }, contexteNuit, regarder,
+  commencerNuit, get nuit() { return nuit; }, contexteNuit, regarder, profiler,
+  uneImage: (dt = 1 / 60) => monde.image(dt, { simuler, placerCamera }),
+  // (l'inspection du pont : le plan où l'on marche colle-t-il au modèle 3D ?)
+  inspecterPont: async (o) => (await import('./atelier/inspection-pont.js')).inspecterPont(bateau, { encombrement: marin.encombrement, ...o }),
+  // (les essais de marche : un marin automatique fait le tour du bord et manie chaque chose)
+  essayerLaMarche: async (o) => {
+    const { essayerLaMarche } = await import('./atelier/essais-marche.js');
+    etat.fige = true;
+    try {
+      return await essayerLaMarche({
+        marin, gestes, gesteVise, commandes, seLever, bateau, regarder,
+        uneImage: (dt) => monde.image(dt, { simuler, placerCamera }),
+        basculerDescente: () => jeu.basculerDescente(),
+      }, o);
+    } finally {
+      etat.fige = false;
+    }
+  },
 };
 function boucle(maintenant) {
   const dt = Math.min((maintenant - dernier) / 1000, 0.05);
   dernier = maintenant;
+  // (les outils de mise au point font avancer le jeu eux-mêmes, image par image)
+  if (etat.fige) { requestAnimationFrame(boucle); return; }
   monde.image(dt, { simuler, placerCamera });
   ageInstruments += dt;
   if (ageInstruments > 0.12 && etat.mode !== 'accueil') {
@@ -1723,6 +1824,7 @@ function boucle(maintenant) {
   }
   afficherGeste();
   afficherCible();
+  afficherCompas();
   if (etat.soirEnAttente && jeu.radio.libre) afficherSoir();
   // (l'aube : on attend que le soleil soit levé, et que Jos ait fini de parler)
   if (etat.aubeEnAttente && jeu.radio.libre && (nuit?.heure ?? 99) >= HEURE_LEVER - 0.01) afficherAube();

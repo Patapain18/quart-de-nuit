@@ -87,6 +87,10 @@ export class Monde3D {
     this.bateau = null;
 
     this.temps = 0;
+    // le chronomètre (l'atelier des performances) : le temps passé dans chaque morceau du
+    // calcul, image par image ; gpu : on attend la carte graphique après chaque morceau
+    // (plus lent, mais on voit son vrai travail)
+    this.chrono = { actif: false, gpu: false, image: null, images: [] };
     this.eclair = { intensite: 0, prochain: 4, flashs: [] };
     this.mesures = { houleMs: 0, imageMs: 0, ips: 0 };
     this._compteur = { images: 0, depuis: performance.now() };
@@ -130,9 +134,21 @@ export class Monde3D {
       montrer(this.bateau.eauABord.cabine.mesh);
       montrer(this.bateau.voileFerlee);
     }
+    // (attention : le jeu dessine la scène dans l'image intermédiaire du développement,
+    // en couleurs linéaires ; préparés pour l'écran, les shaders seraient les mauvais, et
+    // compilés de nouveau en plein jeu — les petits gels)
+    const r = this.renderer;
+    const ancienne = r.getRenderTarget();
     try {
-      await this.renderer.compileAsync(this.scene, this.camera);
+      r.setRenderTarget(this.post.cible);
+      await r.compileAsync(this.scene, this.camera);
+      // puis une vraie image, cachée (dans l'image intermédiaire, pas à l'écran) : elle
+      // prépare aussi ce que la compilation oublie (les ombres, les deux passes des
+      // surfaces transparentes vues des deux côtés)
+      r.setRenderTarget(this.post.cible);
+      r.render(this.scene, this.camera);
     } finally {
+      r.setRenderTarget(ancienne);
       for (const o of caches) o.visible = false;
     }
   }
@@ -190,8 +206,12 @@ export class Monde3D {
 
   // Change le temps qu'il fait. recalculerMer : la mer change de forme (coûte ~5 ms)
   regler(meteo, { recalculerMer = true, brusque = true } = {}) {
+    this.mesurer(recalculerMer ? 'regler (mer)' : 'regler', () => this.reglerSansMesure(meteo, { recalculerMer, brusque }));
+  }
+
+  reglerSansMesure(meteo, { recalculerMer, brusque }) {
     this.meteo = meteo;
-    if (recalculerMer) this.houle.regler(etatMer(meteo));
+    if (recalculerMer) this.houle.regler(etatMer(meteo), { progressif: !brusque });
     if (brusque && recalculerMer) this.houle.effacerEcume();
     this.ecl = eclairage(meteo);
     this.ciel.regler(meteo, this.ecl, this.temps, { brusque });
@@ -255,16 +275,31 @@ export class Monde3D {
     this.lumiereEclair.intensity = e.intensite * 1.3;
   }
 
+  // (le chronomètre : mesure une partie du calcul, si on l'a demandé)
+  mesurer(nom, f) {
+    const c = this.chrono;
+    if (!c.actif || !c.image) return f();
+    const gl = this.renderer.getContext();
+    if (c.gpu) gl.finish();
+    const t0 = performance.now();
+    const r = f();
+    if (c.gpu) gl.finish();
+    c.image[nom] = (c.image[nom] ?? 0) + performance.now() - t0;
+    return r;
+  }
+
   // Une image : la mer avance, le ciel se prépare, on dessine
   // simuler : appelé une fois la houle calculée, pour faire bouger le bateau
   //   (flottaison simple dans l'atelier, vraie physique dans le jeu)
   // placerCamera : appelé une fois le bateau bougé (sinon la caméra a une image de retard)
   image(dt, { toutLeCube = false, placerCamera = null, simuler = null } = {}) {
     const debut = performance.now();
+    const chrono = this.chrono;
+    if (chrono.actif) chrono.image = { temps: this.temps };
     this.temps += dt;
     const m = this.meteo;
     const t0 = performance.now();
-    this.houle.calculer(this.temps, dt);
+    this.mesurer('houle', () => this.houle.calculer(this.temps, dt));
     this.mesures.houleMs = this.mesures.houleMs * 0.95 + (performance.now() - t0) * 0.05;
 
     this.ciel.uniformsNuages.uTemps.value = this.temps;
@@ -275,18 +310,22 @@ export class Monde3D {
     this.cote.maj(this.temps, this.ecl.nuit);
 
     if (this.bateau) {
-      if (simuler) simuler(dt);
-      else this.bateau.flotter(dt, this.houle);
-      this.bateau.maj(dt);
-      this.bateau.groupe.updateMatrixWorld();
-      this.eau.suivreBateau(this.bateau.groupe);
-      // la cabine : ses lumières sont dans le repère du bateau
-      this.bateau.interieur.suivre(this.bateau.groupe);
-      this.bateau.interieur.fixerEnvironnement(this.scene.environment);
+      this.mesurer('simulation', () => {
+        if (simuler) simuler(dt);
+        else this.bateau.flotter(dt, this.houle);
+      });
+      this.mesurer('bateau', () => {
+        this.bateau.maj(dt);
+        this.bateau.groupe.updateMatrixWorld();
+        this.eau.suivreBateau(this.bateau.groupe);
+        // la cabine : ses lumières sont dans le repère du bateau
+        this.bateau.interieur.suivre(this.bateau.groupe);
+        this.bateau.interieur.fixerEnvironnement(this.scene.environment);
+      });
     }
     placerCamera?.(dt);
     this.camera.updateMatrixWorld();
-    this.majLumiere(dt);
+    this.mesurer('lumiere', () => this.majLumiere(dt));
     const vent = new THREE.Vector3(Math.cos(angleVers(m.directionVent)), 0, Math.sin(angleVers(m.directionVent))).multiplyScalar(m.vent * NOEUD);
     this.pluie.maj(this.temps, this.camera, {
       intensite: m.pluie, vent, ambiance: new THREE.Vector3().fromArray(this.ecl.ambiance), eclair: this.eclair.intensite,
@@ -310,10 +349,15 @@ export class Monde3D {
     const face = Math.max(0, -regard.dot(vent.clone().normalize()));
     this.gouttes.maj(dt, { pluie: m.pluie * Math.min(1, m.vent / 20), face, dehors: !this.dansLaCabine });
     this.post.reglages.uForceGouttes.value = this.dansLaCabine || !this.gouttesActives ? 0 : 1;
-    this.eau.preparer(this.camera);
-    this.ciel.preparer(this.camera, { toutLeCube });
-    this.post.rendre(this.scene, this.camera);
+    this.mesurer('eau', () => this.eau.preparer(this.camera));
+    this.mesurer('ciel', () => this.ciel.preparer(this.camera, { toutLeCube }));
+    this.mesurer('rendu', () => this.post.rendre(this.scene, this.camera));
 
+    if (chrono.actif && chrono.image) {
+      chrono.image.total = performance.now() - debut;
+      chrono.images.push(chrono.image);
+      if (chrono.images.length > 30000) chrono.images.shift();
+    }
     this.mesures.imageMs = this.mesures.imageMs * 0.95 + (performance.now() - debut) * 0.05;
     const c = this._compteur;
     c.images++;
