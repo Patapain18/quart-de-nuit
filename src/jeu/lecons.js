@@ -456,6 +456,7 @@ export const LECONS = [
         id: 'nuit.jos',
         dire: [
           'Tu as entendu ? Ça va souffler très fort cette nuit, et tu es trop loin pour rentrer avant.',
+          'Regarde au sud-ouest, sur l\'horizon : ces grosses tours sombres, avec un toit plat. C\'est le front. Il sera sur nous à la nuit tombée.',
           'Alors on prépare le bateau, tant qu\'il fait jour. Voilà la liste. Elle est aussi dans ton carnet de bord, touche L.',
         ],
         verifier: () => true,

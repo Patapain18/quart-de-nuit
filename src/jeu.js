@@ -62,6 +62,8 @@ let journeeFaite = null; // la journée, une fois finie (pour le carnet : ses r�
 let options = lireOptions();
 let difficulte = options.difficulte;
 monde.surEclair = (distance, versLaMer) => audio.tonnerre(distance, versLaMer ? 1 : 0.7);
+// (les éclairs du front orageux, au loin : un grondement sourd, à peine)
+monde.surEclairLointain = (distance) => audio.tonnerre(distance, 0.3);
 
 function mettreALeau() {
   physique.placer(0, 0, (meteo.directionVent + 60) % 360, monde.houle);

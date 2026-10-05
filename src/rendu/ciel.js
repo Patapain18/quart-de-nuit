@@ -12,9 +12,10 @@
 import * as THREE from 'three';
 import { GLSL_ATMOSPHERE } from './glsl/atmosphere.js';
 import { GLSL_NUAGES, UNIFORMS_NUAGES } from './glsl/nuages.js';
+import { glslFront } from './glsl/front.js';
 import { GLSL_OUTILS, PassePleinEcran, SOMMET_PLEIN_ECRAN } from './outils.js';
 import { creerBruitNuages } from './bruit-nuages.js';
-import { INTENSITE_SOLEIL } from '../monde/meteo.js';
+import { INTENSITE_SOLEIL, geometrieFront } from '../monde/meteo.js';
 
 // Correspondance direction ↔ carte du ciel : la hauteur est « étirée » près de
 // l'horizon, là où les couleurs changent le plus vite.
@@ -129,10 +130,14 @@ ${GLSL_OUTILS}
 ${GLSL_ATMOSPHERE}
 ${GLSL_CARTE_CIEL}
 ${GLSL_NUAGES}
+${glslFront('uBruitNuages')}
 void main() {
   vec3 d = normalize(vDirection);
   vec3 dCiel = vec3(d.x, max(d.y, 0.0), d.z);
   vec3 c = texture(uCarteCiel, uvCarteCiel(normalize(dCiel))).rgb;
+  // le front orageux, au loin (la mer le reflète)
+  vec4 front = frontOrage(normalize(dCiel + vec3(0.0, 0.002, 0.0)), c, 0.0);
+  c = mix(c, front.rgb, front.a);
   vec3 origine = vec3(uPositionCamera.x, 2.0, uPositionCamera.z);
   vec4 n = nuagesVolume(origine, normalize(dCiel + vec3(0.0, 0.002, 0.0)), 22, 0.5);
   vec4 ci = cirrus(normalize(dCiel));
@@ -173,6 +178,7 @@ uniform float uBaseNuages;
 uniform float uOrage;
 ${GLSL_ATMOSPHERE}
 ${GLSL_CARTE_CIEL}
+${glslFront('uBruitLune')}
 float voileNuages(float t) { return exp(-t / mix(55000.0, 22000.0, uOrage)); }
 
 uvec3 pcg3d(uvec3 v) {
@@ -274,6 +280,11 @@ void main() {
     float apparition = smoothstep(0.55, 0.95, uNuit);
     derriere += (etoiles(d) * uNuit * apparition * uVisibiliteEtoiles + disqueLune(d) * mix(1.0, uVisibiliteEtoiles, 0.7)) * transmission;
   }
+  // le front orageux, devant le ciel (il cache le soleil qui se couche derrière lui), mais
+  // derrière les nuages proches
+  vec4 front = frontOrage(d, c, 1.0);
+  c = mix(c, front.rgb, front.a);
+  derriere *= 1.0 - front.a;
   vec4 n = texture(uNuagesEcran, gl_FragCoord.xy / uTailleEcran);
   // les nuages lointains prennent la couleur de l'air (la brume entre eux et nous)
   float tNuage = traverserSphere(vec3(0.0, RAYON_TERRE + 2.0, 0.0), dCiel + vec3(0.0, 0.001, 0.0), RAYON_TERRE + uBaseNuages).y;
@@ -298,6 +309,14 @@ export class Ciel {
     u.uDeriveNuages.value = new THREE.Vector2();
     for (const nom of ['uDirSoleil', 'uSoleilNuages', 'uDirLune', 'uLuneNuages', 'uAmbHaut', 'uAmbBas']) u[nom].value = v3();
     u.uEclair.value = new THREE.Vector4();
+    // Le front orageux (glsl/front.js), partagé par le fond, le cube et la mer
+    this.uniformsFront = {
+      uFront: { value: new THREE.Vector4() },
+      uFrontEclair: { value: new THREE.Vector4() },
+      uFrontAmbiance: { value: v3() },
+      uFrontSoleil: { value: v3() },
+      uFrontDirSoleil: { value: v3() },
+    };
 
     // 1. la carte du ciel
     this.carte = new THREE.WebGLRenderTarget(256, 128, {
@@ -372,6 +391,7 @@ export class Ciel {
           uVisibiliteEtoiles: { value: 1 },
           uBaseNuages: u.uBaseNuages,
           uOrage: u.uOrage,
+          ...this.uniformsFront,
         },
         vertexShader: SOMMET_FOND, fragmentShader: FRAGMENT_FOND,
         side: THREE.BackSide, depthWrite: false, depthTest: false,
@@ -391,7 +411,7 @@ export class Ciel {
     this.cameraCube.updateCoordinateSystem();
     this.sceneCube = new THREE.Scene();
     this.materiauCube = new THREE.ShaderMaterial({
-      uniforms: { ...u, uCarteCiel: { value: this.carte.texture }, uPositionCamera: { value: v3() } },
+      uniforms: { ...u, ...this.uniformsFront, uCarteCiel: { value: this.carte.texture }, uPositionCamera: { value: v3() } },
       vertexShader: SOMMET_CUBE, fragmentShader: FRAGMENT_CUBE, side: THREE.BackSide, depthWrite: false, depthTest: false,
     });
     this.sceneCube.add(new THREE.Mesh(new THREE.BoxGeometry(2, 2, 2), this.materiauCube));
@@ -440,6 +460,13 @@ export class Ciel {
     f.uLuminanceLune.value = 2.5 * ecl.eclatLune * ecl.nuit + 0.3;
     f.uRotationEtoiles.value = ecl.rotationEtoiles;
     f.uLatitude.value = ecl.latitude;
+    // le front orageux : plus il approche, plus il monte dans le ciel
+    const uf = this.uniformsFront;
+    const front = geometrieFront(meteo);
+    uf.uFront.value.set(front.azimut, front.demiLargeur, front.sommet, front.visibilite);
+    uf.uFrontAmbiance.value.copy(amb).multiplyScalar(1 / Math.PI);
+    uf.uFrontSoleil.value.fromArray(ecl.soleilNuages).multiplyScalar(2.5);
+    uf.uFrontDirSoleil.value.fromArray(ecl.dirSoleil);
   }
 
   // Le vent pousse les nuages (vitesse en m/s, angle vers lequel ils vont)

@@ -16,6 +16,7 @@ import { PassePleinEcran, SOMMET_PLEIN_ECRAN } from './outils.js';
 import { GLSL_CARTE_CIEL } from './ciel.js';
 import { GLSL_COQUE } from '../bateau/glsl-coque.js';
 import { COQUE } from '../bateau/forme.js';
+import { glslFront } from './glsl/front.js';
 
 const N_SILLAGE = 24; // points du sillage (le premier : la poupe ; puis un toutes les 2,5 s)
 
@@ -126,6 +127,7 @@ uniform float uPlancton;      // la nuit, l'écume remuée par le bateau s'illum
 const float PI = 3.14159265359;
 ${GLSL_CARTE_CIEL}
 ${GLSL_COQUE}
+${glslFront('uBruit')}
 
 float saturer(float x) { return clamp(x, 0.0, 1.0); }
 
@@ -313,6 +315,9 @@ ${cascades.map((_, i) => `  p = texture(uPentes${i}, vSource / uGrille${i}.x);
 
   // la brume : au loin, la mer se fond dans le ciel de l'horizon
   vec3 horizon = texture(uCarteCiel, uvCarteCiel(normalize(vec3(-v.x, 0.015, -v.z)))).rgb;
+  // (sous le front orageux, l'horizon est noir de pluie)
+  vec4 front = frontOrage(normalize(vec3(-v.x, 0.004, -v.z)), horizon, 0.0);
+  horizon = mix(horizon, front.rgb, front.a);
   float brume = 1.0 - exp(-distance * uBrume);
   couleur = mix(couleur, horizon, brume);
   gl_FragColor = vec4(couleur, 1.0);
@@ -422,6 +427,7 @@ export class Eau {
       uDirVent: { value: new THREE.Vector2(1, 0) },
       uBateauInverse: { value: new THREE.Matrix4() },
       uClipCoque: { value: 0 },
+      ...ciel.uniformsFront,
     };
     // une texture de déplacement, une de pentes et une fiche (taille, texel, flou max) par grille
     this.grilles.forEach(({ cascade: c, sortie }, i) => {

@@ -158,6 +158,9 @@ const CURSEURS = [
   { cle: 'orage', nom: 'Orage', min: 0, max: 1, pas: 0.01, format: (v) => `${Math.round(v * 100)} %`, mer: false },
   { cle: 'pluie', nom: 'Pluie', min: 0, max: 1, pas: 0.01, format: (v) => `${Math.round(v * 100)} %`, mer: false },
   { cle: 'brume', nom: 'Brume', min: 0, max: 1, pas: 0.01, format: (v) => `${Math.round(v * 100)} %`, mer: false },
+  { cle: 'front', nom: 'Front orageux (approche)', min: 0, max: 1, pas: 0.01, format: (v) => `${Math.round(v * 100)} %`, mer: false },
+  { cle: 'directionFront', nom: 'Le front est au', min: 0, max: 359, pas: 1, format: (v) => `${v}°`, mer: false },
+  { cle: 'largeurFront', nom: 'Largeur du front', min: 15, max: 90, pas: 1, format: (v) => `± ${v}°`, mer: false },
   { cle: 'houle.hs', nom: 'Houle de fond (hauteur)', min: 0, max: 6, pas: 0.1, format: (v) => `${v.toFixed(1)} m`, mer: true },
   { cle: 'houle.periode', nom: 'Houle de fond (période)', min: 6, max: 18, pas: 0.5, format: (v) => `${v} s`, mer: true },
 ];

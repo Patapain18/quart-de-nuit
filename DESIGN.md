@@ -405,17 +405,34 @@ qui ne répond plus) ; ce qui est dur, c'est **barrer, tenir un cap** ; l'élect
     s'allume : une lueur bleu-verte et de fines étincelles qui clignotent. Le sillage suit
     la vraie route (les virages aussi) et ne coûte rien de mesurable (120 images/s).
 
+14. ✅ **Le front orageux** (`src/rendu/glsl/front.js`) — le coucher de soleil était joli,
+    pas menaçant. Maintenant, dès la fin d'après-midi, une ligne d'orages monte à l'horizon
+    au sud-ouest (d'où vient le vent), et Jos la montre : « ces grosses tours sombres, avec
+    un toit plat. C'est le front ». Il est trop loin (de 160 à 22 km) pour avoir du relief
+    quand on bouge : on le peint donc dans le ciel, selon la direction du regard, comme un
+    décor de théâtre. Une dizaine de cellules d'orage (des colonnes arrondies, plus hautes
+    au milieu), une masse commune dessous, et l'enclume : les trois tours du milieu butent
+    contre le plafond (11 km) et s'étalent en un plateau mince, effiloché par-dessous. Le
+    modelé « chou-fleur » : chaque boule est plus claire sur le dessus (elle voit le ciel) ;
+    gris ardoise dans l'ombre, dorée sur les sommets que le soleil couchant éclaire, un
+    liseré en contre-jour, et le voile d'air bleuté qui adoucit ses noirs à 40 km. Il
+    approche (`front` : 0 → 1, dans la météo) et monte dans le ciel ; il cache le soleil
+    qui passerait derrière lui ; la mer le reflète et l'horizon s'assombrit dessous. À la
+    nuit tombée, des éclairs l'allument de l'intérieur (et un grondement sourd quand il est
+    à moins de 32 km). Au matin, on le revoit de l'autre côté, au nord-nord-est, qui
+    s'éloigne dans l'aube (pas devant le soleil levant : il ne gâche pas l'aube). Réglable dans l'atelier de la mer (« Front orageux »). Coût
+    mesuré : rien de visible (120 images/s).
+
 Et en passant : sous la pluie et dans les embruns, **le pont ruisselle** (le gelcoat et
 l'antidérapant deviennent brillants, le teck fonce : seulement la rugosité et la teinte des
 matériaux, sans rien recompiler) ; le navigateur qui refuse un instant de capturer la souris
 (juste après Échap) ne laisse plus d'erreur. Images : `docs/etape7-inspection-du-pont.jpg`,
 `docs/etape8-le-compas-et-le-radar-du-cockpit.jpg`, `docs/etape10-*.jpg` (la trombe),
 `docs/etape11-la-nuit-noire-et-la-lampe.jpg`, `docs/etape12-*.jpg` (le radar),
-`docs/etape13-*.jpg` (le sillage).
+`docs/etape13-*.jpg` (le sillage), `docs/etape14-*.jpg` (le front orageux).
 
 ## 4. Pistes graphiques notées pour plus tard
 
-- Le mur de cumulonimbus du front orageux, d'un côté du ciel, au coucher du soleil.
 - Le sillage du cargo (celui du voilier est fait : étape 13).
 - L'eau verte qui balaie le pont quand une très grosse déferlante passe dessus.
 - Le bruit de la mer calculé dans un « worker » (fil de calcul séparé) pour libérer 3 ms par image.

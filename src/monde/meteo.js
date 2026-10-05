@@ -30,27 +30,35 @@ export const AMBIANCES = {
   'fin-apres-midi': {
     regard: { cap: 245, site: 6 },
     nom: 'Fin d\'après-midi', heure: 16.9, vent: 17, directionVent: 235, nuages: 0.42, orage: 0.1, pluie: 0, brume: 0.18,
+    front: 0.18, directionFront: 214,
     houle: { hs: 1.6, periode: 12, direction: 270 },
   },
   'coucher-menacant': {
     regard: { soleil: -18, site: 5 },
     nom: 'Coucher de soleil menaçant', heure: 18.45, vent: 24, directionVent: 225, nuages: 0.58, orage: 0.45, pluie: 0.05, brume: 0.25,
+    front: 0.7, directionFront: 212,
     houle: { hs: 2.2, periode: 12, direction: 255 },
   },
   'nuit-tempete': {
     regard: { cap: 230, site: 4 },
     nom: 'Nuit de tempête', heure: 1.5, vent: 40, directionVent: 215, nuages: 1, orage: 1, pluie: 1, brume: 0.55,
+    front: 1, directionFront: 212,
     houle: { hs: 2.5, periode: 13, direction: 240 },
   },
   aube: {
     regard: { soleil: 15, site: 6 },
     nom: 'L\'aube après la tempête', heure: 5.35, vent: 14, directionVent: 260, nuages: 0.38, orage: 0, pluie: 0, brume: 0.3,
+    // (le front s'en va vers le nord-nord-est ; le soleil se lève à côté de lui)
+    front: 0.55, directionFront: 28, largeurFront: 40,
     houle: { hs: 3.2, periode: 14, direction: 245 },
   },
 };
 
 // Valeurs par défaut de ce qui n'est pas réglé dans une ambiance
-const DEFAUTS = { fetch: 150, latitude: 47, declinaison: 10, phaseLune: 0.42 };
+// (front : le front orageux, de 0 (au-delà de l'horizon) à 1 (sur nous) ; directionFront :
+// d'où on le voit, et largeurFront : sur quelle largeur de l'horizon, à droite et à gauche,
+// en degrés)
+const DEFAUTS = { fetch: 150, latitude: 47, declinaison: 10, phaseLune: 0.42, front: 0, directionFront: 212, largeurFront: 62 };
 
 export function etatMeteo(ambiance) {
   return { ...DEFAUTS, ...structuredClone(ambiance) };
@@ -69,6 +77,9 @@ export function interpoler(a, b, t) {
     orage: m(a.orage, b.orage),
     pluie: m(a.pluie, b.pluie),
     brume: m(a.brume, b.brume),
+    front: m(a.front ?? 0, b.front ?? 0),
+    directionFront: angle(a.directionFront ?? 212, b.directionFront ?? 212),
+    largeurFront: m(a.largeurFront ?? 62, b.largeurFront ?? 62),
     fetch: m(a.fetch, b.fetch),
     houle: {
       hs: m(a.houle.hs, b.houle.hs),
@@ -105,6 +116,36 @@ const lisse = (a, b, x) => {
   return t * t * (3 - 2 * t);
 };
 
+// Le front orageux vu d'ici (rendu/glsl/front.js le dessine) : d'où on le voit (azimut,
+// en radians, sens du compas), sa demi-largeur, la hauteur de ses sommets au-dessus de
+// l'horizon (radians) et sa visibilité. Ses sommets sont à 11 km d'altitude ; il est à
+// 160 km (front = 0, sous l'horizon) puis s'approche jusqu'à 22 km (front = 1 : il couvre
+// déjà le ciel, on ne le voit plus comme un mur).
+export function geometrieFront(meteo) {
+  const f = meteo.front ?? 0;
+  const distance = 160000 * Math.exp(-2 * f);
+  const chute = (distance * distance) / (2 * 6371000); // (la Terre est ronde)
+  return {
+    azimut: ((meteo.directionFront ?? 212) * Math.PI) / 180,
+    demiLargeur: ((meteo.largeurFront ?? 62) * Math.PI) / 180,
+    sommet: Math.max(0.01, Math.atan((11000 - chute) / distance)),
+    distance,
+    visibilite: lisse(0.02, 0.12, f) * (1 - lisse(0.9, 0.97, f)),
+  };
+}
+// Part du soleil cachée par le front (0 → 1) : quand il passe derrière ses tours
+function soleilDerriereLeFront(meteo, s) {
+  const front = geometrieFront(meteo);
+  if (front.visibilite <= 0) return 0;
+  const ecart = Math.atan2(Math.sin(s.azimut - front.azimut), Math.cos(s.azimut - front.azimut));
+  const x = ecart / front.demiLargeur;
+  if (Math.abs(x) >= 1) return 0;
+  // (la hauteur moyenne des tours ; leurs bosses font une marge)
+  const tours = front.sommet * Math.sqrt(1 - x * x) * 0.72;
+  const marge = front.sommet * 0.12;
+  return front.visibilite * lisse(tours + marge, tours - marge, Math.asin(Math.max(-1, Math.min(1, s.y))));
+}
+
 // La lumière qui découle du temps qu'il fait : direction et couleur du soleil et de
 // la lune, lumière du ciel, exposition. Les valeurs sont « pré-exposées » : la nuit,
 // on éclaire plus que la réalité pour que le joueur voie (comme au cinéma).
@@ -132,7 +173,9 @@ export function eclairage(meteo) {
   // Les nuages épais coupent le soleil direct et assombrissent la lumière du ciel
   const couverture = Math.min(1, meteo.nuages);
   const voile = Math.min(1, lisse(0.55, 1.0, couverture) * 0.88 + meteo.orage * 0.12);
-  const directVisible = Math.max(0, 1 - voile);
+  // (et le front orageux le cache quand il se couche derrière lui)
+  const soleilCache = soleilDerriereLeFront(meteo, s);
+  const directVisible = Math.max(0, 1 - voile) * (1 - 0.94 * soleilCache);
 
   // Lumière du ciel (ambiance) : ciel clair calculé, puis assombri par les nuages
   const ambSoleil = ambianceCiel(dirSoleil, INTENSITE_SOLEIL);
@@ -181,6 +224,7 @@ export function eclairage(meteo) {
     horizon: horizonVent,
     exposition,
     couverture,
+    soleilCache,
   };
 }
 

@@ -22,13 +22,14 @@ export const JOS = 'Jos';
 export const HEURE_COUCHER = 18.75; // la journée finit quand le soleil se couche
 
 // ---------- Le temps qu'il fait au fil de la journée ----------
-// Du matin calme au coucher de soleil menaçant : le vent forcit d'heure en heure.
+// Du matin calme au coucher de soleil menaçant : le vent forcit d'heure en heure, et en
+// fin d'après-midi le front orageux monte à l'horizon, au sud-ouest.
 const ETAPES_METEO = [
   [9, { ...AMBIANCES['matin-calme'], vent: 8, nuages: 0.2, brume: 0.25 }],
   [12.8, AMBIANCES.midi],
   [16.9, AMBIANCES['fin-apres-midi']],
   [18.45, AMBIANCES['coucher-menacant']],
-  [20.5, { ...AMBIANCES['coucher-menacant'], vent: 30, nuages: 0.85, orage: 0.75, pluie: 0.35 }],
+  [20.5, { ...AMBIANCES['coucher-menacant'], vent: 30, nuages: 0.85, orage: 0.75, pluie: 0.35, front: 0.95 }],
 ];
 export function meteoDuJour(heure) {
   let i = 0;

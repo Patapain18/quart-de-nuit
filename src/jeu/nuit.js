@@ -81,19 +81,22 @@ export const DIFFICULTES = {
 const COUCHER = AMBIANCES['coucher-menacant'];
 const TEMPETE = AMBIANCES['nuit-tempete'];
 const ETAPES_METEO = [
-  [HEURE_COUCHER, { ...COUCHER, vent: 25, directionVent: 222, nuages: 0.68, orage: 0.6, pluie: 0.08, brume: 0.28, houle: { hs: 2.2, periode: 12, direction: 252 } }],
+  [HEURE_COUCHER, { ...COUCHER, vent: 25, directionVent: 222, nuages: 0.68, orage: 0.6, pluie: 0.08, brume: 0.28, front: 0.76, houle: { hs: 2.2, periode: 12, direction: 252 } }],
   // (le front orageux couvre le ciel peu après le coucher du soleil : la lune disparaît)
-  [19.6, { ...COUCHER, vent: 27, directionVent: 221, nuages: 0.95, orage: 0.72, pluie: 0.22, brume: 0.32, houle: { hs: 2.25, periode: 12, direction: 250 } }],
-  [20.5, { ...COUCHER, vent: 30, directionVent: 220, nuages: 0.97, orage: 0.8, pluie: 0.4, brume: 0.36, houle: { hs: 2.3, periode: 12, direction: 248 } }],
+  [19.6, { ...COUCHER, vent: 27, directionVent: 221, nuages: 0.95, orage: 0.72, pluie: 0.22, brume: 0.32, front: 0.95, houle: { hs: 2.25, periode: 12, direction: 250 } }],
+  [20.5, { ...COUCHER, vent: 30, directionVent: 220, nuages: 0.97, orage: 0.8, pluie: 0.4, brume: 0.36, front: 1, houle: { hs: 2.3, periode: 12, direction: 248 } }],
   [22.5, { ...TEMPETE, vent: 35, directionVent: 217, nuages: 0.97, orage: 0.92, pluie: 0.75, brume: 0.48 }],
   [24.5, { ...TEMPETE, vent: 39 }],
   [26.3, { ...TEMPETE, vent: 42 }],
   [27.4, { ...TEMPETE, vent: 38, directionVent: 230, houle: { ...TEMPETE.houle, direction: 244 } }],
-  [28.4, { ...TEMPETE, vent: 27, directionVent: 245, nuages: 0.72, orage: 0.3, pluie: 0.3, brume: 0.4, houle: { hs: 3.0, periode: 13, direction: 245 } }],
+  // (le front est passé : on le revoit de l'autre côté, au nord-nord-est, qui s'éloigne ;
+  // il tourne pendant qu'il est encore au-dessus de nous, quand on ne le voit pas)
+  [27.5, { ...TEMPETE, vent: 37, directionVent: 231, front: 0.975, directionFront: 28, largeurFront: 45, houle: { ...TEMPETE.houle, direction: 244 } }],
+  [28.4, { ...TEMPETE, vent: 27, directionVent: 245, nuages: 0.72, orage: 0.3, pluie: 0.3, brume: 0.4, front: 0.8, directionFront: 28, largeurFront: 45, houle: { hs: 3.0, periode: 13, direction: 245 } }],
   [29.4, { ...AMBIANCES.aube, vent: 17 }],
   [HEURE_AUBE, AMBIANCES.aube],
   // (le matin après la tempête : le ciel se dégage, la mer reste formée)
-  [HEURE_LEVER, { ...AMBIANCES.aube, vent: 12, directionVent: 265, nuages: 0.3, orage: 0, pluie: 0, brume: 0.22, houle: { hs: 2.8, periode: 14, direction: 250 } }],
+  [HEURE_LEVER, { ...AMBIANCES.aube, vent: 12, directionVent: 265, nuages: 0.3, orage: 0, pluie: 0, brume: 0.22, front: 0.32, houle: { hs: 2.8, periode: 14, direction: 250 } }],
 ];
 export function meteoDeLaNuit(heure, niveau = DIFFICULTES.marin) {
   let i = 0;

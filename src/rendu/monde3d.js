@@ -5,7 +5,7 @@ import { Houle } from '../mer/houle.js';
 import { Ciel } from './ciel.js';
 import { Eau } from './eau.js';
 import { Post } from './post.js';
-import { eclairage, etalonnage, etatMer, angleVers, NOEUD } from '../monde/meteo.js';
+import { eclairage, etalonnage, etatMer, angleVers, NOEUD, geometrieFront } from '../monde/meteo.js';
 import { Bateau } from '../bateau/bateau.js';
 import { Pluie } from './pluie.js';
 import { Eclairs } from './eclairs.js';
@@ -282,6 +282,43 @@ export class Monde3D {
       this.lumiereEclair.target.updateMatrixWorld();
     }
     this.lumiereEclair.intensity = e.intensite * 1.3;
+    this.majEclairsDuFront(dt);
+  }
+
+  // Les éclairs dans le front orageux, au loin, dès que le jour baisse : une boule du
+  // nuage s'allume de l'intérieur, une à quatre fois de suite. (Trop loin pour qu'on voie
+  // le trait ; le tonnerre n'est qu'un grondement sourd, et seulement quand il approche.)
+  majEclairsDuFront(dt) {
+    const f = (this.eclairsFront ??= { prochain: 4, flashs: [] });
+    const uf = this.ciel.uniformsFront;
+    const [azimut, demiLargeur, sommet, visibilite] = uf.uFront.value.toArray();
+    const crepuscule = Math.max(this.ecl.nuit, 1 - this.ecl.jour, this.meteo.orage > 0.6 ? 1 : 0);
+    if (visibilite > 0.05 && crepuscule > 0.2) {
+      f.prochain -= dt * crepuscule;
+      if (f.prochain <= 0) {
+        const az = azimut + (Math.random() * 2 - 1) * demiLargeur * 0.75;
+        const el = sommet * (0.15 + Math.random() * 0.6);
+        const rayon = sommet * (0.1 + Math.random() * 0.16);
+        const nb = 1 + Math.floor(Math.random() * 4);
+        for (let i = 0; i < nb; i++) {
+          f.flashs.push({ az, el, rayon, debut: this.temps + i * (0.06 + Math.random() * 0.18), force: 0.5 + Math.random() });
+        }
+        const distance = geometrieFront(this.meteo).distance;
+        if (distance < 32000) this.surEclairLointain?.(distance);
+        f.prochain = 2 + Math.random() * 8;
+      }
+    }
+    f.flashs = f.flashs.filter((x) => this.temps - x.debut < 0.5);
+    let meilleur = 0;
+    let actif = null;
+    for (const x of f.flashs) {
+      const age = this.temps - x.debut;
+      if (age < 0) continue;
+      const v = x.force * Math.exp(-age * 12) * (age < 0.015 ? age / 0.015 : 1);
+      if (v > meilleur) { meilleur = v; actif = x; }
+    }
+    if (actif) uf.uFrontEclair.value.set(actif.az, actif.el, actif.rayon, meilleur * visibilite);
+    else uf.uFrontEclair.value.w = 0;
   }
 
   // (le chronomètre : mesure une partie du calcul, si on l'a demandé)
