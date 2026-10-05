@@ -393,6 +393,13 @@ qui ne répond plus) ; ce qui est dur, c'est **barrer, tenir un cap** ; l'élect
     une vingtaine de secondes (il nous suit), puis disparaît. Jos : « Sur le mien, il n'y a
     que toi ».
 
+Et en passant : sous la pluie et dans les embruns, **le pont ruisselle** (le gelcoat et
+l'antidérapant deviennent brillants, le teck fonce : seulement la rugosité et la teinte des
+matériaux, sans rien recompiler) ; le navigateur qui refuse un instant de capturer la souris
+(juste après Échap) ne laisse plus d'erreur. Images : `docs/etape7-inspection-du-pont.jpg`,
+`docs/etape8-le-compas-et-le-radar-du-cockpit.jpg`, `docs/etape10-*.jpg` (la trombe),
+`docs/etape11-la-nuit-noire-et-la-lampe.jpg`, `docs/etape12-*.jpg` (le radar).
+
 ## 4. Pistes graphiques notées pour plus tard
 
 - Le front orageux du coucher de soleil (un mur de cumulonimbus d'un côté du ciel).

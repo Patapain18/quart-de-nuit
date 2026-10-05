@@ -549,6 +549,7 @@ function simuler(dt) {
   r.angleSafran = physique.barre;
   bateau.instruments.maj(dt, m, monde.ecl.nuit);
   majRadar(dt);
+  mouillerLePont(dt);
   // l'eau embarquée : dans le cockpit, et dans la cabine au-dessus des planchers
   bateau.eauABord.maj(dt, bateau.groupe, {
     litresCockpit: physique.eauCockpit,
@@ -874,6 +875,28 @@ function vivreLaNuit(dt) {
     meteo = nuit.meteo;
     jeu.meteo = meteo;
     monde.regler(meteo, { recalculerMer: mer, brusque: false });
+  }
+}
+
+// ---------- Le pont mouillé ----------
+// Sous la pluie et dans les embruns, tout ce qui est à bord ruisselle : le gelcoat et
+// l'antidérapant deviennent brillants (la lampe et les éclairs s'y reflètent), le teck
+// fonce. (Seulement la rugosité et la teinte des matériaux : aucun shader à refaire.)
+const materiauxSecs = new Map();
+function mouillerLePont(dt) {
+  const vise = Math.min(1, meteo.pluie * 1.3 + Math.max(0, (meteo.vent - 25) / 20) * 0.5);
+  etat.mouille = (etat.mouille ?? 0) + (vise - (etat.mouille ?? 0)) * Math.min(1, dt * (vise > (etat.mouille ?? 0) ? 0.5 : 0.05));
+  const w = etat.mouille;
+  if (Math.abs(w - (etat.mouilleApplique ?? -1)) < 0.01) return;
+  etat.mouilleApplique = w;
+  const mat = bateau.materiaux;
+  for (const [nom, rugueuxMouille, assombri] of [['gelcoat', 0.08, 0.92], ['coque', 0.08, 0.95], ['antiderapant', 0.28, 0.85], ['teck', 0.32, 0.62]]) {
+    const m = mat[nom];
+    if (!m) continue;
+    if (!materiauxSecs.has(nom)) materiauxSecs.set(nom, { rugosite: m.roughness, couleur: m.color.clone() });
+    const sec = materiauxSecs.get(nom);
+    m.roughness = THREE.MathUtils.lerp(sec.rugosite, rugueuxMouille, w);
+    m.color.copy(sec.couleur).multiplyScalar(THREE.MathUtils.lerp(1, assombri, w));
   }
 }
 

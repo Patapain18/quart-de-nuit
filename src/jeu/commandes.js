@@ -57,7 +57,10 @@ export class Commandes {
   }
 
   capturer() {
-    this.element.requestPointerLock?.();
+    // (le navigateur peut refuser : juste après avoir quitté avec Échap, il faut attendre
+    // un instant ; on recliquera. Pas la peine d'en faire une erreur.)
+    const demande = this.element.requestPointerLock?.();
+    demande?.catch?.(() => {});
   }
 
   enfoncee(nom) { return this.enfoncees.has(TOUCHES[nom].code); }
