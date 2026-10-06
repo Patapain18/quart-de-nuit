@@ -289,6 +289,8 @@ function afficher() {
   const points = [];
   for (const res of etat.resultats ?? []) {
     for (const d of res.deferlantes) points.push({ heure: d.heure, y: d.gite, r: 2.5 + 3 * Math.min(1.2, d.force), couleur: couleur(COULEURS[res.cle]) });
+    // (les vagues scélérates : de plus gros points)
+    for (const d of res.scelerates ?? []) points.push({ heure: d.heure, y: d.gite, r: 8, couleur: couleur(COULEURS[res.cle]) });
   }
   for (const d of etat.toi?.deferlantes ?? []) points.push({ heure: d.heure, y: d.gite, r: 2.5 + 3 * Math.min(1.2, d.force), couleur: couleur('--toi') });
   graphe('graphe-gite', { series: gite, yMax: 90, yPas: 15, unite: '°', seuils: [{ y: 60, texte: 'couché' }], points });
@@ -310,7 +312,7 @@ function afficherTableau() {
   const lignes = [...(etat.resultats ?? [])];
   if (etat.toi) lignes.push({ ...etat.toi, cle: 'toi', nom: 'toi' });
   const t = document.getElementById('tableau');
-  t.innerHTML = `<thead><tr><th>Marin</th><th>Issue</th><th class="nombre">Déferlantes</th><th class="nombre">Gîte max</th><th class="nombre">Eau max</th><th class="nombre">Pompé</th><th>Avaries</th><th class="nombre">Trombe</th><th class="nombre">Cargo</th><th class="nombre">Parcouru</th></tr></thead>`
+  t.innerHTML = `<thead><tr><th>Marin</th><th>Issue</th><th class="nombre">Déferlantes</th><th class="nombre">Scélérates</th><th class="nombre">Gîte max</th><th class="nombre">Eau max</th><th class="nombre">Pompé</th><th>Avaries</th><th class="nombre">Trombe</th><th class="nombre">Cargo</th><th class="nombre">Parcouru</th></tr></thead>`
     + `<tbody>${lignes.map((r) => {
       const s = r.stats;
       const issue = r.fin === 'aube' ? 'aube' : 'perdue';
@@ -319,6 +321,7 @@ function afficherTableau() {
       return `<tr><td><span class="marque${r.cle === 'toi' ? ' pointilles' : ''}" style="background:${couleur(COULEURS[r.cle])}"></span>${r.nom}</td>`
         + `<td class="issue" data-issue="${issue}">${issue === 'aube' ? 'a vu l\'aube' : `${raison} à ${heureEnTexte(r.heureFin)}`}</td>`
         + `<td class="nombre">${s.deferlantes}${s.coups ? ` (${s.coups} couché${s.coups > 1 ? 's' : ''})` : ''}</td>`
+        + `<td class="nombre">${s.scelerates ?? 0}${s.sceleratesCouche ? ` (${s.sceleratesCouche} couché${s.sceleratesCouche > 1 ? 's' : ''})` : ''}</td>`
         + `<td class="nombre">${Math.round(s.giteMax)}°</td><td class="nombre">${Math.round(s.caleMax)} L</td><td class="nombre">${Math.round(s.pompee)} L</td>`
         + `<td>${avaries.join(', ') || '—'}</td><td class="nombre">${metres(s.trombeDistance)}</td><td class="nombre">${metres(s.cargoDistance)}${s.cargoAppele ? ' ☎' : ''}</td>`
         + `<td class="nombre">${(s.distance / 1852).toFixed(1)} mille${s.distance >= 3704 ? 's' : ''}</td></tr>`;

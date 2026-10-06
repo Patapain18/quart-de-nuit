@@ -223,6 +223,18 @@ export class Audio {
     diesel.connect(module).connect(this.moteur.filtre).connect(this.moteur.gain).connect(this.bus.dehors);
     diesel.start();
     battement.start();
+    // la vague scélérate : un grondement grave qui enfle pendant qu'elle approche, et
+    // dessous une pulsation sourde (deux notes très graves, presque pareilles, qui battent
+    // lentement l'une contre l'autre : on la sent plus qu'on ne l'entend)
+    this.scelerate = { filtre: filtre('lowpass', 120, 0.8), gain: gain(), pulsation: gain() };
+    source(this.brun, 0.6).connect(this.scelerate.filtre).connect(this.scelerate.gain).connect(this.bus.dehors);
+    for (const f of [43, 45.5, 87]) {
+      const o = ctx.createOscillator();
+      o.frequency.value = f;
+      o.connect(gain(f > 80 ? 0.25 : 0.5)).connect(this.scelerate.pulsation);
+      o.start();
+    }
+    this.scelerate.pulsation.connect(this.bus.dehors);
     this.ageWinch = 0;
     this.ageCraquement = 0;
 
@@ -256,6 +268,22 @@ export class Audio {
     this.boucles[nom] = { source: s, gain: g };
     // la trombe : les mêmes enregistrements, ralentis (plus graves), font son grondement de
     // train de marchandises (le vent de tempête à mi-vitesse) et le fracas de l'eau arrachée
+    if (nom === 'mer-forte') {
+      // (et la vague scélérate : sa crête qui s'écroule, un rugissement plus grave encore)
+      const r = ctx.createBufferSource();
+      r.buffer = s.buffer;
+      r.loop = true;
+      [r.loopStart, r.loopEnd] = infos.boucle;
+      r.playbackRate.value = 0.52;
+      const f = ctx.createBiquadFilter();
+      f.type = 'lowpass';
+      f.frequency.value = 300;
+      const g2 = ctx.createGain();
+      g2.gain.value = 0;
+      r.connect(f).connect(g2).connect(this.bus.dehors);
+      r.start(0, infos.boucle[0] + Math.random() * (infos.boucle[1] - infos.boucle[0]));
+      this.boucles['scelerate-mer-forte'] = { source: r, gain: g2, filtre: f };
+    }
     if (nom === 'vent-rafales' || nom === 'mer-forte') {
       const t = ctx.createBufferSource();
       t.buffer = s.buffer;
@@ -374,6 +402,19 @@ export class Audio {
     this.vers(this.trombe.gain.gain, 0.9 * tr * tr * (grondement ? 0.5 : 1), 0.5);
     this.vers(this.trombe.gainSifflement.gain, 0.12 * tr * tr * tr, 0.5);
     this.vers(this.moteur.gain.gain, 0.5 * (e.cargo ?? 0) ** 2, 0.8);
+    // la vague scélérate (0 : loin → 1 : sur nous ; deferle : sa crête s'écroule) : le
+    // grondement monte et s'éclaircit, la pulsation enfle, puis la crête rugit
+    const sc = e.scelerate ?? 0;
+    const df = e.deferle ?? 0;
+    this.niveaux.scelerate = sc;
+    this.vers(this.scelerate.gain.gain, 1.4 * sc ** 1.5, 0.9);
+    this.vers(this.scelerate.filtre.frequency, 90 + 650 * sc * sc, 0.9);
+    this.vers(this.scelerate.pulsation.gain, 0.22 * Math.min(1, sc * 1.6), 1.5);
+    const rugit = this.boucles['scelerate-mer-forte'];
+    if (rugit) {
+      this.vers(rugit.gain.gain, 1.6 * df * sc ** 2, 0.5);
+      this.vers(rugit.filtre.frequency, 280 + 2600 * df * sc * sc, 0.5);
+    }
     // le bois et les cordages travaillent : d'autant plus que le bateau est secoué et que
     // le vent forcit (un craquement de temps en temps par beau temps, sans cesse dans la tempête)
     this.ageCraquement += dt;
@@ -779,6 +820,30 @@ export class Audio {
     // (et toute la coque gémit sous le choc)
     for (let k = 0; k < 2; k++) {
       this.jouer('craquements', { dans: dans + 0.1 + k * 0.35, gain: 0.5 + 0.5 * force, vitesse: 0.5 + 0.2 * Math.random(), pan: (Math.random() - 0.5) * 1.2 });
+    }
+  }
+
+  // La vague scélérate s'abat sur le bateau : un fracas énorme, un coup sourd dans toute la
+  // coque, et le bois qui hurle
+  chocScelerate() {
+    if (!this.actif()) return;
+    this.deferlante(1.5, 0.02);
+    this.choc(1);
+    const ctx = this.ctx;
+    const t = ctx.currentTime;
+    // (un coup très grave, long : la masse d'eau sur le pont)
+    const o = ctx.createOscillator();
+    o.frequency.setValueAtTime(60, t);
+    o.frequency.exponentialRampToValueAtTime(24, t + 1.2);
+    const a = ctx.createGain();
+    a.gain.setValueAtTime(0.0001, t);
+    a.gain.linearRampToValueAtTime(1, t + 0.02);
+    a.gain.exponentialRampToValueAtTime(0.001, t + 1.6);
+    o.connect(a).connect(this.bus.bord);
+    o.start(t);
+    o.stop(t + 1.7);
+    for (let k = 0; k < 4; k++) {
+      this.jouer('craquements', { dans: 0.2 + k * 0.4 + Math.random() * 0.2, gain: 0.8, vitesse: 0.4 + 0.2 * Math.random(), pan: (Math.random() - 0.5) * 1.6 });
     }
   }
 

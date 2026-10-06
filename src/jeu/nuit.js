@@ -7,6 +7,8 @@
 //  - des avaries : l'écoute de foc qui casse (usée contre le hauban), une voile qui se
 //    déchire quand on en garde trop, le pilote automatique qui lâche ;
 //  - une trombe marine au crépuscule, un cargo qui croise la route vers 22 h 30 ;
+//  - deux ou trois vagues scélérates de 10 à 12 m (annoncées : le grondement, Jos, le
+//    radar) : à prendre droit dans l'arrière, sinon elles couchent le bateau ;
 //  - Jos veille à la radio, depuis son sémaphore, et conseille quand ça va mal.
 // On a gagné si le bateau est encore à flot, et le marin à bord, quand le jour se lève.
 //
@@ -20,6 +22,7 @@
 import { Vector3 } from 'three';
 import { AMBIANCES, etatMeteo, interpoler, angleVers } from '../monde/meteo.js';
 import { Deferlantes } from '../monde/deferlantes.js';
+import { Scelerates, chocScelerate } from '../monde/scelerates.js';
 import { directionEnMots } from './radio.js';
 import { NOM_BATEAU, JOS, HEURE_COUCHER, heureEnTexte } from './journee.js';
 import { LISTE_NUIT } from './lecons.js';
@@ -72,9 +75,9 @@ const MOMENTS = [
 
 // La difficulté (l'atelier de la tempête sert à la régler)
 export const DIFFICULTES = {
-  matelot: { nom: 'Matelot', deferlantes: 0.6, force: 0.85, fuite: 0.6, avaries: 0.7, vent: -3 },
-  marin: { nom: 'Marin', deferlantes: 1, force: 1, fuite: 1, avaries: 1, vent: 0 },
-  caphornier: { nom: 'Cap-hornier', deferlantes: 1.5, force: 1.12, fuite: 1.4, avaries: 1.3, vent: 4 },
+  matelot: { nom: 'Matelot', deferlantes: 0.6, force: 0.85, fuite: 0.6, avaries: 0.7, vent: -3, scelerates: 2, hauteurScelerate: 10 },
+  marin: { nom: 'Marin', deferlantes: 1, force: 1, fuite: 1, avaries: 1, vent: 0, scelerates: 3, hauteurScelerate: 11 },
+  caphornier: { nom: 'Cap-hornier', deferlantes: 1.5, force: 1.12, fuite: 1.4, avaries: 1.3, vent: 4, scelerates: 3, hauteurScelerate: 12 },
 };
 
 // ---------- Le temps qu'il fait pendant la nuit ----------
@@ -190,6 +193,15 @@ export class Nuit {
       coups: 26.9 + etrange() * 0.5,
       echo: 25.05 + etrange() * 0.4,
     });
+    // les vagues scélérates (un hasard à part, lui aussi) : la première quand le vent monte,
+    // la deuxième au plus fort — pendant que Jos ne répond plus —, la dernière quand le
+    // vent tourne (une vague croisée, d'une autre direction que les autres)
+    const scel = generateur(graine * 15485863 + 11);
+    this.hasardScelerate = scel;
+    const heuresScelerates = [21.3 + scel() * 0.3, this.prevu.silence + 0.08 + scel() * 0.1, 27.75 + scel() * 0.3];
+    heuresScelerates.slice(0, this.niveau.scelerates ?? 3).forEach((h, k) => { this.prevu[`scelerate${k}`] = h; });
+    this.scelerates = null; // (le chef d'orchestre : monde/scelerates.js ; il lui faut la houle)
+    this.aLancer = null; // (une vague à lancer tout de suite : pour vérifier)
     this.echoFantome = null; // { distance, releve (rad, dans le monde), age, duree } : sur le radar
     this.hasardEtrange = etrange;
     this.silence = false; // (Jos ne répond plus)
@@ -200,6 +212,7 @@ export class Nuit {
     this.stats = {
       deferlantes: 0, coups: 0, giteMax: 0, couche: 0, pompee: 0, distance: 0, vitesseMax: 0, caleMax: 0,
       cargoDistance: Infinity, cargoAppele: false, trombeDistance: Infinity, aLaBarre: 0,
+      scelerates: 0, sceleratesCouche: 0,
     };
     this.journal = [];
     this.conseils = {};
@@ -256,6 +269,7 @@ export class Nuit {
     this.avancerHeure(dt, ctx);
     this.meteo = meteoDeLaNuit(this.heure, this.niveau);
     ctx.meteo = this.meteo;
+    this.suivreScelerates(dt, ctx);
     this.suivreDeferlantes(dt, ctx);
     this.suivreEau(dt, ctx);
     this.suivreAvaries(dt, ctx);
@@ -302,7 +316,10 @@ export class Nuit {
 
   // ---------- Les déferlantes ----------
   suivreDeferlantes(dt, ctx) {
-    const frappe = this.deferlantes.maj(dt, this.meteo, this.niveau.deferlantes);
+    // (quand une vague scélérate arrive, les autres vagues se taisent : plus de déferlantes)
+    const d = this.scelerates?.vague?.distance ?? Infinity;
+    const calme = d < 420 && d > -220;
+    const frappe = this.deferlantes.maj(dt, this.meteo, calme ? 0 : this.niveau.deferlantes);
     const a = this.deferlantes.annonce;
     if (a && a !== this.annonceVue) {
       this.annonceVue = a;
@@ -336,8 +353,10 @@ export class Nuit {
       if (s.t <= 0) {
         if (s.gite > 60) {
           this.stats.coups++;
-          this.ecrire(`Une déferlante a couché le bateau à ${Math.round(s.gite)}°.`);
-        }
+          if (s.scelerate) this.stats.sceleratesCouche++;
+          this.ecrire(`${s.scelerate ? 'La vague scélérate' : 'Une déferlante'} a couché le bateau à ${Math.round(s.gite)}°.`);
+        } else if (s.scelerate) this.ecrire(`Passé la vague scélérate (gîte ${Math.round(s.gite)}°).`);
+        if (s.scelerate && this.scelerates?.vague) this.scelerates.vague.couche = s.gite > 60;
         this.suiviCoup = null;
       }
     }
@@ -470,6 +489,94 @@ export class Nuit {
     }
     this.emettre('reparee', nom);
     return true;
+  }
+
+  // ---------- Les vagues scélérates ----------
+  suivreScelerates(dt, ctx) {
+    if (!ctx.houle) return;
+    this.scelerates ??= new Scelerates(ctx.houle);
+    const sc = this.scelerates;
+    const p = ctx.physique.position;
+    if (!sc.active) {
+      // l'heure venue, une vague naît au vent du bateau (elle attend que la trombe soit
+      // partie, et que le cargo soit loin)
+      const occupe = (this.trombe && this.trombe.force > 0.1 && this.trombe.distance < 2500) || (this.cargo && this.cargo.distance < 1800);
+      for (let k = 0; k < 3 && !occupe; k++) {
+        const nom = `scelerate${k}`;
+        if (this.faits.has(nom) || !(this.heure >= this.prevu[nom])) continue;
+        this.faits.add(nom);
+        this.lancerScelerate(k, ctx);
+        break;
+      }
+      if (this.aLancer && !sc.active) this.lancerScelerate(this.aLancer.numero, ctx, this.aLancer);
+      this.aLancer = null;
+    }
+    if (!sc.active) return;
+    for (const etape of sc.maj(dt, p.x, p.z)) this.etapeScelerate(etape, ctx);
+  }
+
+  // Une vague naît : du côté du vent (la dernière, d'un côté plus inattendu)
+  lancerScelerate(k, ctx, { depuis = null, hauteur = null } = {}) {
+    const h = this.hasardScelerate;
+    const ecart = (k === 2 ? 34 + 14 * h() : 10 + 18 * h()) * (h() < 0.5 ? -1 : 1);
+    const de = depuis ?? (this.meteo.directionVent + ecart + 360) % 360; // d'où elle vient (cap)
+    const vers = ((de + 180) * Math.PI) / 180;
+    const haut = hauteur ?? (this.niveau.hauteurScelerate ?? 11) + (h() - 0.5) * 0.8;
+    const p = ctx.physique.position;
+    const w = this.scelerates.lancer({ x: p.x, z: p.z, dx: Math.sin(vers), dz: -Math.cos(vers), hauteur: haut });
+    w.depuis = de;
+    w.numero = k;
+    this.stats.scelerates++;
+    this.emettre('scelerate-nee', w);
+  }
+
+  // Une vague tout de suite (pour vérifier) : depuis (cap d'où elle vient) et hauteur, si
+  // on veut les choisir
+  provoquerScelerate({ depuis = null, hauteur = null } = {}) {
+    this.aLancer = { numero: 0, depuis, hauteur };
+  }
+
+  etapeScelerate(etape, ctx) {
+    const w = this.scelerates.vague;
+    if (!w) return;
+    const relatif = ecartAngle(w.depuis, ctx.m.cap);
+    const metres = Math.round(w.v.hauteur);
+    if (etape === 'grondement') this.emettre('scelerate-grondement', w);
+    else if (etape === 'annonce') {
+      const de = directionEnMots(w.depuis);
+      this.ecrire(`Une vague énorme (${metres} m) arrive ${/^[eo]/.test(de) ? 'de l\'' : 'du '}${de}.`);
+      // (pendant le silence, Jos essaie… on ne reçoit que des bribes)
+      if (this.silence) {
+        this.radio.fantome?.('… ague … …orme … dans ton arr… … tiens-t…', { canal: 72, duree: 5 });
+        this.emettre('scelerate', { ...w, relatif, sansJos: true });
+        return;
+      }
+      this.dire([
+        `${NOM_BATEAU}, ${NOM_BATEAU}, ici ${JOS} ! La bouée du large vient de mesurer une vague de ${metres} mètres. Elle arrive sur toi, ${directionRelative(relatif)}. Dans une minute !`,
+        'Mets-la droit dans ton arrière, et ne la prends surtout pas de travers ! Accroche-toi, et ferme la porte !',
+      ], { urgent: true });
+      this.emettre('scelerate', { ...w, relatif });
+    } else if (etape === 'proche') this.emettre('scelerate-proche', { ...w, relatif });
+    else if (etape === 'eclair') this.emettre('scelerate-eclair', w);
+    else if (etape === 'trou') this.emettre('scelerate-trou', w);
+    else if (etape === 'choc') {
+      const c = chocScelerate(ctx.physique, this.scelerates, { porteOuverte: ctx.aBord.descenteOuverte });
+      this.eau.cockpit = Math.min(EAU.cockpitMax, this.eau.cockpit + c.cockpit);
+      this.eau.cale += c.interieur;
+      // (le suivi : couché ou pas, emporté si l'on est sur le pont sans harnais ; la force
+      // compte comme une très grosse déferlante)
+      this.suiviCoup = { t: 6, gite: 0, force: 1.3, angle: c.angle, prise: c.prise, scelerate: true };
+      // (le pilote peut lâcher : la barre arrachée par la vague — moins souvent si on l'a
+      // bien prise par l'arrière)
+      if (ctx.pilote && this.avaries.pilote === 'ok' && this.hasardScelerate() < (c.angle > 150 ? 0.15 : 0.4)) this.avarie('pilote', ctx);
+      this.emettre('scelerate-choc', { ...c, vers: this.scelerates.direction(), relatif });
+    } else if (etape === 'passee') {
+      this.emettre('scelerate-passee', w);
+      if (this.silence) return;
+      this.dire([w.couche
+        ? `${NOM_BATEAU} ? ${NOM_BATEAU}, tu me reçois ? … Elle t'a couché, hein. Respire. Regarde ton bateau : pompe, et vérifie tes voiles et ton pilote.`
+        : `${NOM_BATEAU} ? Tu m'entends ? … Tu es passé. Bien joué, matelot. Garde un œil derrière toi : il peut y en avoir d'autres.`], { urgent: true });
+    }
   }
 
   // ---------- La trombe marine (au crépuscule) ----------
@@ -690,7 +797,8 @@ export class Nuit {
       this.silence = true;
       this.emettre('etrange', 'silence');
     }
-    if (this.silence && h >= this.prevu.silence + 0.55) {
+    // (il ne revient qu'une fois la vague scélérate passée : on l'affronte seul)
+    if (this.silence && h >= this.prevu.silence + 0.55 && !(this.scelerates?.active && this.scelerates.vague.distance > -120)) {
       this.silence = false;
       this.ecrire('Jos est revenu.');
       this.dernierEtrange = { nom: 'retour', heure: h };
@@ -801,6 +909,8 @@ export class Nuit {
     const toileOk = (p) => p.ris >= 2 && p.deroule <= 0.45;
     return [
       { id: 'pilote', apres: 3, repos: 30, si: (ctx) => this.avaries.pilote === 'panne' && ctx.mode !== 'barre', dire: 'Personne à la barre ! Prends-la, sinon le bateau va se mettre en travers des vagues.' },
+      // (une vague scélérate arrive, et le bateau ne lui tourne pas le dos)
+      { id: 'scelerate', apres: 3, repos: 14, si: (ctx) => { const w = this.scelerates?.vague; return !!w && w.faites.has('annonce') && w.distance > 150 && w.distance < 760 && Math.abs(ecartAngle(w.depuis, ctx.m.cap)) < 140; }, dire: 'Elle va te prendre par le travers ! Abats, mets-la droit dans ton arrière, vite !' },
       { id: 'harnais', apres: 4, repos: 40, si: (ctx) => this.meteo.vent >= 25 && ctx.aBord.dehors && !ctx.aBord.attache, dire: 'Accroche ton harnais, touche X ! Une déferlante peut t\'emporter.' },
       { id: 'focBat', apres: 8, repos: 30, si: (ctx) => this.avaries.ecouteFoc === 'cassee' && ctx.physique.deroule > 0.05, dire: 'Roule ce foc qui bat, vite ! À la barre, touche C.' },
       { id: 'gvDechiree', apres: 10, repos: 40, si: (ctx) => this.avaries.grandVoile === 'dechiree' && ctx.physique.ris < 3, dire: 'Ta grand-voile déchirée bat au vent : affale-la, au pied du mât.' },
@@ -913,6 +1023,7 @@ export class Nuit {
       ['Eau pompée', `${Math.round(s.pompee)} litres (au plus ${Math.round(s.caleMax)} dans la cale)`],
       ['Avaries', avaries.length ? avaries.join(', ') : 'aucune'],
       ['La trombe', s.trombeDistance === Infinity ? 'pas vue' : `passée à ${metres(s.trombeDistance)}`],
+      ['Les vagues scélérates', s.scelerates ? `${s.scelerates}${s.sceleratesCouche ? ` (dont ${s.sceleratesCouche} qui t'${s.sceleratesCouche > 1 ? 'ont' : 'a'} couché)` : ', passées sans être couché'}` : 'aucune'],
       ['Le cargo', s.cargoDistance === Infinity ? 'pas vu' : `${s.cargoAppele ? 'appelé à la radio, ' : ''}passé à ${metres(s.cargoDistance)}`],
       ['À la barre', `${Math.round(s.aLaBarre / 60)} min (le reste au pilote)`],
       ['Distance parcourue', `${milles(s.distance)}, jusqu'à ${virgule(s.vitesseMax)} nœuds dans les surfs`],
@@ -928,7 +1039,7 @@ export class Nuit {
     this.commence = true;
     this.tReprise = this.t;
     MOMENTS.forEach((mo, k) => { if (mo.heure <= this.heure) this.faits.add(`moment-${k}`); });
-    for (const nom of ['trombe', 'cargo', 'lumiere', 'voix16', 'silence', 'coups', 'echo']) if (this.prevu[nom] < this.heure) this.faits.add(nom);
+    for (const nom of ['trombe', 'cargo', 'lumiere', 'voix16', 'silence', 'coups', 'echo', 'scelerate0', 'scelerate1', 'scelerate2']) if (this.prevu[nom] < this.heure) this.faits.add(nom);
     for (const nom of ['ecouteFoc', 'pilote']) if (this.prevu[nom] < this.heure) this.prevu[nom] = Infinity;
     this.silence = this.faits.has('silence') && this.heure < this.prevu.silence + 0.55;
     this.meteo = meteoDeLaNuit(this.heure, this.niveau);
@@ -974,11 +1085,15 @@ export class Nuit {
     this.radio.taire?.();
     Object.assign(this, {
       c: s.c, heure: s.heure, eau: { ...s.eau }, avaries: { ...s.avaries }, fatigue: { ...s.fatigue },
-      prevu: { ...s.prevu }, faits: new Set(s.faits), stats: { ...s.stats, trombeDistance: s.stats.trombeDistance ?? Infinity, cargoDistance: s.stats.cargoDistance ?? Infinity },
+      // (une partie gardée avant les vagues scélérates : elles arrivent quand même)
+      prevu: { ...this.prevu, ...s.prevu }, faits: new Set(s.faits),
+      stats: { scelerates: 0, sceleratesCouche: 0, ...s.stats, trombeDistance: s.stats.trombeDistance ?? Infinity, cargoDistance: s.stats.cargoDistance ?? Infinity },
       etat: 'nuit', raison: null, cargo: null, trombe: null, suiviCoup: null, renverse: 0, annonceVue: null, commence: true,
     });
     this.sauvegarde = { ...s, faits: new Set(s.faits) };
-    for (const nom of ['trombe', 'cargo', 'ecouteFoc', 'pilote', 'lumiere', 'voix16', 'silence', 'coups', 'echo']) this.prevu[nom] ??= Infinity; // (JSON : Infinity devient null)
+    for (const nom of ['trombe', 'cargo', 'ecouteFoc', 'pilote', 'lumiere', 'voix16', 'silence', 'coups', 'echo', 'scelerate0', 'scelerate1', 'scelerate2']) this.prevu[nom] ??= Infinity; // (JSON : Infinity devient null)
+    this.scelerates?.finir();
+    this.aLancer = null;
     this.silence = this.faits.has('silence') && this.heure < this.prevu.silence + 0.55;
     this.dernierEtrange = null;
     this.deferlantes.annonce = null;

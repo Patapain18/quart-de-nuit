@@ -12,6 +12,7 @@ import { Eclairs } from './eclairs.js';
 import { Cote } from './cote.js';
 import { Embruns } from './embruns.js';
 import { Deferlantes3D } from './deferlantes.js';
+import { Scelerate3D } from './scelerate.js';
 import { Gouttes } from './gouttes.js';
 import { Cargo3D } from './cargo.js';
 import { Trombe3D } from './trombe.js';
@@ -77,6 +78,8 @@ export class Monde3D {
     // la tempête : les embruns, les déferlantes qu'on voit venir, l'eau sur l'objectif
     this.embruns = new Embruns(this.scene);
     this.deferlantes = new Deferlantes3D(this.scene, this.houle, this.eau, this.embruns);
+    // (la vague scélérate : sa forme est dans la mer ; ici, la lèvre de sa crête)
+    this.scelerate = new Scelerate3D(this.scene, this.houle, this.eau, this.embruns);
     this.gouttes = new Gouttes();
     this.post.reglages.uGouttes.value = this.gouttes.texture;
     this.dansLaCabine = false; // (le jeu le dit : dedans, pas de gouttes sur l'objectif)
@@ -132,7 +135,7 @@ export class Monde3D {
         o.visible = true;
       }
     };
-    for (const o of [this.cargo.groupe, this.trombe.groupe, this.embruns.mesh, this.lumiereEtrange.sprite, ...this.deferlantes.cretes.map((c) => c.mesh)]) montrer(o);
+    for (const o of [this.cargo.groupe, this.trombe.groupe, this.embruns.mesh, this.lumiereEtrange.sprite, this.scelerate.mesh, ...this.deferlantes.cretes.map((c) => c.mesh)]) montrer(o);
     if (this.bateau) {
       montrer(this.bateau.eauABord.cockpit.mesh);
       montrer(this.bateau.eauABord.cabine.mesh);
@@ -278,12 +281,27 @@ export class Monde3D {
     this.post.reglages.uFlash.value = e.intensite * 0.006;
     this.eclairs.maj(actif, e.intensite, this.renderer.getDrawingBufferSize(new THREE.Vector2()));
     if (centre) {
+      this.eau.uniforms.uDirEclair.value.copy(centre).sub(this.camera.position).normalize();
       this.lumiereEclair.position.copy(centre);
       this.lumiereEclair.target.position.copy(this.camera.position);
       this.lumiereEclair.target.updateMatrixWorld();
     }
     this.lumiereEclair.intensity = e.intensite * 1.3;
     this.majEclairsDuFront(dt);
+  }
+
+  // Un éclair tout de suite, au-dessus du point (x, z) du monde, en trois flashs (pour
+  // montrer une vague scélérate : derrière elle, sa crête noire se découpe sur le ciel)
+  eclairSur(x, z) {
+    const e = this.eclair;
+    const centre = new THREE.Vector3(x, this.ciel.uniformsNuages.uBaseNuages.value + 250 + Math.random() * 500, z);
+    const loin = Math.hypot(x - this.camera.position.x, z - this.camera.position.z);
+    this.surEclair?.(loin, true);
+    const cle = Math.floor(Math.random() * 1e9);
+    for (let i = 0; i < 3; i++) {
+      e.flashs.push({ centre, cle, visible: true, debut: this.temps + i * (0.09 + Math.random() * 0.1), force: 1.1 + Math.random() * 0.5, proche: true });
+    }
+    e.prochain = Math.max(e.prochain, 2.5);
   }
 
   // Les éclairs dans le front orageux, au loin, dès que le jour baisse : une boule du
@@ -390,6 +408,7 @@ export class Monde3D {
     const ambiance = new THREE.Vector3().fromArray(this.ecl.ambiance);
     const centre = this.bateau ? this.bateau.groupe.position : this.camera.position;
     this.deferlantes.maj(dt, this.temps, centre, { nuit: this.ecl.nuit, vent });
+    this.scelerate.maj(dt, this.temps, { centre: this.bateau ? centre : null, nuit: this.ecl.nuit, vent });
     this.embruns.maj(dt, {
       vent, camera: this.camera, lampe: this.lampe, ambiance, eclair: this.eclair.intensite, nuit: this.ecl.nuit,
       niveauEau: centre.y - 3,

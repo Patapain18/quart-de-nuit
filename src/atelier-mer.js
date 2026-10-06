@@ -7,6 +7,8 @@ import * as THREE from 'three';
 import { Monde3D } from './rendu/monde3d.js';
 import { AMBIANCES, etatMeteo } from './monde/meteo.js';
 import { Bateau } from './bateau/bateau.js';
+import { Scelerates } from './monde/scelerates.js';
+import { positionCrete } from './mer/scelerate.js';
 
 const parametres = new URLSearchParams(location.search);
 const canvas = document.getElementById('scene');
@@ -371,6 +373,59 @@ window.__cargo = { reglages: cargoAtelier, etat: etatCargo, replacer: replacerCa
 window.__regard = regard; // (pour les photos : la direction du regard, en degrés)
 window.__vue = (v) => { vue = v; marquerVue(); };
 
+// ---------- La vague scélérate (celles de la nuit, à la demande) ----------
+// Elle naît dans la direction du regard (l'angle la décale) et vient droit sur le bateau ;
+// la même que dans le jeu (monde/scelerates.js : sa force qui monte, sa crête qui s'écroule).
+const sceleratesAtelier = new Scelerates(monde.houle);
+const reglageScelerate = { hauteur: Number(parametres.get('scelerate')) || 11, longueur: 110, angle: 0 };
+const CURSEURS_SCELERATE = [
+  { cle: 'hauteur', nom: 'Hauteur (creux-crête)', min: 6, max: 15, pas: 0.5, format: (v) => `${v.toFixed(1).replace('.', ',')} m` },
+  { cle: 'longueur', nom: 'Longueur d\'onde', min: 70, max: 180, pas: 5, format: (v) => `${v} m` },
+  { cle: 'angle', nom: 'D\'où elle vient (par rapport au regard)', min: -90, max: 90, pas: 5, format: (v) => `${v > 0 ? '+' : ''}${v}°` },
+];
+for (const c of CURSEURS_SCELERATE) {
+  const id = `scelerate-${c.cle}`;
+  const bloc = document.createElement('div');
+  bloc.className = 'curseur';
+  bloc.innerHTML = `<label for="${id}">${c.nom}</label><output for="${id}">${c.format(reglageScelerate[c.cle])}</output>
+    <input type="range" id="${id}" min="${c.min}" max="${c.max}" step="${c.pas}" value="${reglageScelerate[c.cle]}">`;
+  const champ = bloc.querySelector('input');
+  champ.addEventListener('input', () => {
+    reglageScelerate[c.cle] = Number(champ.value);
+    bloc.querySelector('output').textContent = c.format(reglageScelerate[c.cle]);
+  });
+  document.getElementById('curseurs-scelerate').append(bloc);
+}
+function envoyerScelerate(distance = 1150) {
+  const r = THREE.MathUtils.degToRad(regard.cap + reglageScelerate.angle); // (le cap d'où elle vient)
+  const c = bateau.groupe.position;
+  sceleratesAtelier.lancer({
+    x: c.x, z: c.z, dx: -Math.sin(r), dz: Math.cos(r), hauteur: reglageScelerate.hauteur, longueur: reglageScelerate.longueur, distance,
+  });
+}
+const etatScelerate = document.getElementById('scelerate-etat');
+let ageEtatScelerate = 0;
+function majScelerate(dt) {
+  const c = bateau.groupe.position;
+  const etapes = sceleratesAtelier.maj(dt, c.x, c.z);
+  // (la nuit, un éclair derrière elle au dernier moment, comme dans le jeu)
+  const v = sceleratesAtelier.vague?.v;
+  if (v && etapes.includes('eclair') && monde.ecl.nuit > 0.3) {
+    const [cx, cz] = positionCrete(v, monde.houle.temps);
+    monde.eclairSur(cx - v.dx * 650, cz - v.dz * 650);
+  }
+  ageEtatScelerate += dt;
+  if (ageEtatScelerate < 0.25) return;
+  ageEtatScelerate = 0;
+  const w = sceleratesAtelier.vague;
+  etatScelerate.textContent = !w ? 'Pas de vague en vue.'
+    : `${w.distance > 0 ? `À ${Math.round(w.distance)} m` : `Passée (${Math.round(-w.distance)} m)`} · ${w.v.hauteur.toFixed(1).replace('.', ',')} m · force ${Math.round(w.v.force * 100)} % · crête qui s'écroule ${Math.round(w.v.deferle * 100)} %`;
+}
+document.getElementById('scelerate-envoyer').addEventListener('click', () => envoyerScelerate());
+document.getElementById('scelerate-proche').addEventListener('click', () => envoyerScelerate(300));
+if (parametres.has('scelerate')) setTimeout(() => envoyerScelerate(), 1500);
+window.__scelerate = { envoyer: envoyerScelerate, reglages: reglageScelerate, scelerates: sceleratesAtelier };
+
 const panneau = document.getElementById('panneau');
 document.getElementById('replier').addEventListener('click', (e) => {
   const replie = panneau.classList.toggle('replie');
@@ -408,6 +463,7 @@ async function photographier(nom, { images = 24, secondes = 0 } = {}) {
   for (let i = 0; i < images; i++) {
     reglerVoiles();
     deplacerCargo(1 / 60);
+    majScelerate(1 / 60);
     monde.image(1 / 60, { toutLeCube: i === 0, placerCamera });
     // (on rend la main au navigateur de temps en temps seulement : un onglet caché ne
     // rappelle qu'une fois par seconde)
@@ -510,6 +566,7 @@ function boucle(maintenant) {
   reglerVoiles();
   placerTrombe();
   deplacerCargo(dt);
+  majScelerate(dt);
   monde.image(dt, { toutLeCube, placerCamera });
   toutLeCube = false;
   ageMesures += dt;

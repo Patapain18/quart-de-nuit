@@ -251,9 +251,12 @@ export class PhysiqueVoilier {
   // Une déferlante frappe : vers = la direction (horizontale, dans le monde) où va la
   // vague ; force : 0 → 1. Renvoie l'angle (degrés) d'où elle arrive, par rapport à
   // l'étrave (0 : de face, 90 : de travers, 180 : de l'arrière).
-  deferlante(vers, force) {
+  // levier : où elle frappe (1 : une crête de quelques mètres, sur la hanche ou l'épaule ;
+  // moins : une crête si longue qu'elle frappe toute la coque à la fois — celle d'une
+  // vague scélérate) ; duree : le temps qu'elle pousse (s)
+  deferlante(vers, force, { levier = 1, duree = 0.7 } = {}) {
     const v = vers.clone().setY(0).normalize();
-    this.choc = { vers: v, force, t: 0, duree: 0.7 };
+    this.choc = { vers: v, force, t: 0, duree, levier };
     const local = v.clone().applyQuaternion(this.orientation.clone().invert());
     return (Math.atan2(Math.abs(local.x), local.z) * 180) / Math.PI;
   }
@@ -441,7 +444,7 @@ export class PhysiqueVoilier {
       // (de travers, la crête frappe plus haut : au livet et au rouf ; et elle trouve toute
       // la longueur de la coque, alors que par l'avant ou l'arrière, l'étrave ou le tableau
       // arrière la fendent : trois fois moins de prise)
-      const impact = new Vector3(-d.x * 1.3, 0.75 + 0.45 * Math.abs(d.x), -d.z * 3.4);
+      const impact = new Vector3(-d.x * 1.3 * c.levier, 0.75 + 0.45 * Math.abs(d.x), -d.z * 3.4 * c.levier);
       const exposition = 0.35 + 0.65 * Math.abs(d.x);
       this.ajouterLocal(d.multiplyScalar(POUSSEE_DEFERLANTE * c.force * exposition * profil), impact, force, couple);
       if (c.t >= c.duree) this.choc = null;

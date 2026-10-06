@@ -29,7 +29,8 @@ import { creerGestes, gesteVise } from './joueur/gestes.js';
 import { Radio } from './jeu/radio.js';
 import { Journee, meteoDuJour, heureEnTexte, JOS } from './jeu/journee.js';
 import { LECONS } from './jeu/lecons.js';
-import { Nuit, DIFFICULTES, EAU, HEURE_LEVER } from './jeu/nuit.js';
+import { Nuit, DIFFICULTES, EAU, HEURE_LEVER, directionRelative } from './jeu/nuit.js';
+import { positionCrete } from './mer/scelerate.js';
 import { lireOptions, changerOptions, quandOptionsChangent } from './jeu/options.js';
 import { Bouees } from './rendu/bouees.js';
 import { distanceALaTerre } from './rendu/cote.js';
@@ -494,6 +495,13 @@ function dangers() {
 
 let secousseForce = 0;
 function secousse(force) { secousseForce = Math.max(secousseForce, force); }
+// (le grondement d'une vague scélérate : 0 loin → 1 sur nous, puis il s'éloigne)
+function sonScelerate() {
+  const w = nuit?.scelerates?.vague;
+  if (!w || !w.faites.has('grondement')) return { scelerate: 0, deferle: 0 };
+  const d = w.distance;
+  return { scelerate: d >= 0 ? 1 - Math.min(1, d / 1000) : Math.max(0, 1 + d / 260), deferle: w.v.deferle };
+}
 
 // ---------- La simulation (appelée par le monde 3D une fois la houle calculée) ----------
 const _origine = new THREE.Vector3();
@@ -689,6 +697,8 @@ function simuler(dt) {
     // (on l'entend gronder de loin : à 1,5 km un murmure, à 300 m un fracas)
     trombe: nuit?.trombe ? nuit.trombe.force * (1 - THREE.MathUtils.smoothstep(nuit.trombe.distance, 60, 1600)) : 0,
     cargo: nuit?.cargo ? 1 - THREE.MathUtils.smoothstep(nuit.cargo.distance, 60, 900) : 0,
+    // la vague scélérate : on l'entend gronder dès un kilomètre ; sa crête rugit en s'écroulant
+    ...sonScelerate(),
   });
   etat.attenteClaque = Math.max(0, etat.attenteClaque - dt);
   if (m.impactEtrave > 0.05 && etat.attenteClaque === 0) {
@@ -837,6 +847,7 @@ function contexteNuit(dt) {
     dt,
     m: physique.mesures,
     physique,
+    houle: monde.houle,
     meteo,
     ventDe: meteo.directionVent,
     pilote: etat.pilote !== null,
@@ -985,6 +996,12 @@ function majRadar(dt) {
   for (const b of journee?.bouees?.values() ?? []) r.cibles.push({ x: b.x, z: b.z, rayon: 6, force: 0.75 });
   if (nuit?.cargo) r.cibles.push({ x: nuit.cargo.x, z: nuit.cargo.z, rayon: 90, force: 1 });
   if (nuit?.trombe?.force > 0.1) r.cibles.push({ x: nuit.trombe.x, z: nuit.trombe.z, rayon: 170, force: 0.4 + 0.45 * nuit.trombe.force });
+  // la crête d'une vague scélérate : une longue ligne qui avance (elle renvoie l'onde)
+  const v = monde.houle.scelerates[0];
+  if (v && v.force > 0.05) {
+    const [cx, cz] = positionCrete(v, monde.houle.temps);
+    r.cibles.push({ x: cx, z: cz, ligne: 1.5 * v.largeur, lx: -v.dz, lz: v.dx, largeurLigne: v.largeur, rayon: 16, force: 0.3 + 0.7 * v.force });
+  }
   const e = nuit?.echoFantome;
   if (e) {
     const fondu = THREE.MathUtils.smoothstep(e.age, 0, 3) * (1 - THREE.MathUtils.smoothstep(e.age, e.duree - 4, e.duree));
@@ -1116,6 +1133,34 @@ function commencerNuit({ depuisJournee = false, bateau: bateauGarde = null, repr
       }[nom]);
     })
     .on('etrange', (nom) => vivreEtrange(nom))
+    .on('scelerate', (w) => afficherMessage(`Une vague énorme arrive ${directionRelative(w.relatif)} ! Mets-la droit dans ton arrière, et accroche-toi (X)`))
+    .on('scelerate-proche', () => {
+      afficherMessage('La voilà ! Tiens-toi (Maj) !');
+      audio.battement?.(1);
+    })
+    .on('scelerate-eclair', () => {
+      // un éclair derrière elle : sa crête noire se découpe sur le ciel
+      const v = monde.houle.scelerates[0];
+      if (!v || monde.ecl.nuit < 0.3) return;
+      const [cx, cz] = positionCrete(v, monde.houle.temps);
+      monde.eclairSur(cx - v.dx * 650, cz - v.dz * 650);
+    })
+    .on('scelerate-choc', (c) => {
+      enregistrement?.deferlantes.push({ heure: nuit.heure, force: 1.6, angle: c.angle, gite: 0, suivi: 6, scelerate: true });
+      secousse(1.6);
+      audio.chocScelerate?.();
+      monde.embruns.gerbe({ vers: c.vers, force: 1.6 }, physique);
+      bateau.paquet.frapper(c.vers.clone().transformDirection(bateau.groupe.matrixWorld.clone().invert()), 1.7);
+      if (!monde.dansLaCabine) monde.gouttes.eclabousser(2.2);
+      // l'eau balaie le pont : elle emporte le marin qui ne se tient pas
+      if (etat.mode === 'pied' && marin.dehors) {
+        const d = c.vers.clone().applyQuaternion(physique.orientation.clone().invert());
+        const k = commandes.maj ? 1.5 : 4.5;
+        marin.glissade.x += d.x * k;
+        marin.glissade.z += d.z * k;
+        if (!marin.attache) marin.etourdi = Math.max(marin.etourdi, 1.2);
+      }
+    })
     .on('cargo', () => afficherMessage('Un cargo en route de collision ! Appelle-le à la radio (canal 16), dans la timonerie'))
     .on('cargo-klaxon', () => audio.corne?.(5))
     .on('trombe', () => afficherMessage('Une trombe marine ! Écarte-toi de sa route : lofe et file de travers au vent'))

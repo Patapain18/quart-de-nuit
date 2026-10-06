@@ -19,18 +19,18 @@ const NU = 40; // sommets le long de la crête
 // vague]. Une déferlante est au sommet d'une grosse vague : la crête est posée sur une
 // bosse large, qui se fond dans la mer devant et derrière. Les premières rangées font la
 // pente de la vague, puis le front, raide ; la rangée LEVRE est le haut de la lèvre.
-const PROFIL = [
+export const PROFIL = [
   [-9, 0, 0.02], [-6, 0, 0.18], [-3.8, 0, 0.5], [-2.4, 0, 0.75], [-1.5, 0.1, 0.9],
   [-0.9, 0.4, 0.97], [-0.45, 0.78, 1], [-0.1, 1.0, 1],
   [0.6, 0.93, 1], [1.6, 0.72, 0.97], [3.0, 0.48, 0.9], [4.6, 0.3, 0.78], [6.4, 0.16, 0.62],
   [8.3, 0.07, 0.45], [10.5, 0.02, 0.3], [13.5, 0, 0.12], [17, 0, 0.02],
 ];
 const NV = PROFIL.length - 1;
-const RANG_LEVRE = 7;
+export const RANG_LEVRE = 7;
 const LEVRE = RANG_LEVRE / NV; // (vCoord.y du haut de la lèvre)
 const TRAINE = 17;
 
-const lisse = (a, b, x) => {
+export const lisse = (a, b, x) => {
   const t = Math.min(1, Math.max(0, (x - a) / (b - a)));
   return t * t * (3 - 2 * t);
 };
@@ -48,13 +48,14 @@ float bruit3(vec3 p) {
 }
 `;
 
-function materiauEcume(eau) {
+export function materiauEcume(eau) {
   const m = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.95, metalness: 0, transparent: true, depthWrite: false, side: THREE.DoubleSide });
   m.userData.uniforms = {
     uTemps: { value: 0 },
     uVie: { value: 0 },
     uPhospho: { value: 0 },
     uLongueur: { value: 30 },
+    uEchelle: { value: 1 }, // (le profil en travers, agrandi : la lèvre d'une vague scélérate)
     uCarteCiel: eau.uniforms.uCarteCiel,
     uBrume: eau.uniforms.uBrume,
     // (pour creuser la crête dans la coque : l'eau passe autour du bateau, pas à travers)
@@ -84,6 +85,7 @@ uniform float uTemps;
 uniform float uVie;
 uniform float uPhospho;
 uniform float uLongueur;
+uniform float uEchelle;
 uniform sampler2D uCarteCiel;
 uniform float uBrume;
 uniform samplerCube uReflets;
@@ -104,7 +106,7 @@ ${GLSL_COQUE}
 vec2 crete() {
   // (dans le repère de la crête, en mètres)
   float le = vCoord.x * uLongueur;
-  float travers = vCoord.y * ${TRAINE.toFixed(1)};
+  float travers = vCoord.y * ${TRAINE.toFixed(1)} * uEchelle;
   float bouts = 1.0 - smoothstep(0.24, 0.5, abs(vCoord.x) + 0.12 * (bruit3(vec3(le * 0.3, 0.0, uTemps * 0.3)) - 0.5));
   float front = 1.0 - smoothstep(${(LEVRE * 0.96).toFixed(3)}, ${(LEVRE * 1.03).toFixed(3)}, vCoord.y);
   // un « grain » d'écume : une dentelle de filets blancs (les bords des bulles serrées),
@@ -194,9 +196,11 @@ totalEmissiveRadiance += vec3(0.08, 0.66, 0.72) * uPhospho * lueur * 0.38;`)
   return m;
 }
 
-// Une crête : une bande de (NU + 1) × (NV + 1) sommets, recalculée à chaque image
-class Crete {
-  constructor(materiau) {
+// Une crête : une bande de (nu + 1) × (NV + 1) sommets, recalculée à chaque image
+export class Crete {
+  constructor(materiau, nu = NU) {
+    this.nu = nu;
+    const NU = nu;
     const n = (NU + 1) * (NV + 1);
     this.positions = new Float32Array(n * 3);
     const coords = new Float32Array(n * 2);

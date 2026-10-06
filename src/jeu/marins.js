@@ -6,7 +6,8 @@
 // Chacun a sa façon de faire :
 //  - le prudent fait tout ce que Jos conseille : la toile réduite, puis la grand-voile
 //    affalée au plus fort, les vagues bien dans l'arrière, la descente fermée, le
-//    harnais ; il pompe, répare ce qui casse, appelle le cargo et s'écarte de la trombe ;
+//    harnais ; il pompe, répare ce qui casse, appelle le cargo, s'écarte de la trombe, et
+//    met les vagues scélérates droit dans son arrière ;
 //  - le moyen garde ce qu'il avait au coucher du soleil (2 ris, le foc roulé aux deux
 //    tiers), le vent à 140°, et ne pompe que quand il y a beaucoup d'eau ;
 //  - l'imprudent garde toute la toile, de travers aux vagues, la descente ouverte, sans
@@ -30,6 +31,9 @@ export const MARINS = {
     aBord: { feux: true, gilet: true, lampeEssayee: true, descenteOuverte: false, attache: true, dehors: true },
     // l'angle du vent visé (vent sur tribord : on fuit vers l'est, loin de la côte)
     angle(nuit) {
+      // une vague scélérate annoncée : droit dans l'arrière (l'angle du vent à ce cap)
+      const w = nuit.scelerates?.vague;
+      if (w && w.faites.has('annonce') && w.distance > -40) return ecartAngle(nuit.meteo.directionVent, nuit.scelerates.capPourLaFuir);
       if (nuit.trombe && nuit.trombe.force > 0.05 && nuit.trombe.distance < 700) return 95; // s'écarter de sa route
       return nuit.meteo.vent >= 28 ? 165 : 140;
     },
@@ -94,20 +98,22 @@ export function jouerLaNuit({
     const nuit = new Nuit({ radio: radioMuette, difficulte, graine });
     if (niveau) nuit.niveau = { ...nuit.niveau, ...niveau };
     const b = new PhysiqueVoilier();
-    // au coucher du soleil, à 6 milles au sud de Kervalen
-    b.placer(1500 + k * 600, 7000, (nuit.meteo.directionVent - 140 + 360) % 360, houle);
+    // au coucher du soleil, à 6 milles au sud de Kervalen (à 2,5 km les uns des autres :
+    // la vague scélérate de chacun ne passe que sur lui)
+    b.placer(1500 + k * 2500, 7000, (nuit.meteo.directionVent - 140 + 360) % 360, houle);
     b.vitesse.copy(b.avant).multiplyScalar(3);
     Object.assign(b, marin.debut);
     const e = {
       cle, marin, nuit, b, vent: new Vent(21 + graine), pilote: true, enPanne: 0, pompe: false, avaries: [], fin: null,
       serie: { t: [], heure: [], vent: [], rafale: [], hs: [], gite: [], twa: [], vitesse: [], cale: [], cockpit: [] },
-      deferlantes: [],
+      deferlantes: [], scelerates: [],
     };
     nuit.on('cargo', () => { e.cargoVu = 15; });
     nuit.on('avarie', (nom) => e.avaries.push({ heure: nuit.heure, nom }));
     nuit.on('perdue', (raison) => { e.fin = raison; });
     nuit.on('aube', () => { e.fin = 'aube'; });
     nuit.on('deferlante', (f) => e.deferlantes.push({ heure: nuit.heure, force: f.force, angle: f.angle, gite: 0, suivi: 4 }));
+    nuit.on('scelerate-choc', (c) => e.scelerates.push({ heure: nuit.heure, angle: c.angle, gite: 0, suivi: 6 }));
     return e;
   });
 
@@ -132,7 +138,7 @@ export function jouerLaNuit({
       if (e.fin) continue;
       const { b, nuit, marin } = e;
       const m = b.mesures;
-      const ctx = { dt: pas, m, physique: b, pilote: e.pilote, mode: e.pilote ? 'pied' : 'barre', aBord: { ...marin.aBord }, evenements: [] };
+      const ctx = { dt: pas, m, physique: b, houle, pilote: e.pilote, mode: e.pilote ? 'pied' : 'barre', aBord: { ...marin.aBord }, evenements: [] };
       e.ctx = ctx;
       nuit.maj(pas, ctx);
       if (nuit.etat !== 'nuit') continue;
@@ -171,7 +177,7 @@ export function jouerLaNuit({
       b.avancer(pas, houle, v, sousPas);
       if (b.reprises) e.fin = 'instable';
       // la gîte après chaque déferlante
-      for (const d of e.deferlantes) {
+      for (const d of [...e.deferlantes, ...e.scelerates]) {
         if (d.suivi <= 0) continue;
         d.suivi -= pas;
         d.gite = Math.max(d.gite, Math.abs(m.gite));
@@ -207,6 +213,7 @@ export function jouerLaNuit({
     reparees: { ...e.nuit.avaries },
     journal: e.nuit.journal.map((j) => ({ heure: j.heure, texte: j.texte })),
     deferlantes: e.deferlantes.map(({ heure, force, angle, gite }) => ({ heure, force, angle, gite })),
+    scelerates: e.scelerates.map(({ heure, angle, gite }) => ({ heure, angle, gite })),
     serie: e.serie,
     nuit: e.nuit,
   }));

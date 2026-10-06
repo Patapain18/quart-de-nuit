@@ -18,6 +18,7 @@ import { GLSL_COQUE } from '../bateau/glsl-coque.js';
 import { COQUE } from '../bateau/forme.js';
 import { glslFront } from './glsl/front.js';
 import { LONGUEUR as LONGUEUR_CARGO, GLSL_CARGO } from './forme-cargo.js';
+import { GLSL_SCELERATE, reglerUniformsScelerate } from '../mer/scelerate.js';
 
 const N_SILLAGE = 24; // points du sillage (le premier : la poupe ; puis un toutes les 2,5 s)
 const N_CARGO = 24; // ceux du cargo (un toutes les 7 s : près de trois minutes, plus d'un kilomètre)
@@ -61,6 +62,7 @@ uniform float uPasAngulaire;
 out vec3 vMonde;
 out vec2 vSource;
 out float vHauteur;
+${GLSL_SCELERATE}
 
 // Lit une grille ; au loin (sommets espacés), dans une version floue de la grille
 vec3 lireCascade(sampler2D t, vec2 xz, vec3 grille, float espacement) {
@@ -77,6 +79,10 @@ void main() {
   float espacement = max(r * uPasAngulaire, 0.01);
   vec3 d = vec3(0.0);
 ${utiles.map(({ i }) => `  d += lireCascade(uDeplacement${i}, xz, uGrille${i}, espacement);`).join('\n')}
+  // la vague scélérate, quand il y en a une (mer/scelerate.js)
+  Scelerate sc = scelerate(xz);
+  d.y += sc.h;
+  d.xz += uScelerate.zw * sc.d;
   vec3 monde = vec3(xz.x + d.x, d.y, xz.y + d.z);
   // la Terre est ronde : au loin, la mer passe sous l'horizon
   vec2 ecart = monde.xz - cameraPosition.xz;
@@ -112,6 +118,7 @@ uniform float uBrume;
 uniform float uTemps;
 uniform float uHs;
 uniform float uEclair;
+uniform vec3 uDirEclair; // (vers l'éclair : sa lumière vient de là)
 uniform vec3 uCouleurFond;
 uniform vec3 uCouleurTranslucide;
 uniform float uForceEcume;
@@ -137,6 +144,30 @@ const float PI = 3.14159265359;
 ${GLSL_CARTE_CIEL}
 ${GLSL_COQUE}
 ${GLSL_CARGO}
+${GLSL_SCELERATE}
+// L'écume de la vague scélérate quand sa crête s'écroule : une écume épaisse qui dévale
+// le haut du front en coulées (elle avance avec la crête), et derrière, la traîne qu'elle
+// laisse sur l'eau (elle reste où elle est tombée, et s'efface)
+float ecumeScelerate(Scelerate sc, vec2 p) {
+  float deferle = uScelerate3.y;
+  if (deferle < 0.01 || sc.e < 0.01) return 0.0;
+  float L = uScelerate2.z;
+  float W = uScelerate2.w;
+  float u = sc.s / L; // (0 à la crête ; + devant, là où elle va)
+  // (elle ne brise pas partout pareil le long de sa crête)
+  float le = sc.l / W;
+  float crete = exp(-le * le * 1.8) * smoothstep(0.25, 0.7, texture(uBruit, vec3(sc.l * 0.011, 0.31, uTemps * 0.02)).a + 0.3);
+  // les coulées sur le front : étirées dans la pente, elles descendent
+  float coulees = texture(uBruit, vec3(sc.l * 0.06, sc.s * 0.018 - uTemps * 0.11, 0.53 + uTemps * 0.01)).a * 0.7
+                + texture(uBruit, vec3(sc.l * 0.19, sc.s * 0.05 - uTemps * 0.3, 0.77)).b * 0.3;
+  float bas = 0.025 + 0.11 * deferle * coulees;
+  float front = smoothstep(-0.04, -0.005, u) * (1.0 - smoothstep(bas, bas + 0.04, u));
+  // la traîne : des plaques posées sur l'eau, de plus en plus rares loin derrière
+  float plaques = texture(uBruit, vec3(p * 0.016, 0.17)).a * 0.6 + texture(uBruit, vec3(p * 0.05, 0.43)).b * 0.4;
+  float loin = smoothstep(0.0, 0.5, -u);
+  float traine = step(u, 0.0) * (1.0 - loin) * smoothstep(0.42 + 0.35 * loin, 0.6 + 0.3 * loin, plaques);
+  return deferle * crete * max(front, traine * 0.85);
+}
 ${glslFront('uBruit')}
 
 float saturer(float x) { return clamp(x, 0.0, 1.0); }
@@ -323,6 +354,12 @@ void main() {
 ${cascades.map((_, i) => `  p = texture(uPentes${i}, vSource / uGrille${i}.x);
   pente += p.xy; variance += max(p.z - dot(p.xy, p.xy), 0.0); ecume += p.w * ${(POIDS_ECUME[i] ?? 0).toFixed(2)};`).join('\n')}
   ecume *= uForceEcume;
+  // la vague scélérate : sa pente ; sa face, hachée par le vent et les embruns, ne fait
+  // pas miroir
+  Scelerate sc = scelerate(vSource);
+  pente += sc.pente;
+  float uFace = sc.s / max(uScelerate2.z, 1.0);
+  variance += 0.14 * sc.e * (0.35 + 0.65 * uScelerate3.y) * smoothstep(-0.06, 0.01, uFace) * (1.0 - smoothstep(0.12, 0.5, uFace));
 
   // le bateau : son écume, et l'eau qu'il a lissée derrière lui (moins de petites rides)
   // (celle du bateau et celle du cargo, s'il est là)
@@ -349,13 +386,16 @@ ${cascades.map((_, i) => `  p = texture(uPentes${i}, vSource / uGrille${i}.x);
     r.y = abs(r.y);
     float lod = clamp(log2(a * 200.0), 0.0, 6.0);
     vec3 reflet = textureLod(uReflets, r, lod).rgb;
-    reflet += vec3(0.55, 0.6, 0.75) * uEclair * 0.4;
+    // (l'éclair se reflète dans les pentes tournées vers lui ; une vague entre lui et nous
+    // reste un mur noir qui se découpe sur le ciel)
+    float versEclair = saturer(dot(r, uDirEclair) * 0.75 + 0.25);
+    reflet += vec3(0.55, 0.6, 0.75) * uEclair * 0.6 * versEclair * versEclair;
 
     // les éclats du soleil et de la lune
     vec3 eclats = uSoleil * eclat(n, v, uDirSoleil, a) * 1.6 + uLune * eclat(n, v, uDirLune, a) * 1.6;
 
     // le bleu du fond et la lumière qui traverse les crêtes
-    vec3 lumiere = uAmbiance + uSoleil * max(uDirSoleil.y, 0.0) + uLune * max(uDirLune.y, 0.0) + vec3(uEclair * 0.3);
+    vec3 lumiere = uAmbiance + uSoleil * max(uDirSoleil.y, 0.0) + uLune * max(uDirLune.y, 0.0) + vec3(uEclair * 0.3 * saturer(dot(n, uDirEclair) * 0.8 + 0.2));
     vec3 corps = uCouleurFond * lumiere;
     float crete = saturer(vHauteur / max(uHs * 0.6, 0.25) * 0.5 + 0.5);
     float contreJour = pow(saturer(dot(-v, uDirSoleil) * 0.8 + 0.2), 3.0);
@@ -387,6 +427,8 @@ ${cascades.map((_, i) => `  p = texture(uPentes${i}, vSource / uGrille${i}.x);
       float anneau = smoothstep(R * 0.3, R * 0.9, d) * (1.0 - smoothstep(R * 1.6, R * 4.5, d));
       fraiche = max(fraiche, anneau * smoothstep(0.38, 0.62, spirale + anneau * 0.25) * uTrombe.w);
     }
+    float mousseScelerate = ecumeScelerate(sc, vSource);
+    fraiche = max(fraiche, mousseScelerate);
     float voile = smoothstep(1.0 - fraiche, 1.0 - fraiche + 0.22, dentelle) * (0.35 + 0.65 * fraiche);
     // au loin, le motif devient une teinte moyenne (sinon il scintille)
     voile = mix(voile, fraiche * 0.5, saturer(distance / 250.0));
@@ -394,13 +436,15 @@ ${cascades.map((_, i) => `  p = texture(uPentes${i}, vSource / uGrille${i}.x);
     // au-delà, sa teinte moyenne, plus claire que la mer mais pas blanche)
     voile = max(voile, mix(bateau.y, bateau.x * 0.35, saturer(distance / 700.0)));
     fraiche = max(fraiche, bateau.x);
-    vec3 lumiereEcume = uAmbiance * 0.9 + uSoleil * (0.25 + 0.75 * max(dot(n, uDirSoleil), 0.0)) + uLune * 0.8 + vec3(uEclair * 0.5);
+    vec3 lumiereEcume = uAmbiance * 0.9 + uSoleil * (0.25 + 0.75 * max(dot(n, uDirSoleil), 0.0)) + uLune * 0.8 + vec3(uEclair * 0.5 * saturer(dot(n, uDirEclair) * 0.8 + 0.25));
     // l'écume épaisse est blanche, la dentelle laisse voir l'eau verte en dessous
     vec3 couleurEcume = mix(vec3(0.55, 0.72, 0.72), vec3(0.88, 0.9, 0.92), fraiche) * lumiereEcume;
     couleur = mix(couleur, couleurEcume, voile);
     // la nuit, le plancton remué par l'étrave et le sillage s'allume : une lueur bleu-verte
     // et des étincelles qui s'éteignent derrière le bateau
     // (seulement dans les remous frais : la lueur s'éteint en quelques secondes)
+    // (et dans l'écume de la vague scélérate qui s'écroule : toute sa crête s'allume)
+    couleur += vec3(0.03, 0.4, 0.42) * uPlancton * mousseScelerate * (0.06 + 0.3 * smoothstep(0.75, 0.95, texture(uBruit, vec3(vMonde.xz * 0.9, uTemps * 0.7)).a));
     if (uPlancton > 0.01 && bateau.w > 0.01) {
       // (de toutes petites, qui clignotent ; au loin il n'en reste que la lueur)
       float etincelles = smoothstep(0.7, 0.9, texture(uBruit, vec3(vMonde.xz * 7.0, uTemps * 1.6)).a)
@@ -513,6 +557,7 @@ export class Eau {
       uTemps: ciel.uniformsNuages.uTemps,
       uHs: { value: 1 },
       uEclair: { value: 0 },
+      uDirEclair: { value: new THREE.Vector3(0, 1, 0) },
       uCouleurFond: { value: new THREE.Vector3(0.0028, 0.0125, 0.024) },
       uCouleurTranslucide: { value: new THREE.Vector3(0.025, 0.16, 0.13) },
       uForceEcume: { value: 1 },
@@ -531,6 +576,9 @@ export class Eau {
       uCargoSillage: { value: Array.from({ length: N_CARGO }, () => new THREE.Vector4()) },
       uCargoSillageN: { value: 0 },
       uCargoBoite: { value: new THREE.Vector4() },
+      uScelerate: { value: new THREE.Vector4() },
+      uScelerate2: { value: new THREE.Vector4() },
+      uScelerate3: { value: new THREE.Vector4() },
       ...ciel.uniformsFront,
     };
     // une texture de déplacement, une de pentes et une fiche (taille, texel, flou max) par grille
@@ -569,6 +617,8 @@ export class Eau {
     }
     r.setRenderTarget(ancienne);
     this.uniforms.uCentre.value.set(camera.position.x, 0, camera.position.z);
+    // (la vague scélérate, au même instant que la houle)
+    reglerUniformsScelerate(this.uniforms, this.houle.scelerates[0], this.houle.temps);
   }
 
   // Plus ou moins de sommets (la qualité de l'image, dans les options)

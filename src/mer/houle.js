@@ -21,6 +21,7 @@
 
 import { creerFFT } from './fft.js';
 import { pulsation, spectreDirectionnel } from './spectre.js';
+import { ajouterScelerate } from './scelerate.js';
 
 // Les cascades : taille du carreau (m), nombre de cases par côté, et la gamme de
 // vagues couverte, en « nombre de vagues par carreau » (de min à max).
@@ -290,6 +291,9 @@ export class Houle {
     this.version = 0; // (change à chaque nouvel état de la mer d'un coup)
     this.partDansLeFil = 0; // la part des images dont la mer vient du fil (moyenne glissante)
     this.fil = fil ? ouvrirFil(this, graine, cascades) : null;
+    // les vagues scélérates (mer/scelerate.js), quand il y en a : elles s'ajoutent à la houle,
+    // pour la physique comme pour l'image (eau.js : la première seulement)
+    this.scelerates = [];
   }
 
   // Nouvel état de la mer (vent, fetch, direction, houle) : voir spectre.js
@@ -374,11 +378,13 @@ export class Houle {
     fil.travailleur.postMessage({ type: 'calculer', t, choppy: this.choppy, version: this.version, tampons }, tampons);
   }
 
-  // Somme des cascades « physiques » au point (x, z) de la grille non déplacée
+  // Somme des cascades « physiques » au point (x, z) de la grille non déplacée (et de la
+  // vague scélérate, s'il y en a une)
   lire(x, z) {
     const s = this._s;
     s[0] = 0; s[1] = 0; s[2] = 0;
     for (const c of this.cascades) if (c.physique) c.ajouter(x, z, s);
+    for (const v of this.scelerates) ajouterScelerate(v, x, z, this.temps, s);
     return s;
   }
 
@@ -389,7 +395,9 @@ export class Houle {
   hauteur(x, z) {
     let px = x;
     let pz = z;
-    for (let i = 0; i < 5; i++) {
+    // (la vague scélérate pousse l'eau de 13 m : quelques essais de plus)
+    const essais = this.scelerates.length ? 9 : 5;
+    for (let i = 0; i < essais; i++) {
       const s = this.lire(px, pz);
       px = x - s[0];
       pz = z - s[2];

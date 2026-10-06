@@ -98,7 +98,9 @@ export class Radar {
   // dt ; m : { x, z (la position du bateau), cap (degrés) } ; monde : {
   //   hs (hauteur des vagues), pluie (0 → 1), vent : { x, z } (m/s, vers où il va),
   //   temps (s), terre(x, z) → distance à la côte (négative : à terre),
-  //   cibles : [{ x, z, rayon, force }] (les navires, les bouées, la trombe, l'écho fantôme) }
+  //   cibles : [{ x, z, rayon, force }] (les navires, les bouées, la trombe, l'écho fantôme ;
+  //     avec ligne, lx, lz, largeurLigne : un segment de ±ligne m le long de (lx, lz), dont
+  //     l'écho faiblit vers les bouts — la crête d'une vague scélérate) }
   // nuit : 0 → 1 (l'écran baisse son éclat)
   maj(dt, m, monde, nuit = 0) {
     const R = this.milles * MILLE;
@@ -154,8 +156,16 @@ export class Radar {
       }
       // les cibles (navires, bouées, trombe, l'écho fantôme)
       for (const t of monde.cibles) {
-        const d = Math.hypot(x - t.x, z - t.z);
-        if (d < t.rayon + pas) e += t.force * (1 - 0.4 * (d / (t.rayon + pas)));
+        let d;
+        let k = 1;
+        if (t.ligne) {
+          const qx = x - t.x;
+          const qz = z - t.z;
+          const le = Math.max(-t.ligne, Math.min(t.ligne, qx * t.lx + qz * t.lz));
+          d = Math.hypot(qx - t.lx * le, qz - t.lz * le);
+          k = Math.exp(-((le / t.largeurLigne) ** 2));
+        } else d = Math.hypot(x - t.x, z - t.z);
+        if (d < t.rayon + pas) e += k * t.force * (1 - 0.4 * (d / (t.rayon + pas)));
       }
       // les grains : des taches de pluie qui dérivent avec le vent (seuls les plus
       // denses renvoient l'onde)

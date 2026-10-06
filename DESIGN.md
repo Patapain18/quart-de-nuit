@@ -531,9 +531,40 @@ Feuille de route :
     les deux sens, le ciré…), `npm run test-pont` vérifie les nouvelles surfaces et les
     plafonds (on se baisse sous le pare-brise en montant l'escalier), et les sept essais
     passent. Images : `docs/etape18-*.jpg`.
-19. **Les vagues scélérates** — une vague de 10 à 12 m dans la houle (image et physique),
-    sa crête qui déferle, son annonce, comment la prendre ; un atelier et un essai
-    automatique.
+19. ✅ **Les vagues scélérates** (`src/mer/scelerate.js`, `src/monde/scelerates.js`,
+    `src/rendu/scelerate.js`) — une vague isolée de 10 à 12 m du creux à la crête : une
+    vague de Gerstner (crête pointue, pente de 28° juste sous la crête) dans une enveloppe
+    plus longue devant que derrière, si bien qu'elle est précédée d'un creux de 4,5 m — « le
+    trou dans la mer » des marins qui en ont vu une — et que sa crête court sur 250 m. Le
+    même calcul sert à la physique (la houle l'ajoute à ses vagues : le bateau monte, surfe,
+    se couche pour de vrai) et à l'image (la mer la dessine, avec sa pente exacte pour les
+    reflets, sa face hachée par le vent, l'écume qui dévale le haut de son front et la traîne
+    qu'elle laisse derrière elle). Elle naît à 1 150 m au vent du bateau, grandit en
+    approchant (elle reste centrée sur lui, s'il file le long d'elle), et sa crête
+    s'écroule dans les 250 derniers mètres : une lèvre de 3 m (la crête des déferlantes, en
+    très grand) qui arrache des embruns et, la nuit, luit de plancton — une ligne bleu-vert
+    qui avance dans le noir. Son annonce : un grondement grave qui enfle pendant une minute,
+    avec une pulsation sourde qu'on sent plus qu'on ne l'entend ; Jos (« la bouée du large
+    vient de mesurer une vague de onze mètres… mets-la droit dans ton arrière ») ; sa crête
+    sur le radar, une longue ligne qui avance ; le message à l'écran. Au dernier moment, la
+    nuit, un éclair éclate juste derrière elle (la lumière des éclairs vient maintenant de
+    leur direction : un mur d'eau se découpe sur le ciel). Le choc : sa crête frappe toute
+    la coque à la fois pendant une seconde, 300 litres d'eau verte dans le cockpit (plus à
+    l'intérieur si la porte est ouverte), le pilote arraché une fois sur trois, le marin
+    emporté s'il est sur le pont sans harnais. Réglé avec un essai automatique,
+    `npm run test-scelerate` (six situations sur trois mers, la vraie physique) : prise
+    droit derrière, 15 à 39° de gîte et un surf à 15 nœuds ; de trois quarts arrière
+    (145°), 35 à 64° ; par la hanche (115°) ou de travers, couché à chaque fois (76 à 90°).
+    Il y en a deux (matelot, 10 m) ou trois (marin 11 m, cap-hornier 12 m) par nuit : la
+    première quand le vent monte, vers 21 h 30 ; la deuxième au plus fort, pendant que Jos ne
+    répond plus — on ne reçoit de lui que des bribes, et il ne revient qu'une fois la vague
+    passée ; la dernière quand le vent tourne, une vague croisée qui vient d'une autre
+    direction. Les déferlantes se taisent pendant son passage. Le marin automatique prudent
+    met chaque vague droit dans son arrière (`npm run test-nuit` : trois vagues prises à
+    157 à 180°, jamais couché) ; l'imprudent, de travers, est emporté. L'atelier de la mer a
+    sa section « La vague scélérate » (hauteur, longueur, d'où elle vient ; « La voir de
+    près » ; `?scelerate=11` dans l'adresse). Coût : 0,3 ms par image quand elle déferle.
+    Images : `docs/etape19-*.jpg`.
 20. **La peur** — paranoïa (le coin de l'œil, le reflet dans les vitres de la timonerie,
     la chose sous la coque), sons (la mer qui gémit, la coque, ton nom), quelques vrais
     sursauts, une tension qui monte avec la nuit ; un atelier de la peur pour tout régler.

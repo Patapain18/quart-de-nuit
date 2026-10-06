@@ -31,6 +31,8 @@ Au clavier (français) et à la souris. La souris tourne la tête.
 
 **La nuit, ce qui sauve** : au plus fort (plus de 34 nœuds), affaler la grand-voile au pied du mât et fuir sous un mouchoir de foc, les vagues bien dans l'arrière (le vent à 160-170°) ; jamais les déferlantes de travers ; le harnais toujours accroché ; la porte de la timonerie fermée ; pomper (la pompe est dans le cockpit, à bâbord) ; et quand un cargo arrive, l'appeler à la radio (canal 16, dans la timonerie).
 
+**Les vagues scélérates** : deux ou trois fois dans la nuit, une vague de 10 à 12 m. On l'entend gronder une minute avant, Jos prévient (quand il le peut), sa crête avance sur le radar. Mets-la droit dans ton arrière et tiens-toi : de trois quarts, ça passe encore ; de travers, elle couche le bateau.
+
 Les **options** (accueil ou pause) : la qualité de l'image (économique, moyenne, haute, superbe), la sensibilité de la souris, le champ de vision, la **barre assistée** (ou la vraie barre, plus dure), un **horizon stable** contre le mal de mer, les secousses, les gouttes sur l'écran, le volume, la voix de Jos et les sous-titres.
 
 Le jeu saccade ? Ouvre `jeu.html?perf` : un petit graphique, en haut à gauche, montre le temps de chaque image, compte les à-coups et dit ce qui les a causés.

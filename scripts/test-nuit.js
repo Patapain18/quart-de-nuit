@@ -34,6 +34,7 @@ for (const r of resultats) {
   console.log(`  ${s.deferlantes} déferlantes, ${s.coups} l'ont couché, gîte max ${Math.round(s.giteMax)}°, couché ${s.couche.toFixed(1)} s`);
   console.log(`  eau : ${Math.round(s.caleMax)} L au plus dans la cale, ${Math.round(s.pompee)} L pompés · ${(s.distance / 1852).toFixed(1)} milles, ${s.vitesseMax.toFixed(1)} nds au plus`);
   console.log(`  trombe à ${Math.round(s.trombeDistance)} m · cargo à ${Math.round(s.cargoDistance)} m${s.cargoAppele ? ' (appelé)' : ''} · avaries : ${r.avaries.map((a) => `${heureEnTexte(a.heure)} ${a.nom}`).join(', ') || 'aucune'}`);
+  console.log(`  vagues scélérates : ${r.scelerates.map((v) => `${heureEnTexte(v.heure)} prise à ${Math.round(v.angle)}°, gîte ${Math.round(v.gite)}°`).join(' · ') || 'aucune'}`);
 }
 const [prudent, moyen, imprudent] = resultats;
 console.log('');
@@ -46,6 +47,9 @@ verifier(prudent.nuit.faits.has('trombe') && prudent.stats.trombeDistance > 150,
 verifier(prudent.nuit.faits.has('cargo') && prudent.stats.cargoAppele && prudent.stats.cargoDistance > 150, 'le cargo est passé au large du prudent, qui l\'a appelé');
 verifier(prudent.avaries.some((a) => a.nom === 'ecouteFoc') && prudent.reparees.ecouteFoc === 'reparee', 'l\'écoute de foc a cassé, et le prudent l\'a remplacée');
 verifier(prudent.stats.deferlantes >= 12, 'des déferlantes toute la nuit (au moins 12)');
+verifier(prudent.scelerates.length === 3, 'trois vagues scélérates sont passées sur le prudent');
+verifier(prudent.scelerates.every((v) => v.angle > 140), 'le prudent les a toutes prises par l\'arrière (à plus de 140°)');
+verifier(prudent.stats.sceleratesCouche <= 1, 'elles ne l\'ont pas couché (une fois au plus)');
 verifier(prudent.heureFin >= HEURE_AUBE, 'la nuit va jusqu\'à 6 h');
 
 console.log(echecs ? `\n${echecs} vérification(s) en échec` : '\nTout est bon.');
