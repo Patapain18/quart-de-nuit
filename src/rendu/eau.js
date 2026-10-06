@@ -139,12 +139,34 @@ uniform vec4 uCargo;          // présent (0 ou 1), vitesse (m/s)
 uniform vec4 uCargoSillage[${N_CARGO}];
 uniform int uCargoSillageN;
 uniform vec4 uCargoBoite;
+// la chose sous la coque (jeu/peur.js) : x, z, sa route (rad, dans le plan x z), sa force ;
+// elle remue le plancton en passant : on devine sa forme, immense
+uniform vec4 uChose;
+// la forme pâle sous la surface (jeu/peur.js) : x, z, son orientation (rad), son opacité
+uniform vec4 uForme;
 
 const float PI = 3.14159265359;
 ${GLSL_CARTE_CIEL}
 ${GLSL_COQUE}
 ${GLSL_CARGO}
 ${GLSL_SCELERATE}
+// La chose : une forme fuselée de 34 m (plus large vers l'avant, une longue queue), sous
+// la surface ; 1 dans son corps, 0 dehors (les bords flous : elle est profonde)
+float formeChose(vec2 p) {
+  vec2 dir = vec2(cos(uChose.z), sin(uChose.z));
+  vec2 q = p - uChose.xy;
+  float u = dot(q, dir) / 34.0; // (−0,5 : la queue, 0,5 : la tête)
+  float l = dot(q, vec2(-dir.y, dir.x));
+  if (abs(u) > 0.7 || abs(l) > 12.0) return 0.0;
+  float largeur = 4.6 * smoothstep(-0.62, 0.05, u) * (1.0 - smoothstep(0.32, 0.58, u)) + 0.5;
+  // (deux nageoires, à peine ; un bord qui n'est jamais net)
+  largeur += 2.4 * exp(-pow((u - 0.16) / 0.05, 2.0)) + 2.2 * exp(-pow((u + 0.6) / 0.035, 2.0));
+  largeur *= 0.88 + 0.24 * texture(uBruit, vec3(u * 2.6, 0.83, uTemps * 0.05)).a;
+  // (la queue ondule)
+  l += sin(u * 9.0 - uTemps * 1.8) * 1.2 * (1.0 - smoothstep(-0.5, 0.0, u));
+  return smoothstep(1.8, -1.2, abs(l) - largeur) * smoothstep(-0.68, -0.5, u) * (1.0 - smoothstep(0.52, 0.62, u));
+}
+
 // L'écume de la vague scélérate quand sa crête s'écroule : une écume épaisse qui dévale
 // le haut du front en coulées (elle avance avec la crête), et derrière, la traîne qu'elle
 // laisse sur l'eau (elle reste où elle est tombée, et s'efface)
@@ -443,6 +465,35 @@ ${cascades.map((_, i) => `  p = texture(uPentes${i}, vSource / uGrille${i}.x);
     // la nuit, le plancton remué par l'étrave et le sillage s'allume : une lueur bleu-verte
     // et des étincelles qui s'éteignent derrière le bateau
     // (seulement dans les remous frais : la lueur s'éteint en quelques secondes)
+    // (la forme pâle, juste sous la surface : un ovale, deux creux plus sombres ; vue à
+    // travers l'eau, elle ondule, et disparaît quand on regarde l'eau en rasant — le reflet
+    // du ciel la cache)
+    if (uForme.w > 0.01) {
+      vec2 q = vMonde.xz - uForme.xy;
+      vec2 axe = vec2(cos(uForme.z), sin(uForme.z));
+      vec2 pf = vec2(dot(q, axe), dot(q, vec2(-axe.y, axe.x))) / vec2(0.95, 0.58);
+      pf += 0.07 * vec2(sin(pf.y * 7.0 + uTemps * 2.1), sin(pf.x * 6.0 - uTemps * 1.7));
+      float ovale = smoothstep(1.0, 0.45, length(pf));
+      if (ovale > 0.0) {
+        float creux = smoothstep(0.3, 0.06, length((pf - vec2(0.42, -0.3)) * vec2(0.8, 1.0)))
+                    + smoothstep(0.3, 0.06, length((pf - vec2(0.42, 0.3)) * vec2(0.8, 1.0)))
+                    + 0.55 * smoothstep(0.32, 0.05, length((pf - vec2(-0.32, 0.0)) * vec2(0.7, 1.6)));
+        vec3 pale = vec3(0.62, 0.78, 0.74) * (0.06 + 5.0 * lumiere + vec3(uEclair * 0.4));
+        vec3 cf = mix(pale, pale * 0.15, min(1.0, creux));
+        couleur = mix(couleur, cf, ovale * uForme.w * 0.6 * (1.0 - fresnel));
+      }
+    }
+    // (la chose sous la coque : le plancton qu'elle remue dessine sa forme, une lueur
+    // sourde, des étincelles là où elle bouge le plus — ses bords)
+    if (uChose.w > 0.01 && uPlancton > 0.01) {
+      float corps = formeChose(vMonde.xz);
+      if (corps > 0.0) {
+        float bord = corps * (1.0 - corps) * 4.0;
+        float etincelle = smoothstep(0.78, 0.95, texture(uBruit, vec3(vMonde.xz * 1.3, uTemps * 0.9)).a);
+        float plaques = 0.35 + 0.65 * smoothstep(0.3, 0.7, texture(uBruit, vec3(vMonde.xz * 0.08, 0.27 + uTemps * 0.02)).a);
+        couleur += vec3(0.02, 0.32, 0.34) * uPlancton * uChose.w * (corps * 0.018 + bord * plaques * (0.03 + 0.14 * etincelle)) * (1.0 - fresnel * 0.5);
+      }
+    }
     // (et dans l'écume de la vague scélérate qui s'écroule : toute sa crête s'allume)
     couleur += vec3(0.03, 0.4, 0.42) * uPlancton * mousseScelerate * (0.06 + 0.3 * smoothstep(0.75, 0.95, texture(uBruit, vec3(vMonde.xz * 0.9, uTemps * 0.7)).a));
     if (uPlancton > 0.01 && bateau.w > 0.01) {
@@ -577,6 +628,8 @@ export class Eau {
       uCargoSillageN: { value: 0 },
       uCargoBoite: { value: new THREE.Vector4() },
       uScelerate: { value: new THREE.Vector4() },
+      uChose: { value: new THREE.Vector4() },
+      uForme: { value: new THREE.Vector4() },
       uScelerate2: { value: new THREE.Vector4() },
       uScelerate3: { value: new THREE.Vector4() },
       ...ciel.uniformsFront,

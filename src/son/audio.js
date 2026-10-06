@@ -80,6 +80,24 @@ function echoCabine(ctx) {
   return b;
 }
 
+// L'écho du large : une queue longue, sombre (le gémissement de la mer s'y noie)
+function echoLarge(ctx) {
+  const duree = 4.2;
+  const n = Math.floor(ctx.sampleRate * duree);
+  const b = ctx.createBuffer(2, n, ctx.sampleRate);
+  for (let c = 0; c < 2; c++) {
+    const d = b.getChannelData(c);
+    let lisse = 0;
+    for (let i = 0; i < n; i++) {
+      const t = i / ctx.sampleRate;
+      // (du bruit adouci : les aigus meurent plus vite que les graves)
+      lisse += ((Math.random() * 2 - 1) - lisse) * (0.05 + 0.25 * Math.exp(-t * 2));
+      d[i] = lisse * Math.exp(-t * 1.6) * 0.9;
+    }
+  }
+  return b;
+}
+
 // Les boucles enregistrées, et sur quel bus elles jouent
 const BOUCLES = {
   'vent-doux': 'dehors', 'vent-fort': 'dehors', 'vent-rafales': 'dehors', greement: 'dehors', 'greement-aigu': 'dehors',
@@ -235,6 +253,26 @@ export class Audio {
       o.start();
     }
     this.scelerate.pulsation.connect(this.bus.dehors);
+    // l'angoisse : un bourdonnement très grave, deux notes qui battent lentement, et tout
+    // en haut un sifflement à peine audible ; il monte avec la tension de la nuit
+    this.angoisse = { gain: gain(), aigu: gain() };
+    for (const f of [49, 51.7, 98.6]) {
+      const o = ctx.createOscillator();
+      o.frequency.value = f;
+      o.connect(gain(f > 90 ? 0.3 : 0.5)).connect(this.angoisse.gain);
+      o.start();
+    }
+    const bande = filtre('bandpass', 210, 3);
+    source(this.brun, 0.5).connect(bande).connect(gain(0.6)).connect(this.angoisse.gain);
+    this.angoisse.gain.connect(this.bus.bord);
+    const sifflement = ctx.createOscillator();
+    sifflement.frequency.value = 3150;
+    sifflement.connect(this.angoisse.aigu).connect(this.bus.radio);
+    sifflement.start();
+    // l'écho du large
+    this.echoLarge = ctx.createConvolver();
+    this.echoLarge.buffer = echoLarge(ctx);
+    this.echoLarge.connect(gain(0.8)).connect(this.bus.dehors);
     this.ageWinch = 0;
     this.ageCraquement = 0;
 
@@ -402,6 +440,11 @@ export class Audio {
     this.vers(this.trombe.gain.gain, 0.9 * tr * tr * (grondement ? 0.5 : 1), 0.5);
     this.vers(this.trombe.gainSifflement.gain, 0.12 * tr * tr * tr, 0.5);
     this.vers(this.moteur.gain.gain, 0.5 * (e.cargo ?? 0) ** 2, 0.8);
+    // la tension de la nuit (jeu/peur.js) : le bourdonnement, et le sifflement aigu
+    // quand elle est très haute
+    const tension = e.tension ?? 0;
+    this.vers(this.angoisse.gain.gain, 0.16 * lisse(0.3, 1, tension) ** 1.5, 2);
+    this.vers(this.angoisse.aigu.gain, 0.0035 * lisse(0.72, 1, tension), 3);
     // la vague scélérate (0 : loin → 1 : sur nous ; deferle : sa crête s'écroule) : le
     // grondement monte et s'éclaircit, la pulsation enfle, puis la crête rugit
     const sc = e.scelerate ?? 0;
@@ -821,6 +864,171 @@ export class Audio {
     for (let k = 0; k < 2; k++) {
       this.jouer('craquements', { dans: dans + 0.1 + k * 0.35, gain: 0.5 + 0.5 * force, vitesse: 0.5 + 0.2 * Math.random(), pan: (Math.random() - 0.5) * 1.2 });
     }
+  }
+
+  // ---------- La peur (jeu/peur.js) ----------
+  // La mer gémit : une voix immense et grave, au loin, qui monte puis retombe, noyée dans
+  // un long écho (pan : de quel côté, −1 → 1)
+  gemissement(pan = 0) {
+    if (!this.actif()) return;
+    const ctx = this.ctx;
+    const t0 = ctx.currentTime + 0.05;
+    const duree = 7.5 + Math.random() * 2;
+    const sortie = ctx.createGain();
+    sortie.gain.setValueAtTime(0, t0);
+    sortie.gain.linearRampToValueAtTime(0.55, t0 + 2.4);
+    sortie.gain.setValueAtTime(0.55, t0 + duree - 3);
+    sortie.gain.linearRampToValueAtTime(0, t0 + duree);
+    const p = ctx.createStereoPanner();
+    p.pan.value = pan;
+    const passe = ctx.createBiquadFilter();
+    passe.type = 'lowpass';
+    passe.frequency.value = 900;
+    sortie.connect(passe).connect(p);
+    p.connect(this.bus.dehors);
+    p.connect(this.echoLarge);
+    // (deux voix presque à l'unisson, l'une un demi-ton au-dessus : ça ne sonne pas juste)
+    for (const [k, niveau] of [[1, 0.6], [1.06, 0.28]]) {
+      const o = ctx.createOscillator();
+      o.type = 'sawtooth';
+      const f = 56 * k;
+      o.frequency.setValueAtTime(f, t0);
+      o.frequency.linearRampToValueAtTime(f * 1.32, t0 + duree * 0.45);
+      o.frequency.linearRampToValueAtTime(f * 0.92, t0 + duree);
+      // (elle tremble)
+      const vibrato = ctx.createOscillator();
+      vibrato.frequency.value = 0.35 + Math.random() * 0.3;
+      const ampleur = ctx.createGain();
+      ampleur.gain.value = f * 0.03;
+      vibrato.connect(ampleur).connect(o.frequency);
+      // deux formants : une voyelle sombre qui s'ouvre (« ou » → « o »)
+      const f1 = ctx.createBiquadFilter();
+      const f2 = ctx.createBiquadFilter();
+      f1.type = f2.type = 'bandpass';
+      f1.Q.value = 5;
+      f2.Q.value = 7;
+      f1.frequency.setValueAtTime(290, t0);
+      f1.frequency.linearRampToValueAtTime(470, t0 + duree * 0.5);
+      f2.frequency.setValueAtTime(760, t0);
+      f2.frequency.linearRampToValueAtTime(880, t0 + duree * 0.5);
+      const g = ctx.createGain();
+      g.gain.value = niveau;
+      o.connect(f1).connect(g);
+      o.connect(f2).connect(g);
+      g.connect(sortie);
+      o.start(t0);
+      vibrato.start(t0);
+      o.stop(t0 + duree + 0.1);
+      vibrato.stop(t0 + duree + 0.1);
+    }
+  }
+
+  // Des pas sur le pont, au-dessus de soi : de l'avant vers l'arrière, lents ; ils
+  // s'arrêtent ; puis un dernier, juste au-dessus. (On ne les entend que dedans.)
+  pasSurLePont() {
+    if (!this.actif()) return;
+    const ctx = this.ctx;
+    const t0 = ctx.currentTime + 0.1;
+    const n = 6 + Math.floor(Math.random() * 3);
+    const pas = [];
+    for (let i = 0; i < n; i++) pas.push([i * (0.62 + (Math.random() - 0.5) * 0.08), 0.55 + 0.25 * (i / n), -0.4 + 0.5 * (i / n)]);
+    pas.push([n * 0.62 + 2.6, 1, 0.12]);
+    for (const [dans, force, pan] of pas) {
+      const t = t0 + dans;
+      const s = ctx.createBufferSource();
+      s.buffer = this.brun;
+      const f = ctx.createBiquadFilter();
+      f.type = 'lowpass';
+      f.frequency.value = 170;
+      const coque = ctx.createBiquadFilter();
+      coque.type = 'peaking';
+      coque.frequency.value = 120;
+      coque.Q.value = 3;
+      coque.gain.value = 9;
+      const g = ctx.createGain();
+      g.gain.setValueAtTime(0, t);
+      g.gain.linearRampToValueAtTime(1.3 * force, t + 0.012);
+      g.gain.exponentialRampToValueAtTime(0.001, t + 0.22);
+      const p = ctx.createStereoPanner();
+      p.pan.value = pan;
+      s.connect(f).connect(coque).connect(g).connect(p).connect(this.bus.dedans);
+      s.start(t, Math.random() * 2, 0.3);
+    }
+    // (et le pont qui craque sous le poids, une fois)
+    this.jouer('craquements', { dans: 0.1 + n * 0.3, gain: 0.35, vitesse: 0.8, pan: 0, bus: 'dedans' });
+  }
+
+  // Quelque chose d'immense frotte sous la coque, d'un bord à l'autre (cote : d'où il vient)
+  raclement(cote = 1) {
+    if (!this.actif()) return;
+    const ctx = this.ctx;
+    const t0 = ctx.currentTime + 0.05;
+    const duree = 5.5;
+    const s = ctx.createBufferSource();
+    s.buffer = this.rose;
+    s.loop = true;
+    const f = ctx.createBiquadFilter();
+    f.type = 'bandpass';
+    f.Q.value = 2.2;
+    f.frequency.setValueAtTime(260, t0);
+    f.frequency.exponentialRampToValueAtTime(120, t0 + duree);
+    // (le grain du frottement : des à-coups rapides, irréguliers)
+    const grain = ctx.createGain();
+    for (let k = 0; k * 0.04 < duree; k++) grain.gain.setValueAtTime(0.25 + Math.random() * 0.75, t0 + k * 0.04);
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(0, t0);
+    g.gain.linearRampToValueAtTime(0.9, t0 + 1.2);
+    g.gain.setValueAtTime(0.9, t0 + duree - 1.5);
+    g.gain.linearRampToValueAtTime(0, t0 + duree);
+    const p = ctx.createStereoPanner();
+    p.pan.setValueAtTime(cote * 0.8, t0);
+    p.pan.linearRampToValueAtTime(-cote * 0.8, t0 + duree);
+    s.connect(f).connect(grain).connect(g).connect(p).connect(this.bus.bord);
+    s.start(t0, Math.random() * 2);
+    s.stop(t0 + duree + 0.1);
+    // la coque qui gémit sous la pression : un son très grave qui glisse
+    const o = ctx.createOscillator();
+    o.type = 'triangle';
+    o.frequency.setValueAtTime(48, t0 + 1);
+    o.frequency.linearRampToValueAtTime(36, t0 + duree);
+    const go = ctx.createGain();
+    go.gain.setValueAtTime(0, t0 + 1);
+    go.gain.linearRampToValueAtTime(0.4, t0 + 2.5);
+    go.gain.linearRampToValueAtTime(0, t0 + duree);
+    o.connect(go).connect(this.bus.bord);
+    o.start(t0 + 1);
+    o.stop(t0 + duree + 0.1);
+    for (let k = 0; k < 3; k++) this.jouer('craquements', { dans: 1.2 + k * 1.3, gain: 0.6, vitesse: 0.45 + 0.1 * Math.random(), pan: cote * (0.5 - k * 0.5) });
+  }
+
+  // Un choc énorme contre la coque, tout près (après un long calme : on sursaute)
+  coupEnorme() {
+    if (!this.actif()) return;
+    const ctx = this.ctx;
+    const t = ctx.currentTime + 0.02;
+    const o = ctx.createOscillator();
+    o.frequency.setValueAtTime(72, t);
+    o.frequency.exponentialRampToValueAtTime(28, t + 0.7);
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.linearRampToValueAtTime(1.4, t + 0.008);
+    g.gain.exponentialRampToValueAtTime(0.001, t + 1.1);
+    o.connect(g).connect(this.bus.bord);
+    o.start(t);
+    o.stop(t + 1.2);
+    const c = ctx.createBufferSource();
+    c.buffer = this.blanc;
+    const fc = ctx.createBiquadFilter();
+    fc.type = 'bandpass';
+    fc.frequency.value = 650;
+    fc.Q.value = 1.2;
+    const gc = ctx.createGain();
+    gc.gain.setValueAtTime(0, t);
+    gc.gain.linearRampToValueAtTime(0.9, t + 0.003);
+    gc.gain.exponentialRampToValueAtTime(0.001, t + 0.12);
+    c.connect(fc).connect(gc).connect(this.bus.bord);
+    c.start(t, Math.random(), 0.2);
+    for (let k = 0; k < 2; k++) this.jouer('craquements', { dans: 0.05 + k * 0.5, gain: 0.9, vitesse: 0.5, pan: (Math.random() - 0.5) });
   }
 
   // La vague scélérate s'abat sur le bateau : un fracas énorme, un coup sourd dans toute la

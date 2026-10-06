@@ -37,6 +37,8 @@ Les **options** (accueil ou pause) : la qualité de l'image (économique, moyenn
 
 Le jeu saccade ? Ouvre `jeu.html?perf` : un petit graphique, en haut à gauche, montre le temps de chaque image, compte les à-coups et dit ce qui les a causés.
 
+L'atelier de la peur : `jeu.html?peur` ouvre, à droite du jeu, un panneau qui montre la tension de la nuit, chaque chose étrange qui peut arriver (si elle le pourrait maintenant, et sinon ce qu'il lui faut), un bouton pour la provoquer, des boutons pour sauter à une heure de la nuit, et la frise de toute la nuit.
+
 ## Les tests
 
 Tout ce qui ne dépend pas de l'écran se vérifie sans navigateur :

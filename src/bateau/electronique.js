@@ -204,7 +204,7 @@ export class Electronique {
     ctx.fillStyle = '#ffffff';
     ctx.fillText(`${e.vitesse.toFixed(1)} nd`, 14, hc + 52);
     ctx.fillText(`${String(Math.round(e.route) % 360).padStart(3, '0')}°`, 150, hc + 52);
-    const p = sonde(e.x, e.z);
+    const p = e.sonde ?? sonde(e.x, e.z);
     ctx.fillStyle = p < 10 ? '#ff6b5b' : '#ffffff';
     ctx.fillText(`${p.toFixed(1)} m`, 330, hc + 52);
     // l'échelle, en haut à gauche

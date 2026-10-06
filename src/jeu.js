@@ -27,10 +27,11 @@ import { Compas } from './jeu/compas.js';
 import { ouvrirDescente } from './joueur/pont.js';
 import { creerGestes, gesteVise } from './joueur/gestes.js';
 import { Radio } from './jeu/radio.js';
-import { Journee, meteoDuJour, heureEnTexte, JOS } from './jeu/journee.js';
+import { Journee, meteoDuJour, heureEnTexte, JOS, NOM_BATEAU } from './jeu/journee.js';
 import { LECONS } from './jeu/lecons.js';
 import { Nuit, DIFFICULTES, EAU, HEURE_LEVER, directionRelative } from './jeu/nuit.js';
 import { positionCrete } from './mer/scelerate.js';
+import { Apparitions } from './rendu/apparitions.js';
 import { lireOptions, changerOptions, quandOptionsChangent } from './jeu/options.js';
 import { Bouees } from './rendu/bouees.js';
 import { distanceALaTerre } from './rendu/cote.js';
@@ -57,7 +58,12 @@ const marin = new Marin();
 marin.encombrement = construireEncombrement(bateau);
 // (jeu.html?perf : le compteur de fluidité, en haut à gauche)
 if (parametres.has('perf')) import('./atelier/fluidite.js').then((m) => m.afficherFluidite(monde));
+// (jeu.html?peur : l'atelier de la peur, à droite)
+if (parametres.has('peur')) import('./atelier/atelier-peur.js').then((m) => m.ouvrirAtelierPeur(window.__jeu));
 const bouees = new Bouees(monde.scene, monde.houle);
+// (la peur : ce qu'on voit du coin de l'œil — jeu/peur.js décide, ceci le montre)
+const apparitions = new Apparitions(monde.scene, bateau, monde.houle, monde.eau);
+monde.aPrecompiler.push(...apparitions.objets);
 let journee = null; // la journée d'apprentissage (null : navigation libre)
 let nuit = null; // la nuit de tempête
 let journeeFaite = null; // la journée, une fois finie (pour le carnet : ses réflexes, son journal)
@@ -544,6 +550,9 @@ function simuler(dt) {
     }
   }
   monde.mesurer('physique', () => physique.avancer(dt, monde.houle, v, Math.max(2, Math.ceil(dt * 240))));
+  apparitions.maj(nuit?.peur ?? null, {
+    temps: monde.temps, eclairage: etat.eclairage, ambiance: monde.ecl.ambiance, eclair: monde.eclair.intensite, lampe: etat.lampe,
+  });
 
   // à pied : le marin bouge, sent le bateau, vise et agit
   const ressentie = sentirLeBateau(dt);
@@ -615,6 +624,8 @@ function simuler(dt) {
     pilote: etat.pilote, panne: nuit?.avaries.pilote === 'panne', barre: physique.barre,
     bouees: [...(journee?.bouees?.values() ?? [])].map((b) => ({ x: b.x, z: b.z, couleur: { jaune: '#ffd23a', rouge: '#ff4a3a', verte: '#3ad06a' }[b.couleur] })),
     nuit: monde.ecl.nuit,
+    // (la chose sous la coque : le sondeur la voit, lui)
+    sonde: nuit?.peur?.chose?.sonde ?? null,
   });
   // les essuie-glaces : sous la pluie, ou quand les embruns arrosent le pare-brise ; et
   // l'eau qui ruisselle sur les vitres de la timonerie
@@ -659,6 +670,10 @@ function simuler(dt) {
   const et = monde.etalonnage;
   reglages.uSaturation.value = THREE.MathUtils.lerp(et.saturation, 1.05, etat.adaptation);
   reglages.uBalance.value.set(...et.balance.map((b) => THREE.MathUtils.lerp(b, 1, etat.adaptation)));
+  // (la peur resserre la vue — les bords s'assombrissent — et pâlit les couleurs)
+  const tension = nuit?.peur?.tension ?? 0;
+  reglages.uVignettage.value = et.vignettage + 0.5 * tension * tension;
+  reglages.uSaturation.value *= 1 - 0.25 * tension;
   monde.lampeFrontale(etat.lampe || (etat.mode === 'accueil' && monde.ecl.nuit > 0.6));
   // (dans la timonerie, on voit la pluie par les vitres ; dans le carré, plus du tout)
   monde.pluie.mesh.visible = (!dedans || enTimonerie) && meteo.pluie > 0.01;
@@ -699,6 +714,7 @@ function simuler(dt) {
     cargo: nuit?.cargo ? 1 - THREE.MathUtils.smoothstep(nuit.cargo.distance, 60, 900) : 0,
     // la vague scélérate : on l'entend gronder dès un kilomètre ; sa crête rugit en s'écroulant
     ...sonScelerate(),
+    tension: nuit?.peur?.tension ?? 0,
   });
   etat.attenteClaque = Math.max(0, etat.attenteClaque - dt);
   if (m.impactEtrave > 0.05 && etat.attenteClaque === 0) {
@@ -842,6 +858,20 @@ function commencerJournee({ reprise = null } = {}) {
 // faut de « l'eau à courir » pour fuir devant le temps.
 const DEPART_NUIT = { x: 1500, z: 7000 };
 
+const _inverse = new THREE.Matrix4();
+const _qInverse = new THREE.Quaternion();
+function regardDansLeBateau() {
+  const g = bateau.groupe;
+  _inverse.copy(g.matrixWorld).invert();
+  _qInverse.copy(g.quaternion).invert();
+  const cam = monde.camera;
+  const yeux = cam.position.clone().applyMatrix4(_inverse);
+  const regard = cam.getWorldDirection(new THREE.Vector3()).applyQuaternion(_qInverse);
+  const haut = new THREE.Vector3(0, 1, 0).applyQuaternion(cam.quaternion).applyQuaternion(_qInverse);
+  const tanY = Math.tan(THREE.MathUtils.degToRad(cam.fov / 2));
+  const lieu = etat.mode === 'barre' ? 'barre' : etat.mode === 'poste' || marin.dansLaTimonerie ? 'timonerie' : marin.dehors ? 'pont' : 'carre';
+  return { yeux, regard, haut, tanX: tanY * cam.aspect, tanY, lieu };
+}
 function contexteNuit(dt) {
   return {
     dt,
@@ -850,6 +880,13 @@ function contexteNuit(dt) {
     houle: monde.houle,
     meteo,
     ventDe: meteo.directionVent,
+    // (pour la peur : où l'on est, d'où et vers où l'on regarde — dans le repère du bateau)
+    ...regardDansLeBateau(),
+    lampe: etat.lampe,
+    eclairage: etat.eclairage,
+    eclair: monde.eclair.intensite,
+    danger: etat.danger ?? 0,
+    calme: etat.calme ?? 0,
     pilote: etat.pilote !== null,
     regleurAuto: etat.regleurAuto,
     mode: etat.mode,
@@ -935,10 +972,24 @@ function vivreLaNuit(dt) {
   const m = physique.mesures;
   const trombe = nuit.trombe ? nuit.trombe.force * (1 - THREE.MathUtils.smoothstep(nuit.trombe.distance, 60, 260)) : 0;
   const danger = Math.max(THREE.MathUtils.smoothstep(Math.abs(m.gite), 48, 80), trombe, THREE.MathUtils.smoothstep(etat.eauCale ?? 0, 1100, 1700));
+  etat.danger = danger;
+  etat.calme = (etat.calme ?? 0) + dt;
+  // (et quand la peur monte, sans danger visible : un cœur lent, sourd)
+  const coeur = Math.max(danger, 0.55 * THREE.MathUtils.smoothstep(nuit.peur.tension, 0.7, 1));
   etat.attenteCoeur = (etat.attenteCoeur ?? 0) - dt;
-  if (danger > 0.25 && etat.attenteCoeur <= 0) {
-    audio.battement?.(danger);
-    etat.attenteCoeur = 60 / (72 + 70 * danger);
+  if (coeur > 0.25 && etat.attenteCoeur <= 0) {
+    audio.battement?.(coeur);
+    etat.attenteCoeur = 60 / (72 + 70 * coeur);
+  }
+  // la chose sous la coque : quand elle passe dessous, quelque chose d'immense frotte la
+  // quille et soulève le bateau
+  const chose = nuit.peur.chose;
+  if (chose?.sous && !chose.secoue) {
+    chose.secoue = true;
+    audio.raclement?.(chose.cote);
+    physique.rotation.addScaledVector(physique.avant, 0.2 * chose.cote);
+    physique.vitesse.y += 0.45;
+    secousse(0.35);
   }
   etat.eauCale = nuit.eau.cale;
   // le pilote a lâché : plus personne ne tient la barre
@@ -1028,6 +1079,21 @@ function vivreEtrange(nom) {
   }
 }
 
+// La peur (jeu/peur.js, par la nuit) : ce qu'on entend, ce qui secoue. (Ce qu'on voit :
+// rendu/apparitions.js, à chaque image.)
+function vivrePeur(e) {
+  const p = nuit?.peur;
+  if (e === 'gemissement') audio.gemissement?.((Math.random() - 0.5) * 1.6);
+  else if (e === 'pas') audio.pasSurLePont?.();
+  else if (e === 'nom') jeu.radio.chuchoter?.(`${NOM_BATEAU}… ${NOM_BATEAU}…`, { canal: 16, sousTitre: `Canal 16 : une voix, tout près du micro, très lente : « ${NOM_BATEAU}… »` });
+  else if (e === 'coupCoque') {
+    audio.coupEnorme?.();
+    secousse(0.9);
+    audio.battement?.(1);
+  } else if (e === 'eclairSilhouette') audio.battement?.(1);
+  else if (e.endsWith('-fin') && p?.journal.at(-1)?.regardee) audio.battement?.(0.8);
+}
+
 // D'où vient une déferlante, vue du bateau (« par le travers tribord »…)
 function cotePar(vers) {
   const origine = (Math.atan2(-vers.x, vers.z) * 180) / Math.PI; // le cap d'où elle vient
@@ -1108,6 +1174,7 @@ function commencerNuit({ depuisJournee = false, bateau: bateauGarde = null, repr
       if (a.force > 0.7) afficherMessage(`Une grosse déferlante arrive ${cotePar(a.vers)} ! Tiens-toi (Maj)`);
     })
     .on('deferlante', (f) => {
+      etat.calme = 0;
       enregistrement?.deferlantes.push({ heure: nuit.heure, force: f.force, angle: f.angle, gite: 0, suivi: 4 });
       secousse(0.35 + f.force * 0.9);
       monde.embruns.gerbe(f, physique);
@@ -1133,6 +1200,7 @@ function commencerNuit({ depuisJournee = false, bateau: bateauGarde = null, repr
       }[nom]);
     })
     .on('etrange', (nom) => vivreEtrange(nom))
+    .on('peur', (e) => vivrePeur(e))
     .on('scelerate', (w) => afficherMessage(`Une vague énorme arrive ${directionRelative(w.relatif)} ! Mets-la droit dans ton arrière, et accroche-toi (X)`))
     .on('scelerate-proche', () => {
       afficherMessage('La voilà ! Tiens-toi (Maj) !');
@@ -1146,6 +1214,7 @@ function commencerNuit({ depuisJournee = false, bateau: bateauGarde = null, repr
       monde.eclairSur(cx - v.dx * 650, cz - v.dz * 650);
     })
     .on('scelerate-choc', (c) => {
+      etat.calme = 0;
       enregistrement?.deferlantes.push({ heure: nuit.heure, force: 1.6, angle: c.angle, gite: 0, suivi: 6, scelerate: true });
       secousse(1.6);
       audio.chocScelerate?.();

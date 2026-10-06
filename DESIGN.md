@@ -565,9 +565,44 @@ Feuille de route :
     sa section « La vague scélérate » (hauteur, longueur, d'où elle vient ; « La voir de
     près » ; `?scelerate=11` dans l'adresse). Coût : 0,3 ms par image quand elle déferle.
     Images : `docs/etape19-*.jpg`.
-20. **La peur** — paranoïa (le coin de l'œil, le reflet dans les vitres de la timonerie,
-    la chose sous la coque), sons (la mer qui gémit, la coque, ton nom), quelques vrais
-    sursauts, une tension qui monte avec la nuit ; un atelier de la peur pour tout régler.
+20. ✅ **La peur** (`src/jeu/peur.js`, `src/rendu/apparitions.js`) — rien n'est jamais
+    confirmé : ce qu'on voit du coin de l'œil disparaît dès qu'on le regarde en face, ce
+    qu'on entend, personne d'autre ne l'a entendu. Une **tension** (0 → 1) monte avec la
+    nuit (0,05 au coucher, 0,55 vers 2 h, 0,1 à l'aube), avec chaque chose étrange (elle
+    retombe en une minute et demie), le danger et le noir ; elle resserre la vue (les bords
+    s'assombrissent), pâlit les couleurs, fait monter un bourdonnement très grave (deux
+    notes qui battent) et, tout en haut, un sifflement à peine audible ; au-delà de 0,7, le
+    cœur bat. Ce qui peut arriver, chacun dans sa fenêtre d'heures, jamais deux à moins de
+    75 s, jamais pendant qu'une vague scélérate, la trombe, le cargo ou un danger occupent
+    le marin : **la mer gémit** (une voix immense et grave, au loin, deux notes qui ne sonnent
+    pas juste, noyée dans un écho de quatre secondes) ; **quelqu'un à l'avant** — une
+    silhouette en ciré jaune délavé, comme le tien, capuche rabattue, sans visage, debout sur
+    le pont avant, qu'on ne voit qu'au bord de la vue (elle se place là où la timonerie ne la
+    cache pas) ; **le reflet** — dans le pare-brise de la timonerie, la lumière allumée,
+    quelqu'un debout juste derrière toi (dessiné devant la vitre, à l'endroit où elle
+    renverrait quelqu'un qui se tiendrait là : faible, flou, rougi par la veilleuse) ; on se
+    retourne : personne, et il n'est plus dans la vitre ; **la forme dans l'eau** — pâle,
+    ovale, deux creux sombres, sous la surface le long de la coque (la mer la dessine : elle
+    suit chaque ride, et disparaît quand on regarde l'eau en rasant) ; regardée, elle coule ;
+    **la chose sous la coque** — le sondeur marque six mètres (il y en a quatre-vingt-dix),
+    quelque chose frotte la quille d'un bord à l'autre, le bateau est soulevé et roule, et
+    la nuit, le plancton qu'elle remue dessine sa forme : immense, fuselée, une nageoire, une
+    queue, trois fois et demie la longueur du bateau ; **des pas sur le pont**, au-dessus de
+    soi, quand on est dedans ; **ton nom** chuchoté sur le 16 (« Morgane… »), pendant que Jos
+    ne répond plus ; deux vrais sursauts : **un choc énorme** contre la coque après un long
+    calme, et **dans un éclair, quelqu'un à l'avant** — à l'éclair suivant, plus personne.
+    Le journal de bord note ce qu'on a vu (« Quelqu'un, debout à l'avant. Non :
+    personne. ») ; Jos, si on l'appelle, cherche une explication, sans conviction. Ce qu'on
+    voit « du coin de l'œil » se mesure sur l'écran (près d'un bord, et non en degrés :
+    une première version en degrés plaçait la silhouette hors du cadre dans une fenêtre
+    étroite). L'**atelier de la peur** (`jeu.html?peur`) montre la tension, chaque chose
+    (possible maintenant ? sinon, ce qu'il lui faut ; où est sa cible sur l'écran), la
+    provoque, saute à une heure, et dessine la frise de la nuit. `npm run test-peur` : trois
+    nuits avec un marin simulé qui va et vient et regarde partout (fenêtres, espacements,
+    jamais pendant une vague…), et surtout que rien n'est jamais confirmé (la silhouette
+    regardée disparaît dans la même image, le reflet quand on se retourne, la forme coule).
+    Les marins automatiques n'ont pas peur : la nuit de `npm run test-nuit` est inchangée.
+    Images : `docs/etape20-*.jpg`.
 21. **L'ambiance** — le son et la lumière de la nuit, plus oppressants ; vérification
     complète (la nuit jouée en entier, les marins automatiques, les performances).
 

@@ -92,6 +92,7 @@ export class Monde3D {
     this.etatCargo = null;
     this.etatTrombe = null;
     this.bateau = null;
+    this.aPrecompiler = []; // (d'autres objets qui n'apparaissent que plus tard : le jeu les ajoute)
 
     this.temps = 0;
     // le chronomètre (l'atelier des performances) : le temps passé dans chaque morceau du
@@ -135,7 +136,7 @@ export class Monde3D {
         o.visible = true;
       }
     };
-    for (const o of [this.cargo.groupe, this.trombe.groupe, this.embruns.mesh, this.lumiereEtrange.sprite, this.scelerate.mesh, ...this.deferlantes.cretes.map((c) => c.mesh)]) montrer(o);
+    for (const o of [this.cargo.groupe, this.trombe.groupe, this.embruns.mesh, this.lumiereEtrange.sprite, this.scelerate.mesh, ...this.aPrecompiler, ...this.deferlantes.cretes.map((c) => c.mesh)]) montrer(o);
     if (this.bateau) {
       montrer(this.bateau.eauABord.cockpit.mesh);
       montrer(this.bateau.eauABord.cabine.mesh);

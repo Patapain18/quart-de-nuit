@@ -23,6 +23,7 @@ import { Vector3 } from 'three';
 import { AMBIANCES, etatMeteo, interpoler, angleVers } from '../monde/meteo.js';
 import { Deferlantes } from '../monde/deferlantes.js';
 import { Scelerates, chocScelerate } from '../monde/scelerates.js';
+import { Peur } from './peur.js';
 import { directionEnMots } from './radio.js';
 import { NOM_BATEAU, JOS, HEURE_COUCHER, heureEnTexte } from './journee.js';
 import { LISTE_NUIT } from './lecons.js';
@@ -204,6 +205,8 @@ export class Nuit {
     this.aLancer = null; // (une vague à lancer tout de suite : pour vérifier)
     this.echoFantome = null; // { distance, releve (rad, dans le monde), age, duree } : sur le radar
     this.hasardEtrange = etrange;
+    // la peur (jeu/peur.js) : la tension, et ce qu'on voit du coin de l'œil
+    this.peur = new Peur({ graine });
     this.silence = false; // (Jos ne répond plus)
     this.dernierEtrange = null; // { nom, heure } : ce que Jos tentera d'expliquer si on l'appelle
     this.faits = new Set(); // les moments et les imprévus déjà passés
@@ -276,6 +279,7 @@ export class Nuit {
     this.suivreTrombe(dt, ctx);
     this.suivreCargo(dt, ctx);
     this.suivreEtrange(dt, ctx);
+    this.suivrePeur(dt, ctx);
     this.suivreBateau(dt, ctx);
     if (this.etat !== 'nuit') return;
     this.suivreMoments();
@@ -782,6 +786,7 @@ export class Nuit {
       this.faits.add(nom);
       if (journal) this.ecrire(journal);
       this.dernierEtrange = { nom, heure: h };
+      this.peur.secouer(0.3);
       this.emettre('etrange', nom);
     };
     // une lumière sur l'eau, au loin, dans le creux des vagues : il faut être dehors
@@ -828,6 +833,45 @@ export class Nuit {
     }
   }
 
+  // ---------- La peur ----------
+  // (le jeu donne ce que le marin regarde : ctx.regard ; les marins automatiques n'ont pas
+  // peur)
+  suivrePeur(dt, ctx) {
+    if (!ctx.regard) return;
+    const w = this.scelerates?.vague;
+    const occupe = (w && w.distance > -250) || (this.trombe && this.trombe.force > 0.1 && this.trombe.distance < 900)
+      || (this.cargo && this.cargo.distance < 1500) || (ctx.danger ?? 0) > 0.4;
+    const evts = this.peur.maj(dt, {
+      heure: this.heure, lieu: ctx.lieu, yeux: ctx.yeux, regard: ctx.regard, haut: ctx.haut, tanX: ctx.tanX, tanY: ctx.tanY,
+      lampe: ctx.lampe, eclairage: ctx.eclairage,
+      eclair: ctx.eclair ?? 0, danger: ctx.danger ?? 0, calme: ctx.calme ?? 0, occupe, silence: this.silence,
+      porteOuverte: ctx.aBord.descenteOuverte,
+    });
+    const h = this.heure;
+    const noter = (nom, texte) => {
+      if (texte) this.ecrire(texte);
+      this.dernierEtrange = { nom, heure: h };
+    };
+    for (const e of evts) {
+      if (e === 'gemissement' && this.peur.fois.gemissement === 1) noter('gemissement', 'La mer a gémi. Longtemps.');
+      else if (e === 'chose') noter('chose', 'Le sondeur a marqué six mètres. Il y en a quatre-vingt-dix.');
+      else if (e === 'pas') noter('pas', 'Des pas sur le pont, au-dessus de moi.');
+      else if (e === 'nom') noter('nom', `Une voix a dit « ${NOM_BATEAU} », sur le 16.`);
+      else if (e === 'coupCoque') noter('coupCoque', 'Un choc énorme contre la coque.');
+      else if (e === 'eclairSilhouette') noter('eclairSilhouette', 'Dans l\'éclair, quelqu\'un à l\'avant. À l\'éclair suivant, plus personne.');
+      else if (e === 'silhouette-fin' || e === 'reflet-fin' || e === 'forme-fin') {
+        // (ce qu'on a vu du coin de l'œil ne compte que si on l'a regardé : il n'y avait rien)
+        const j = this.peur.journal.at(-1);
+        if (j?.regardee) {
+          if (j.nom === 'silhouette') noter('silhouette', 'Quelqu\'un, debout à l\'avant. Non : personne.');
+          if (j.nom === 'reflet') noter('reflet', 'Dans la vitre, quelqu\'un se tenait derrière moi. Derrière moi : personne.');
+          if (j.nom === 'forme') noter('forme', 'Une forme pâle dans l\'eau, le long de la coque. Elle a coulé.');
+        }
+      }
+      this.emettre('peur', e);
+    }
+  }
+
   // Appeler Jos (radio, canal 72) : il donne des nouvelles, ou le conseil le plus urgent
   appelerJos(ctx) {
     // pendant le silence : rien que des parasites
@@ -848,6 +892,15 @@ export class Nuit {
         voix16: ['Un appel sur le seize ? Non… Je n\'ai rien reçu, moi. Et il n\'y a aucun bateau signalé dans le secteur, à part toi.', 'La fatigue joue des tours, la nuit. Reste concentré, matelot.'],
         coups: ['Des coups contre la coque ? Un tronc, une épave… ça arrive, par gros temps.', 'Regarde si tu ne prends pas l\'eau à l\'avant. Et écoute si ça recommence.'],
         echo: ['Un écho sur ton radar ? Sur le mien, il n\'y a que toi.', 'Du fouillis de mer, sans doute. Ou un grain. Ne te laisse pas impressionner, matelot.'],
+        gemissement: ['La mer qui gémit ? C\'est le vent dans ta mâture, matelot. Ou une bouée sifflante, loin d\'ici.', 'Il n\'y en a pas dans le secteur… mais par ce temps, le son porte loin.'],
+        silhouette: ['Quelqu\'un à l\'avant ? Tu es seul à bord, matelot.', 'Ton ciré de rechange qui bat, peut-être. Ou la fatigue. Bois un peu d\'eau, mange quelque chose.'],
+        eclairSilhouette: ['Dans l\'éclair ? … Tu es seul à bord. Tu le sais.', 'Ne va pas à l\'avant. Pas cette nuit. Reste attaché au cockpit.'],
+        reflet: ['Ton reflet dans la vitre, matelot. Avec la lumière rouge, on se fait peur tout seul.', 'Éteins un peu, tu verras mieux dehors.'],
+        forme: ['Une forme dans l\'eau ? Un sac, une bâche, un bout de filet… La mer en charrie, par gros temps.', 'Ne te penche pas pour voir. Jamais.'],
+        chose: ['Ta sonde a marqué six mètres ? Il y en a quatre-vingt-dix sous toi.', 'Un banc de poissons, sans doute… Les sondeurs voient des choses, parfois. Ou une baleine. Ça arrive, ici.'],
+        pas: ['Des pas ? C\'est une drisse qui cogne, ou le tangon mal saisi.', 'Va voir si tu veux. Mais attache-toi avant de sortir.'],
+        nom: ['Ton nom, sur le seize ? Ce n\'était pas moi. Je n\'ai rien émis.', 'Et personne d\'autre n\'est sur le canal, à part nous deux…'],
+        coupCoque: ['Un choc ? Une épave, un conteneur, un tronc… Vérifie que tu ne prends pas l\'eau.', 'Et regarde ta cale dans dix minutes.'],
       };
       if (explications[e.nom]) {
         this.dire(explications[e.nom]);
@@ -1065,6 +1118,7 @@ export class Nuit {
       prevu: { ...this.prevu },
       faits: new Set(this.faits),
       stats: { ...this.stats },
+      peur: this.peur.instantane(),
       voiles: { ris: p.ris, deroule: p.deroule, ecouteFocLibre: p.ecouteFocLibre, grandVoileDechiree: p.grandVoileDechiree, focDechire: p.focDechire },
     };
   }
@@ -1094,6 +1148,7 @@ export class Nuit {
     for (const nom of ['trombe', 'cargo', 'ecouteFoc', 'pilote', 'lumiere', 'voix16', 'silence', 'coups', 'echo', 'scelerate0', 'scelerate1', 'scelerate2']) this.prevu[nom] ??= Infinity; // (JSON : Infinity devient null)
     this.scelerates?.finir();
     this.aLancer = null;
+    this.peur.restaurer(s.peur);
     this.silence = this.faits.has('silence') && this.heure < this.prevu.silence + 0.55;
     this.dernierEtrange = null;
     this.deferlantes.annonce = null;

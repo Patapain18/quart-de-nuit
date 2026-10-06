@@ -84,6 +84,15 @@ export class Radio {
     });
   }
 
+  // Une voix qui chuchote sur un canal, tout près du micro (personne n'appelle) : la voix
+  // de synthèse, très grave et lente, à peine audible dans les parasites
+  chuchoter(texte, { canal = 16, sousTitre = null } = {}) {
+    return new Promise((fini) => {
+      this.file.push({ chuchote: true, texte, canal, sousTitre, fini });
+      if (!this.occupee) this.lireLaFile();
+    });
+  }
+
   async lireLaFile() {
     this.occupee = true;
     while (this.file.length) {
@@ -96,6 +105,17 @@ export class Radio {
         this.audio?.voixFantome?.(message.duree);
         this.afficher(message.texte);
         await new Promise((r) => { this.finPhrase = r; setTimeout(r, message.duree * 1000); });
+        this.afficher('');
+        this.ecran?.dessiner(`CH ${canal}`, FREQUENCES[canal] ?? '');
+        fini(true);
+        continue;
+      }
+      if (message.chuchote) {
+        this.audio?.parasites?.(4.5, 0.4);
+        this.afficher(message.sousTitre ?? `Canal ${canal} : une voix, tout près du micro : « ${message.texte} »`);
+        await new Promise((r) => setTimeout(r, 900));
+        await this.dire(message.texte, { pitch: 0.05, rate: 0.6, volume: 0.42 });
+        await new Promise((r) => setTimeout(r, 1200));
         this.afficher('');
         this.ecran?.dessiner(`CH ${canal}`, FREQUENCES[canal] ?? '');
         fini(true);
@@ -144,7 +164,7 @@ export class Radio {
     }).filter((m) => m !== '').join(' ');
   }
 
-  dire(phrase) {
+  dire(phrase, { pitch = 0.9, rate = 1.02, volume = null } = {}) {
     return new Promise((resoudre) => {
       this.finPhrase = resoudre;
       if (this.muette || !('speechSynthesis' in window) || !this.voix) {
@@ -154,9 +174,9 @@ export class Radio {
       const u = new SpeechSynthesisUtterance(phrase);
       u.voice = this.voix;
       u.lang = 'fr-FR';
-      u.rate = 1.02;
-      u.pitch = 0.9;
-      u.volume = 1 - 0.45 * this.brouillage; // (la voix faiblit dans les parasites)
+      u.rate = rate;
+      u.pitch = pitch;
+      u.volume = volume ?? 1 - 0.45 * this.brouillage; // (la voix faiblit dans les parasites)
       // (la synthèse vocale des navigateurs reste parfois bloquée sans jamais dire qu'elle
       // a fini : au-delà du temps qu'il faut pour lire la phrase, on passe à la suite)
       const secours = setTimeout(() => {

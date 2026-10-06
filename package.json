@@ -16,6 +16,7 @@
     "test-nuit": "node scripts/test-nuit.js",
     "test-barre": "node scripts/test-barre.js",
     "test-scelerate": "node scripts/test-scelerate.js",
+    "test-peur": "node scripts/test-peur.js",
     "sons": "node scripts/preparer-sons.mjs"
   },
   "dependencies": {
