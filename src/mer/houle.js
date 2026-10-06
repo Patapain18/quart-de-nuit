@@ -14,6 +14,10 @@
 //
 // Ce fichier n'utilise pas Three.js : il tourne aussi bien dans le navigateur que
 // dans Node (pour les tests et les réglages).
+//
+// Dans le navigateur, le gros du calcul (les FFT, ~2,6 ms par image) se fait dans un fil
+// à part (houle-fil.js, un « worker ») : pendant qu'on dessine une image, il calcule déjà
+// la mer de la suivante. Voir Houle.calculer.
 
 import { creerFFT } from './fft.js';
 import { pulsation, spectreDirectionnel } from './spectre.js';
@@ -138,6 +142,13 @@ class Cascade {
 
   // Calcule la surface au temps t (s). dt sert à faire vieillir l'écume.
   calculer(t, dt, choppyGlobal, ecume) {
+    this.calculerDeplacements(t, choppyGlobal, this.donnees);
+    this.calculerEcume(dt, ecume, this.donnees);
+  }
+
+  // La hauteur et le déplacement horizontal au temps t, rangés dans d (4 nombres par case :
+  // déplacement x, hauteur, déplacement z, et la place de l'écume, qu'on ne touche pas)
+  calculerDeplacements(t, choppyGlobal, d) {
     const { n, h0Re, h0Im, omega, ux, uz, miroir, aRe, aIm, bRe, bIm } = this;
     const n2 = n * n;
     // 1) Chaque vague avance : h(k, t) = h0(k)·e^(-iωt) + conj(h0(-k))·e^(+iωt)
@@ -172,22 +183,20 @@ class Cascade {
     this.fft(aRe, aIm);
     this.fft(bRe, bIm);
 
-    // 2) On recopie le résultat dans le tableau destiné à la carte graphique,
-    //    et on fait naître l'écume là où la surface se replie sur elle-même.
+    // 2) On recopie le résultat dans le tableau destiné à la carte graphique
     const lambda = this.choppy * choppyGlobal;
-    const d = this.donnees;
     for (let idx = 0; idx < n2; idx++) {
       d[idx * 4] = aIm[idx] * lambda; // déplacement x
       d[idx * 4 + 1] = aRe[idx]; // hauteur
       d[idx * 4 + 2] = bRe[idx] * lambda; // déplacement z
     }
-    this.calculerEcume(dt, ecume);
   }
 
   // L'écume naît là où la vague « se casse » : le déplacement horizontal resserre
   // tellement la surface qu'elle se replie (le jacobien J passe sous un seuil).
   // Elle s'efface ensuite lentement, ce qui laisse des traînées derrière les crêtes.
-  calculerEcume(dt, { seuil, force, duree }) {
+  // (precedente : le tableau de l'image d'avant, où l'on reprend l'écume qui vieillit)
+  calculerEcume(dt, { seuil, force, duree }, precedente = this.donnees) {
     const { n, pas } = this;
     const d = this.donnees;
     const attenuation = Math.exp(-dt / duree);
@@ -206,7 +215,7 @@ class Cascade {
         const jacobien = (1 + dxdx) * (1 + dzdz) - dxdz * dzdx;
         const nouvelle = Math.min(1, Math.max(0, (seuil - jacobien) * force));
         const idx = (jn + i) * 4 + 3;
-        d[idx] = Math.max(d[idx] * attenuation, nouvelle);
+        d[idx] = Math.max(precedente[idx] * attenuation, nouvelle);
       }
     }
   }
@@ -238,13 +247,49 @@ class Cascade {
   }
 }
 
+// Le fil à part (navigateur seulement). Chaque cascade a deux tableaux : celui de l'image
+// en cours (lu par la carte graphique et par la physique) et un libre, que l'on prête au
+// fil pour qu'il y écrive la mer suivante, puis qu'il nous rend.
+function ouvrirFil(houle, graine, cascades) {
+  if (typeof Worker === 'undefined') return null;
+  let travailleur;
+  try {
+    travailleur = new Worker(new URL('./houle-fil.js', import.meta.url), { type: 'module' });
+  } catch {
+    return null;
+  }
+  const fil = {
+    travailleur,
+    libres: houle.cascades.map((c) => new Float32Array(c.donnees.length)),
+    enCours: false,
+    resultat: null,
+    panne: false,
+  };
+  travailleur.onmessage = ({ data }) => {
+    if (data.type !== 'resultat') return;
+    fil.enCours = false;
+    fil.resultat = { t: data.t, version: data.version, donnees: data.tampons.map((b) => new Float32Array(b)) };
+  };
+  // (si le fil ne démarre pas, on calcule tout ici, comme avant)
+  travailleur.onerror = (e) => {
+    fil.panne = true;
+    console.warn('Houle : le fil de calcul ne marche pas, on calcule sur le fil principal.', e.message ?? e);
+  };
+  travailleur.postMessage({ type: 'debut', graine, cascades: cascades.map((c) => ({ ...c })) });
+  return fil;
+}
+
 export class Houle {
-  constructor({ graine = 1, cascades = CASCADES } = {}) {
+  // fil : calculer les vagues dans un fil à part (dans le navigateur seulement)
+  constructor({ graine = 1, cascades = CASCADES, fil = false } = {}) {
     this.cascades = cascades.map((def, i) => new Cascade(def, graine * 1013 + i * 7919));
     this.choppy = 1;
     this.ecume = { seuil: 0.8, force: 5, duree: 3.5 };
     this.temps = 0;
     this._s = [0, 0, 0];
+    this.version = 0; // (change à chaque nouvel état de la mer d'un coup)
+    this.partDansLeFil = 0; // la part des images dont la mer vient du fil (moyenne glissante)
+    this.fil = fil ? ouvrirFil(this, graine, cascades) : null;
   }
 
   // Nouvel état de la mer (vent, fetch, direction, houle) : voir spectre.js
@@ -253,6 +298,9 @@ export class Houle {
   // temps change peu à peu)
   regler(mer, { progressif = false } = {}) {
     this.mer = mer;
+    // (le fil fait de même de son côté ; un changement d'un coup rend périmé ce qu'il calcule)
+    if (!progressif) this.version++;
+    this.fil?.travailleur.postMessage({ type: 'regler', mer, progressif, version: this.version });
     if (progressif) {
       this.aRegler = [];
       for (const c of this.cascades) for (let j = 0; j < c.n; j += 32) this.aRegler.push([c, j, Math.min(c.n, j + 32)]);
@@ -281,13 +329,49 @@ export class Houle {
     for (const c of this.cascades) for (let i = 3; i < c.donnees.length; i += 4) c.donnees[i] = 0;
   }
 
+  // La mer au temps t. Avec un fil : il a calculé pendant l'image d'avant la mer de cet
+  // instant-ci ; on échange ses tableaux contre les nôtres (sans rien recopier) et on lui
+  // demande déjà ceux de l'image suivante. Ici, il ne reste que l'écume (elle a besoin de
+  // l'image d'avant). Si le fil n'a pas fini à temps — ou si le navigateur ne nous a pas
+  // rendu la main entre deux images, comme dans les outils d'essai qui enchaînent les
+  // images —, on calcule ici, comme sans fil : la mer est la même.
   calculer(t, dt = 1 / 60) {
     this.temps = t;
     if (this.aRegler?.length) {
       const [c, j0, j1] = this.aRegler.shift();
       c.regler(this.mer, j0, j1);
     }
+    const fil = this.fil;
+    if (fil && !fil.panne) {
+      const r = fil.resultat;
+      fil.resultat = null;
+      if (r && r.version === this.version && Math.abs(r.t - t) < 0.1) {
+        fil.libres = [];
+        this.cascades.forEach((c, i) => {
+          const ancienne = c.donnees;
+          c.donnees = r.donnees[i];
+          c.calculerEcume(dt, this.ecume, ancienne);
+          fil.libres[i] = ancienne;
+        });
+        this.partDansLeFil += (1 - this.partDansLeFil) * 0.02;
+        this.demanderAuFil(t + dt);
+        return;
+      }
+      // (trop vieille, ou d'une mer qui a changé : on reprend juste ses tableaux)
+      if (r) fil.libres = r.donnees;
+    }
     for (const c of this.cascades) c.calculer(t, dt, this.choppy, this.ecume);
+    this.partDansLeFil *= 0.98;
+    if (fil && !fil.panne && !fil.enCours) this.demanderAuFil(t + dt);
+  }
+
+  // Demande au fil la mer du temps t (on lui confie nos tableaux libres pour l'écrire)
+  demanderAuFil(t) {
+    const fil = this.fil;
+    const tampons = fil.libres.map((d) => d.buffer);
+    fil.libres = null;
+    fil.enCours = true;
+    fil.travailleur.postMessage({ type: 'calculer', t, choppy: this.choppy, version: this.version, tampons }, tampons);
   }
 
   // Somme des cascades « physiques » au point (x, z) de la grille non déplacée

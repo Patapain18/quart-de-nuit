@@ -559,6 +559,8 @@ export class Eau {
     const ancienne = r.getRenderTarget();
     const u = this.passe.materiau.uniforms;
     for (const { cascade, entree, sortie } of this.grilles) {
+      // (la houle change de tableau à chaque image quand elle est calculée dans son fil)
+      entree.image.data = cascade.donnees;
       entree.needsUpdate = true;
       u.uDonnees.value = entree;
       u.uPas.value = cascade.pas;

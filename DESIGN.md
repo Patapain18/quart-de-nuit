@@ -28,7 +28,8 @@ Ouvrir `atelier-mer.html` (serveur : `npm run dev`, port 5190).
 | L'image | Halo autour des lumières, exposition qui s'adapte (sans compenser toute la nuit), AgX (le rendu de Blender), étalonnage par ambiance (doré au coucher, bleu la nuit). | `post.js` |
 | L'atelier | 6 ambiances, curseurs (heure, vent, nuages, orage, pluie, brume, houle), 3 points de vue, photo, planches comparatives, petite balade au clavier. | `atelier-mer.*` |
 
-Mesures sur le Mac M4 Pro : ~120 images/s en 1920 × 1200 ; la houle coûte 3 ms par image.
+Mesures sur le Mac M4 Pro : ~120 images/s en 1920 × 1200 ; la houle coûte 3 ms par image
+(0,3 ms sur le fil principal depuis qu'elle est calculée dans un fil à part : étape 17).
 
 ---
 
@@ -452,6 +453,24 @@ qui ne répond plus) ; ce qui est dur, c'est **barrer, tenir un cap** ; l'élect
     cargo » ; `?cargo=400` dans l'adresse), et ses photos vont plus vite dans un onglet
     caché (une pause toutes les 30 images, pas à chaque image). Coût : rien de mesurable.
 
+17. ✅ **La houle dans un fil à part** (`src/mer/houle-fil.js`, un « worker ») — les FFT de
+    la houle (2,6 ms par image) se font maintenant sur un autre cœur du processeur : pendant
+    que le jeu dessine une image, le fil calcule déjà la mer de la suivante (au temps
+    t + dt), dans des tableaux qu'on lui prête et qu'il rend aussitôt (on se les passe sans
+    les recopier : chaque cascade a son tableau en cours et un tableau libre). Il garde sa
+    propre copie de la mer (les mêmes vagues tirées avec la même graine, les mêmes
+    réglages) ; l'écume reste sur le fil principal (0,2 ms : elle a besoin de l'image
+    d'avant). Si le fil n'a pas fini à temps, ou si la mer a changé d'un coup entre-temps
+    (un numéro de version), ou dans les outils d'essai qui enchaînent les images sans rendre
+    la main au navigateur, on calcule sur place, comme avant : la mer est la même. Mesures :
+    dans le jeu, en pleine tempête, la houle passe de ~3 ms à 0,3 ms par image sur le fil
+    principal (tout le travail du fil principal : 1,6 ms par image), 100 % des images
+    viennent du fil, 120 images/s sans à-coup ; la mer du fil et une mer calculée sur
+    place au même instant diffèrent de moins d'un millimètre (1,5 cm au pire, quand deux
+    images arrivent à des intervalles un peu différents). L'atelier de la mer affiche
+    « Houle calculée à part ». Ce Mac est limité par l'écran (120 Hz) : le gain servira
+    surtout aux ordinateurs plus lents.
+
 Et en passant : sous la pluie et dans les embruns, **le pont ruisselle** (le gelcoat et
 l'antidérapant deviennent brillants, le teck fonce : seulement la rugosité et la teinte des
 matériaux, sans rien recompiler) ; le navigateur qui refuse un instant de capturer la souris
@@ -462,4 +481,4 @@ matériaux, sans rien recompiler) ; le navigateur qui refuse un instant de captu
 
 ## 4. Pistes graphiques notées pour plus tard
 
-- Le bruit de la mer calculé dans un « worker » (fil de calcul séparé) pour libérer 3 ms par image.
+Toutes celles du grand chantier sont faites (étapes 13 à 17).

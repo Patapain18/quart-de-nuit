@@ -385,6 +385,7 @@ function afficherMesures() {
     ['Images par seconde', m.ips.toFixed(0)],
     ['Une image (processeur)', `${m.imageMs.toFixed(1)} ms`],
     ['dont la houle', `${m.houleMs.toFixed(1)} ms`],
+    ['Houle calculée à part', `${Math.round(monde.houle.partDansLeFil * 100)} % des images`],
     ['Hauteur des vagues (Hs)', `${monde.houle.hauteurSignificative.toFixed(1)} m`],
     ['Vitesse du bateau', `${(balade.vitesse / 0.5144).toFixed(1)} nœuds`],
     ['Cap', `${Math.round(bateau.cap)}°`],
