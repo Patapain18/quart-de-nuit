@@ -615,7 +615,7 @@ Feuille de route :
     (puis le choc), pendant les pas et la voix, et dans le creux de la vague scélérate, à
     l'abri de son mur. Une option, « Des éclairs vifs, des lumières qui vacillent », permet
     de tout adoucir : les éclairs montent et s'éteignent lentement, sans claquer, et rien ne
-    vacille. Vérification complète : les dix essais passent (physique, houle, pont, barre,
+    vacille. Vérification complète : les neuf essais passent (physique, houle, pont, barre,
     journée, nuit, tempête, scélérates, peur) ; un tour de la nuit heure par heure dans le
     jeu ; au moment le plus chargé (en pleine tempête, la nuit, une vague scélérate qui
     s'écroule sur le bateau), 120 images par seconde, 95 % des images en moins de 10 ms,
