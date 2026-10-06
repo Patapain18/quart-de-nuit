@@ -33,7 +33,7 @@ Au clavier (français) et à la souris. La souris tourne la tête.
 
 **Les vagues scélérates** : deux ou trois fois dans la nuit, une vague de 10 à 12 m. On l'entend gronder une minute avant, Jos prévient (quand il le peut), sa crête avance sur le radar. Mets-la droit dans ton arrière et tiens-toi : de trois quarts, ça passe encore ; de travers, elle couche le bateau.
 
-Les **options** (accueil ou pause) : la qualité de l'image (économique, moyenne, haute, superbe), la sensibilité de la souris, le champ de vision, la **barre assistée** (ou la vraie barre, plus dure), un **horizon stable** contre le mal de mer, les secousses, les gouttes sur l'écran, le volume, la voix de Jos et les sous-titres.
+Les **options** (accueil ou pause) : la qualité de l'image (économique, moyenne, haute, superbe), la sensibilité de la souris, le champ de vision, la **barre assistée** (ou la vraie barre, plus dure), un **horizon stable** contre le mal de mer, les secousses, les gouttes sur l'écran, les **éclairs vifs et les lumières qui vacillent** (à décocher si les éclats de lumière te gênent), le volume, la voix de Jos et les sous-titres.
 
 Le jeu saccade ? Ouvre `jeu.html?perf` : un petit graphique, en haut à gauche, montre le temps de chaque image, compte les à-coups et dit ce qui les a causés.
 

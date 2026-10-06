@@ -15,6 +15,7 @@ export const OPTIONS_DE_BASE = {
   stabilisation: 0, // la tête compense le roulis : 0 (comme en vrai) → 1 (horizon presque fixe)
   secousses: true, // la vue tremble quand une vague frappe
   gouttes: true, // les gouttes d'eau sur l'écran
+  clignotements: true, // les éclairs vifs, les lumières qui vacillent (sinon : adoucis, pour les yeux sensibles)
   volume: 0.8, // le son : 0 → 1
   voix: true, // Jos parle (sinon : seulement les sous-titres)
   sousTitres: true, // les sous-titres de la radio

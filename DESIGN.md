@@ -603,8 +603,24 @@ Feuille de route :
     regardée disparaît dans la même image, le reflet quand on se retourne, la forme coule).
     Les marins automatiques n'ont pas peur : la nuit de `npm run test-nuit` est inchangée.
     Images : `docs/etape20-*.jpg`.
-21. **L'ambiance** — le son et la lumière de la nuit, plus oppressants ; vérification
-    complète (la nuit jouée en entier, les marins automatiques, les performances).
+21. ✅ **L'ambiance** — la nuit se referme quand la peur monte : l'exposition baisse avec
+    la tension (jusqu'à 30 % de lumière en moins au plus fort de la peur : l'œil ne s'habitue
+    plus aussi bien au noir), en plus de la vue qui se resserre et des couleurs qui pâlissent.
+    Les lumières du bord hésitent quand l'étrange arrive (des pas, ton nom, la chose sous la
+    coque, ce qu'on a vu puis plus vu) et parfois, quand la peur est haute : la veilleuse
+    faiblit presque jusqu'au noir, les écrans du radar, du traceur et du pilote s'éteignent
+    à moitié — jamais plus de trois changements par seconde (au-delà, des éclats de lumière
+    peuvent être dangereux pour les personnes photosensibles). Des silences : le bruit du
+    monde (le vent, la mer, la pluie) se retire un instant avant le choc contre la coque
+    (puis le choc), pendant les pas et la voix, et dans le creux de la vague scélérate, à
+    l'abri de son mur. Une option, « Des éclairs vifs, des lumières qui vacillent », permet
+    de tout adoucir : les éclairs montent et s'éteignent lentement, sans claquer, et rien ne
+    vacille. Vérification complète : les dix essais passent (physique, houle, pont, barre,
+    journée, nuit, tempête, scélérates, peur) ; un tour de la nuit heure par heure dans le
+    jeu ; au moment le plus chargé (en pleine tempête, la nuit, une vague scélérate qui
+    s'écroule sur le bateau), 120 images par seconde, 95 % des images en moins de 10 ms,
+    aucune au-delà de 25 ms, 2 ms de travail par image sur le fil principal ; aucune erreur
+    dans la console.
 
 ## 4. Pistes graphiques notées pour plus tard
 

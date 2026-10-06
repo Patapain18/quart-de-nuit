@@ -744,7 +744,9 @@ export class Interieur {
   //   navigation sont-ils allumés (le voyant du tableau) ; ciel : [r, g, b], la lumière du
   //   ciel (eclairage(meteo).ambiance) ; eclair : un éclair illumine les hublots ;
   //   descente : 0 (fermée) → 1 (ouverte) ; pression (hPa) et heure, pour les cadrans
-  regler({ eclairage, feux, ciel, eclair = 0, descente = 1, pression = 1015, heure = 12 }) {
+  //   vacille : 0 → 1, la lumière des plafonniers (1 : normale ; moins : elle faiblit, quand
+  //   le courant hésite)
+  regler({ eclairage, feux, ciel, eclair = 0, descente = 1, pression = 1015, heure = 12, vacille = 1 }) {
     this.eclairage = eclairage;
     const u = this.uniforms;
     const S = u.uSourceCouleur.value;
@@ -762,8 +764,8 @@ export class Interieur {
     // n'est plus qu'une veilleuse : le bois sombre, les écrans pour seule vraie lumière)
     const kTimonerie = eclairage === 'rouge' ? 0.12 : 0.35;
     for (const [i, l, k] of [[0, this.lampes[0], 1], [1, this.lampes[1], 1], [5, this.lampeTimonerie, kTimonerie]]) {
-      S[i].copy(lampe).multiplyScalar(k);
-      l.diffuseur.material.emissive.copy(lampe).multiplyScalar(3.2 * k);
+      S[i].copy(lampe).multiplyScalar(k * vacille);
+      l.diffuseur.material.emissive.copy(lampe).multiplyScalar(3.2 * k * vacille);
     }
     // les hublots du carré (≈ 4 dm² de vitre chacun), le panneau de pont (un plexiglas fumé :
     // 35 % passe), les grandes vitres de la timonerie (et sa porte, quand elle est ouverte)

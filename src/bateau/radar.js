@@ -127,7 +127,7 @@ export class Radar {
     this.ageEcran = 0;
     this.copierEchos();
     this.dessinerEcran(TAILLE / 2, TAILLE * 0.46);
-    this.materiau.emissiveIntensity = 1.1 - 0.6 * nuit;
+    this.materiau.emissiveIntensity = (1.1 - 0.6 * nuit) * (this.vacille ?? 1);
   }
 
   // Un rayon de l'antenne (a : relatif à l'avant, sens des aiguilles d'une montre)

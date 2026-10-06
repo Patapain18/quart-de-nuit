@@ -270,11 +270,16 @@ export class Monde3D {
     }
     let centre = null;
     let actif = null;
-    e.flashs = e.flashs.filter((f) => this.temps - f.debut < 0.4);
+    // (les éclairs doux, pour les yeux sensibles : moins forts, et ils s'éteignent lentement
+    // au lieu de claquer — plus d'éclats successifs)
+    const doux = this.eclairsDoux;
+    e.flashs = e.flashs.filter((f) => this.temps - f.debut < (doux ? 1.4 : 0.4));
     for (const f of e.flashs) {
       const age = this.temps - f.debut;
       if (age < 0) continue;
-      const v = f.force * Math.exp(-age * 18) * (age < 0.02 ? age / 0.02 : 1);
+      const v = doux
+        ? 0.4 * f.force * Math.exp(-age * 3.5) * Math.min(1, age / 0.25)
+        : f.force * Math.exp(-age * 18) * (age < 0.02 ? age / 0.02 : 1);
       if (v > e.intensite) { e.intensite = v; centre = f.centre; actif = f; }
     }
     this.ciel.eclair(centre ?? new THREE.Vector3(), e.intensite);

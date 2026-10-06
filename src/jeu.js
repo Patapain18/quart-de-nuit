@@ -280,6 +280,7 @@ function appliquerOptions(o, changements = o) {
   etat.aide = o.aide;
   document.getElementById('aide-touches').classList.toggle('cache', !o.aide);
   monde.gouttesActives = o.gouttes;
+  monde.eclairsDoux = !o.clignotements;
   difficulte = o.difficulte;
   majDifficultes();
   majFenetreOptions();
@@ -593,6 +594,9 @@ function simuler(dt) {
   bouees.maj(journee?.bouees, monde.temps, monde.ecl.nuit);
   if (enJeu) surveillerLaCote(dt);
 
+  // (les lumières du bord vacillent quand l'étrange arrive)
+  const vacille = facteurVacille(dt);
+  bateau.radar.vacille = vacille;
   // le modèle 3D suit la physique
   physique.origine(_origine);
   bateau.groupe.position.copy(_origine);
@@ -626,6 +630,7 @@ function simuler(dt) {
     nuit: monde.ecl.nuit,
     // (la chose sous la coque : le sondeur la voit, lui)
     sonde: nuit?.peur?.chose?.sonde ?? null,
+    vacille,
   });
   // les essuie-glaces : sous la pluie, ou quand les embruns arrosent le pare-brise ; et
   // l'eau qui ruisselle sur les vitres de la timonerie
@@ -652,6 +657,7 @@ function simuler(dt) {
     descente: bateau.descenteOuverte ? 1 : 0,
     pression,
     heure: meteo.heure,
+    vacille,
   });
   const dedans = (etat.mode === 'pied' && !marin.dehors) || etat.mode === 'poste';
   const enTimonerie = etat.mode === 'poste' || (etat.mode === 'pied' && marin.dansLaTimonerie);
@@ -664,6 +670,9 @@ function simuler(dt) {
   const reglages = monde.post.reglages;
   // (on mélange les expositions « en photographe » : en diaphragmes, pas en valeurs)
   reglages.uExposition.value = Math.exp(THREE.MathUtils.lerp(Math.log(monde.ecl.exposition), Math.log(expositionCabine), etat.adaptation));
+  // (quand la peur monte, la nuit se referme : l'œil ne s'habitue plus aussi bien au noir)
+  const peurNuit = (nuit?.peur?.tension ?? 0) ** 2 * monde.ecl.nuit;
+  reglages.uExposition.value *= 1 - 0.3 * peurNuit;
   // (sous le nuage-mur de la trombe, il fait sombre)
   if (nuit?.trombe) reglages.uExposition.value *= 1 - 0.32 * nuit.trombe.force * (1 - THREE.MathUtils.smoothstep(nuit.trombe.distance, 150, 900));
   // (et les couleurs de la nuit — bleues, délavées — ne valent que dehors)
@@ -1084,14 +1093,49 @@ function vivreEtrange(nom) {
 function vivrePeur(e) {
   const p = nuit?.peur;
   if (e === 'gemissement') audio.gemissement?.((Math.random() - 0.5) * 1.6);
-  else if (e === 'pas') audio.pasSurLePont?.();
-  else if (e === 'nom') jeu.radio.chuchoter?.(`${NOM_BATEAU}… ${NOM_BATEAU}…`, { canal: 16, sousTitre: `Canal 16 : une voix, tout près du micro, très lente : « ${NOM_BATEAU}… »` });
-  else if (e === 'coupCoque') {
-    audio.coupEnorme?.();
-    secousse(0.9);
-    audio.battement?.(1);
-  } else if (e === 'eclairSilhouette') audio.battement?.(1);
-  else if (e.endsWith('-fin') && p?.journal.at(-1)?.regardee) audio.battement?.(0.8);
+  else if (e === 'pas') {
+    // (le monde se tait un instant : on les entend d'autant mieux ; la lumière hésite)
+    audio.etouffer?.(5.5, 0.55);
+    audio.pasSurLePont?.();
+    etat.vacille = 1.2;
+  } else if (e === 'nom') {
+    audio.etouffer?.(4, 0.5);
+    etat.vacille = 2;
+    jeu.radio.chuchoter?.(`${NOM_BATEAU}… ${NOM_BATEAU}…`, { canal: 16, sousTitre: `Canal 16 : une voix, tout près du micro, très lente : « ${NOM_BATEAU}… »` });
+  } else if (e === 'coupCoque') {
+    // (un silence, d'abord : le vent, la mer se retirent… puis le choc)
+    audio.etouffer?.(1.9, 0.8);
+    setTimeout(() => {
+      if (!nuit) return;
+      audio.coupEnorme?.();
+      secousse(0.9);
+      audio.battement?.(1);
+      etat.vacille = 1.6;
+    }, 1700);
+  } else if (e === 'chose') etat.vacille = 2.5;
+  else if (e === 'eclairSilhouette') audio.battement?.(1);
+  else if (e.endsWith('-fin') && p?.journal.at(-1)?.regardee) {
+    audio.battement?.(0.8);
+    etat.vacille = 0.7;
+  }
+}
+
+// Les lumières du bord (les plafonniers, les écrans) quand le courant hésite : elles
+// faiblissent, presque jusqu'au noir, ou reviennent. Quand
+// l'étrange arrive, et parfois, quand la peur est haute.
+// (au plus trois changements par seconde : plus vite, des éclats de lumière peuvent être
+// dangereux pour les personnes photosensibles ; et rien du tout si l'option est décochée)
+function facteurVacille(dt) {
+  if (!options.clignotements) return 1;
+  if ((nuit?.peur?.tension ?? 0) > 0.7 && Math.random() < dt / 55) etat.vacille = Math.max(etat.vacille ?? 0, 0.9 + 0.8 * Math.random());
+  etat.vacille = Math.max(0, (etat.vacille ?? 0) - dt);
+  if (etat.vacille <= 0) return 1;
+  etat.ageVacille = (etat.ageVacille ?? 0) + dt;
+  if (etat.ageVacille > 0.34 || etat.valeurVacille === undefined) {
+    etat.ageVacille = 0;
+    etat.valeurVacille = Math.random() < 0.4 ? 0.05 + 0.3 * Math.random() : 0.75 + 0.25 * Math.random();
+  }
+  return etat.valeurVacille;
 }
 
 // D'où vient une déferlante, vue du bateau (« par le travers tribord »…)
@@ -1202,6 +1246,7 @@ function commencerNuit({ depuisJournee = false, bateau: bateauGarde = null, repr
     .on('etrange', (nom) => vivreEtrange(nom))
     .on('peur', (e) => vivrePeur(e))
     .on('scelerate', (w) => afficherMessage(`Une vague énorme arrive ${directionRelative(w.relatif)} ! Mets-la droit dans ton arrière, et accroche-toi (X)`))
+    .on('scelerate-trou', () => audio.etouffer?.(2.6, 0.55))
     .on('scelerate-proche', () => {
       afficherMessage('La voilà ! Tiens-toi (Maj) !');
       audio.battement?.(1);
@@ -2006,7 +2051,7 @@ const TEXTES_QUALITE = {
   for (const cle of Object.keys(curseurs)) {
     document.getElementById(`o-${cle}`).addEventListener('input', (e) => changerOptions({ [cle]: Number(e.target.value) }));
   }
-  for (const cle of ['inverser', 'secousses', 'gouttes', 'voix', 'sousTitres', 'barreAssistee']) {
+  for (const cle of ['inverser', 'secousses', 'gouttes', 'clignotements', 'voix', 'sousTitres', 'barreAssistee']) {
     document.getElementById(`o-${cle}`).addEventListener('change', (e) => changerOptions({ [cle]: e.target.checked }));
   }
   majFenetreOptions.curseurs = curseurs;
@@ -2019,7 +2064,7 @@ function majFenetreOptions() {
     document.getElementById(`o-${cle}`).value = options[cle];
     document.getElementById(`v-${cle}`).textContent = texte(options[cle]);
   }
-  for (const cle of ['inverser', 'secousses', 'gouttes', 'voix', 'sousTitres', 'barreAssistee']) document.getElementById(`o-${cle}`).checked = options[cle];
+  for (const cle of ['inverser', 'secousses', 'gouttes', 'clignotements', 'voix', 'sousTitres', 'barreAssistee']) document.getElementById(`o-${cle}`).checked = options[cle];
   document.getElementById('o-sousTitres').disabled = !options.voix; // (sans la voix, les sous-titres restent)
 }
 function ouvrirFenetre(id) {

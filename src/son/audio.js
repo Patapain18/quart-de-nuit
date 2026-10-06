@@ -165,7 +165,9 @@ export class Audio {
     // les bus
     this.filtreCabine = filtre('lowpass', 18000, 0.5);
     this.bus = { dehors: gain(1), dedans: gain(0), bord: gain(1), radio: gain(1) };
-    this.bus.dehors.connect(this.filtreCabine).connect(this.compresseur);
+    // (le bruit du monde peut se retirer un instant : etouffer())
+    this.etouffe = gain(1);
+    this.bus.dehors.connect(this.etouffe).connect(this.filtreCabine).connect(this.compresseur);
     this.bus.dedans.connect(this.compresseur);
     this.bus.bord.connect(this.compresseur);
     this.bus.radio.connect(this.sortie);
@@ -864,6 +866,20 @@ export class Audio {
     for (let k = 0; k < 2; k++) {
       this.jouer('craquements', { dans: dans + 0.1 + k * 0.35, gain: 0.5 + 0.5 * force, vitesse: 0.5 + 0.2 * Math.random(), pan: (Math.random() - 0.5) * 1.2 });
     }
+  }
+
+  // Le bruit du monde se retire (le vent, la mer, la pluie) : profondeur 0 → 1, pendant
+  // « duree » secondes, puis il revient. (Avant un choc, dans le creux d'une vague : un
+  // silence qu'on n'attendait pas.)
+  etouffer(duree = 2, profondeur = 0.75) {
+    if (!this.actif()) return;
+    const g = this.etouffe.gain;
+    const t = this.ctx.currentTime;
+    g.cancelScheduledValues(t);
+    g.setValueAtTime(g.value, t);
+    g.linearRampToValueAtTime(1 - profondeur, t + 0.35);
+    g.setValueAtTime(1 - profondeur, t + duree);
+    g.linearRampToValueAtTime(1, t + duree + 1.8);
   }
 
   // ---------- La peur (jeu/peur.js) ----------

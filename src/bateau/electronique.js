@@ -100,11 +100,12 @@ export class Electronique {
       this.trajet.push({ x: etat.x, z: etat.z });
       if (this.trajet.length > 360) this.trajet.shift();
     }
+    // (l'éclat des écrans : plus faible la nuit ; il hésite quand le courant hésite)
+    for (const m of this.materiaux) m.emissiveIntensity = (1 - 0.78 * etat.nuit) * (etat.vacille ?? 1);
     if (this.age < 0.25) return;
     this.age = 0;
     this.dessinerTraceur(etat);
     this.dessinerPilote(etat);
-    for (const m of this.materiaux) m.emissiveIntensity = 1 - 0.78 * etat.nuit;
   }
 
   dessinerTraceur(e) {
