@@ -71,7 +71,15 @@ const _q = new THREE.Quaternion();
 function placerCamera(dt) {
   const cam = monde.camera;
   const direction = directionRegard();
-  if (vue === 'large') {
+  if (vue === 'cargo' && monde.etatCargo) {
+    // en orbite autour du cargo (quand il est là)
+    const cible = new THREE.Vector3(monde.etatCargo.x, 12, monde.etatCargo.z);
+    cam.position.copy(cible).addScaledVector(direction, -distanceOrbite);
+    cam.position.y = Math.max(cam.position.y, monde.houle.hauteur(cam.position.x, cam.position.z) + 3);
+    cam.lookAt(cible);
+    return;
+  }
+  if (vue === 'large' || vue === 'cargo') {
     // en orbite autour du bateau
     const cible = bateau.groupe.position.clone().add(new THREE.Vector3(0, 3.5, 0));
     cam.position.copy(cible).addScaledVector(direction, -distanceOrbite);
@@ -246,7 +254,7 @@ marquerAmbiance(parametres.get('ambiance') ?? 'midi');
 bateau.cap = parametres.has('capBateau') ? Number(parametres.get('capBateau')) : capDeDepart(regard.cap);
 balade.vitesse = vitessePolaire(meteo.vent, 60) * 0.5144;
 
-const VUES = { pont: 'Sur le pont', ras: 'Au ras de l\'eau', large: 'Du large' };
+const VUES = { pont: 'Sur le pont', ras: 'Au ras de l\'eau', large: 'Du large', cargo: 'Autour du cargo' };
 const zoneVues = document.getElementById('vues');
 const boutonsVue = new Map();
 for (const [id, nom] of Object.entries(VUES)) {
@@ -301,6 +309,65 @@ function placerTrombe() {
   monde.etatTrombe = etatTrombe;
 }
 window.__trombe = trombe;
+
+// ---------- Le cargo (celui de la nuit, à la demande) ----------
+// Il passe devant le regard, de gauche à droite, à la distance choisie ; « Il vire » lui
+// fait prendre 50° sur tribord, pour voir son sillage suivre le virage.
+const cargoAtelier = { active: parametres.has('cargo'), distance: Number(parametres.get('cargo') ?? 400), vitesse: 7.5 };
+const CURSEURS_CARGO = [
+  { cle: 'distance', nom: 'Il passe à', min: 60, max: 3000, pas: 10, format: (v) => `${v} m` },
+  { cle: 'vitesse', nom: 'Vitesse', min: 0, max: 10, pas: 0.1, format: (v) => `${(v / 0.5144).toFixed(1)} nœuds` },
+];
+const caseCargo = document.getElementById('cargo-actif');
+caseCargo.checked = cargoAtelier.active;
+caseCargo.addEventListener('change', () => {
+  cargoAtelier.active = caseCargo.checked;
+  if (cargoAtelier.active) replacerCargo();
+});
+for (const c of CURSEURS_CARGO) {
+  const id = `cargo-${c.cle}`;
+  const bloc = document.createElement('div');
+  bloc.className = 'curseur';
+  bloc.innerHTML = `<label for="${id}">${c.nom}</label><output for="${id}">${c.format(cargoAtelier[c.cle])}</output>
+    <input type="range" id="${id}" min="${c.min}" max="${c.max}" step="${c.pas}" value="${cargoAtelier[c.cle]}">`;
+  const champ = bloc.querySelector('input');
+  champ.addEventListener('input', () => {
+    cargoAtelier[c.cle] = Number(champ.value);
+    bloc.querySelector('output').textContent = c.format(cargoAtelier[c.cle]);
+  });
+  document.getElementById('curseurs-cargo').append(bloc);
+}
+const etatCargo = { x: 0, z: 0, cap: 0, capVise: 0 };
+// (le point où il croise le regard, puis 900 m en amont sur sa route)
+function replacerCargo() {
+  const r = THREE.MathUtils.degToRad(regard.cap);
+  const centre = bateau.groupe.position;
+  const cx = centre.x + Math.sin(r) * cargoAtelier.distance;
+  const cz = centre.z - Math.cos(r) * cargoAtelier.distance;
+  etatCargo.cap = etatCargo.capVise = (regard.cap + 90 + 360) % 360;
+  const rc = THREE.MathUtils.degToRad(etatCargo.cap);
+  etatCargo.x = cx - Math.sin(rc) * 900;
+  etatCargo.z = cz + Math.cos(rc) * 900;
+  monde.etatCargo = null; // (son ancien sillage s'efface)
+}
+function virerCargo() { etatCargo.capVise = (etatCargo.capVise + 50) % 360; }
+function deplacerCargo(dt) {
+  if (!cargoAtelier.active) {
+    monde.etatCargo = null;
+    return;
+  }
+  const e = etatCargo;
+  const ecart = ((e.capVise - e.cap + 540) % 360) - 180;
+  e.cap = (e.cap + THREE.MathUtils.clamp(ecart, -1.2 * dt, 1.2 * dt) + 360) % 360;
+  const rc = THREE.MathUtils.degToRad(e.cap);
+  e.x += Math.sin(rc) * cargoAtelier.vitesse * dt;
+  e.z -= Math.cos(rc) * cargoAtelier.vitesse * dt;
+  monde.etatCargo = e;
+}
+document.getElementById('cargo-replacer').addEventListener('click', replacerCargo);
+document.getElementById('cargo-virer').addEventListener('click', virerCargo);
+if (cargoAtelier.active) replacerCargo();
+window.__cargo = { reglages: cargoAtelier, etat: etatCargo, replacer: replacerCargo, virer: virerCargo, activer: (oui = true) => { cargoAtelier.active = oui; caseCargo.checked = oui; if (oui) replacerCargo(); } };
 window.__regard = regard; // (pour les photos : la direction du regard, en degrés)
 window.__vue = (v) => { vue = v; marquerVue(); };
 
@@ -339,8 +406,11 @@ async function photographier(nom, { images = 24, secondes = 0 } = {}) {
   images = Math.max(images, Math.round(secondes * 60));
   for (let i = 0; i < images; i++) {
     reglerVoiles();
+    deplacerCargo(1 / 60);
     monde.image(1 / 60, { toutLeCube: i === 0, placerCamera });
-    await new Promise((r) => setTimeout(r, 0));
+    // (on rend la main au navigateur de temps en temps seulement : un onglet caché ne
+    // rappelle qu'une fois par seconde)
+    if (i % 30 === 29) await new Promise((r) => setTimeout(r, 0));
   }
   reglerVoiles();
   monde.image(1 / 60, { placerCamera });
@@ -438,6 +508,7 @@ function boucle(maintenant) {
   naviguer(dt);
   reglerVoiles();
   placerTrombe();
+  deplacerCargo(dt);
   monde.image(dt, { toutLeCube, placerCamera });
   toutLeCube = false;
   ageMesures += dt;

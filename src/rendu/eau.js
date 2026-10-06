@@ -17,8 +17,10 @@ import { GLSL_CARTE_CIEL } from './ciel.js';
 import { GLSL_COQUE } from '../bateau/glsl-coque.js';
 import { COQUE } from '../bateau/forme.js';
 import { glslFront } from './glsl/front.js';
+import { LONGUEUR as LONGUEUR_CARGO, GLSL_CARGO } from './forme-cargo.js';
 
 const N_SILLAGE = 24; // points du sillage (le premier : la poupe ; puis un toutes les 2,5 s)
+const N_CARGO = 24; // ceux du cargo (un toutes les 7 s : près de trois minutes, plus d'un kilomètre)
 
 const FRAGMENT_PREPARATION = /* glsl */ `
 in vec2 vUv;
@@ -123,10 +125,18 @@ uniform int uSillageN;
 uniform vec4 uSillageBoite;
 uniform float uVitesseBateau; // m/s
 uniform float uPlancton;      // la nuit, l'écume remuée par le bateau s'illumine (0 → 1)
+// le cargo : son repère (pour l'écume le long de sa coque), présent ou non et sa vitesse,
+// et son sillage (comme celui du bateau)
+uniform mat4 uCargoInverse;
+uniform vec4 uCargo;          // présent (0 ou 1), vitesse (m/s)
+uniform vec4 uCargoSillage[${N_CARGO}];
+uniform int uCargoSillageN;
+uniform vec4 uCargoBoite;
 
 const float PI = 3.14159265359;
 ${GLSL_CARTE_CIEL}
 ${GLSL_COQUE}
+${GLSL_CARGO}
 ${glslFront('uBruit')}
 
 float saturer(float x) { return clamp(x, 0.0, 1.0); }
@@ -201,6 +211,90 @@ vec4 ecumeDuBateau(vec3 pMonde) {
   return vec4(force, voile, saturer(lisse), saturer(bulles));
 }
 
+// Le sillage du cargo (185 m, 14 nœuds) : la grosse vague d'étrave et l'eau qu'il repousse
+// le long de sa coque ; les deux bras du « V » qui s'ouvrent derrière l'étrave (à 19,5° de
+// sa route, comme derrière tout navire : l'angle de Kelvin) ; puis derrière son hélice un
+// remous blanc large comme lui, qui s'étale et laisse une longue cicatrice d'eau lisse,
+// qui suit sa vraie route. Rend (force, voile d'écume, lisse, bulles), comme pour le bateau.
+vec4 ecumeDuCargo(vec3 pMonde) {
+  if (uCargo.x < 0.5) return vec4(0.0);
+  float force = 0.0;
+  float voile = 0.0;
+  float lisse = 0.0;
+  float bulles = 0.0;
+  float v = clamp(uCargo.y / 7.5, 0.0, 1.3);
+  // près de lui (dans son repère : l'avant vers -z)
+  vec3 p = (uCargoInverse * vec4(pMonde, 1.0)).xyz;
+  float derriere = p.z + ${(LONGUEUR_CARGO / 2).toFixed(1)}; // derrière l'étrave (m)
+  float ax = abs(p.x);
+  if (derriere > -20.0 && derriere < 420.0 && ax < 200.0) {
+    // le long de la coque : l'eau repoussée, épaisse à l'étrave (elle s'écarte jusqu'à
+    // une dizaine de mètres), plus mince ensuite
+    float w = cargoDemiLargeur(p.z);
+    float d = ax - w;
+    float etrave = 1.0 - smoothstep(0.0, 80.0, derriere);
+    float largeur = (2.5 + 13.0 * etrave) * v;
+    float coque = derriere < ${LONGUEUR_CARGO.toFixed(1)} + 5.0 ? (1.0 - smoothstep(0.0, largeur, d)) * smoothstep(-3.0, 0.0, d + 1.5) * smoothstep(-12.0, 0.0, derriere) : 0.0;
+    // (des traînées qui filent vers l'arrière à sa vitesse)
+    float zEau = p.z - uTemps * uCargo.y;
+    float stries = texture(uBruit, vec3(p.x * 0.12, zEau * 0.025, 0.41)).a * 0.65 + texture(uBruit, vec3(p.x * 0.4, zEau * 0.09, 0.77)).b * 0.35;
+    float fc = saturer(coque * (0.35 + 0.9 * etrave) * v);
+    // les bras du V : ils quittent la coque aux épaules de l'étrave, puis s'ouvrent à 19,5°
+    float bras = 0.0;
+    if (derriere > 5.0) {
+      float xa = 4.0 + derriere * 0.36 + 10.0 * smoothstep(0.0, 45.0, derriere);
+      float l = 2.0 + derriere * 0.03;
+      bras = (1.0 - smoothstep(0.0, l + 3.0, abs(ax - xa))) * exp(-derriere / 170.0) * v;
+      // (en courtes crêtes, en biais : les vagues qui divergent, à 35° de sa route, ne
+      // brisent que par endroits ; elles dessinent des plumes le long du bras)
+      float leLong = ax * 0.574 + derriere * 0.819;
+      float travers = ax * 0.819 - derriere * 0.574;
+      float cretes = texture(uBruit, vec3(leLong * 0.02, travers * 0.11, 0.63 + uTemps * 0.008)).a * 0.7
+                   + texture(uBruit, vec3(leLong * 0.06, travers * 0.3, 0.27)).b * 0.3;
+      bras *= smoothstep(0.42, 0.68, cretes + bras * 0.2);
+    }
+    force = max(fc, saturer(bras));
+    voile = max(motifEcume(fc, stries + etrave * 0.2), motifEcume(saturer(bras), stries));
+    bulles = max(fc * 0.8, bras * 0.5);
+  }
+  // le sillage de l'hélice
+  if (uCargoSillageN > 1 && pMonde.x > uCargoBoite.x && pMonde.x < uCargoBoite.z && pMonde.z > uCargoBoite.y && pMonde.z < uCargoBoite.w) {
+    float meilleur = 1e9;
+    float age = 0.0;
+    float vit = 0.0;
+    vec2 sens = vec2(0.0, 1.0);
+    for (int i = 0; i < ${N_CARGO - 1}; i++) {
+      if (i + 1 >= uCargoSillageN) break;
+      vec4 a = uCargoSillage[i];
+      vec4 b = uCargoSillage[i + 1];
+      vec2 ab = b.xy - a.xy;
+      vec2 ap = pMonde.xz - a.xy;
+      float t = clamp(dot(ap, ab) / max(dot(ab, ab), 1e-3), 0.0, 1.0);
+      float d = length(ap - ab * t);
+      if (d < meilleur) { meilleur = d; age = uTemps - mix(a.z, b.z, t); vit = mix(a.w, b.w, t); sens = ab; }
+    }
+    sens = length(sens) > 1e-3 ? normalize(sens) : vec2(0.0, 1.0);
+    float allure = clamp(vit / 7.5, 0.0, 1.2);
+    // large comme le navire à la poupe, il s'étale d'un mètre toutes les trois secondes ;
+    // ses bords sont déchiquetés
+    float largeur = 14.0 + 0.3 * age;
+    meilleur *= 0.75 + 0.5 * texture(uBruit, vec3(pMonde.xz * 0.012, 0.91)).a;
+    float coeur = (1.0 - smoothstep(largeur * 0.35, largeur, meilleur)) * allure;
+    float fs = coeur * exp(-age / 30.0);
+    vec2 q = vec2(dot(pMonde.xz, sens), dot(pMonde.xz, vec2(-sens.y, sens.x)));
+    float plaques = texture(uBruit, vec3(q.x * 0.022, q.y * 0.07, 0.29 + age * 0.002)).a;
+    float veines = 1.0 - abs(texture(uBruit, vec3(q.x * 0.07, q.y * 0.22, 0.61 - age * 0.003)).b * 2.0 - 1.0);
+    float grain = texture(uBruit, vec3(q.x * 0.3, q.y * 0.7, 0.05 + age * 0.005)).a;
+    float remous = plaques * 0.5 + veines * veines * 0.32 + grain * 0.18;
+    force = max(force, saturer(fs));
+    voile = max(voile, motifEcume(saturer(fs), remous));
+    bulles = max(bulles, coeur * exp(-age / 20.0));
+    // la cicatrice : une bande d'eau lisse, plus large, qui dure des minutes
+    lisse = (1.0 - smoothstep(largeur * 0.9, largeur * 1.7, meilleur)) * exp(-age / 160.0) * allure;
+  }
+  return vec4(saturer(force), saturer(voile), saturer(lisse), saturer(bulles));
+}
+
 // Reflet d'un astre (modèle GGX : la tache de lumière s'élargit quand l'eau est agitée)
 float eclat(vec3 n, vec3 v, vec3 l, float a) {
   vec3 h = normalize(v + l);
@@ -231,7 +325,8 @@ ${cascades.map((_, i) => `  p = texture(uPentes${i}, vSource / uGrille${i}.x);
   ecume *= uForceEcume;
 
   // le bateau : son écume, et l'eau qu'il a lissée derrière lui (moins de petites rides)
-  vec4 bateau = ecumeDuBateau(vMonde);
+  // (celle du bateau et celle du cargo, s'il est là)
+  vec4 bateau = max(ecumeDuBateau(vMonde), ecumeDuCargo(vMonde));
   pente *= 1.0 - 0.35 * bateau.z;
   variance *= 1.0 - 0.7 * bateau.z;
 
@@ -293,11 +388,12 @@ ${cascades.map((_, i) => `  p = texture(uPentes${i}, vSource / uGrille${i}.x);
       fraiche = max(fraiche, anneau * smoothstep(0.38, 0.62, spirale + anneau * 0.25) * uTrombe.w);
     }
     float voile = smoothstep(1.0 - fraiche, 1.0 - fraiche + 0.22, dentelle) * (0.35 + 0.65 * fraiche);
-    // (l'écume du bateau a son propre motif)
-    voile = max(voile, bateau.y);
-    fraiche = max(fraiche, bateau.x);
     // au loin, le motif devient une teinte moyenne (sinon il scintille)
     voile = mix(voile, fraiche * 0.5, saturer(distance / 250.0));
+    // (l'écume du bateau et du cargo a son propre motif, plus grand : il tient plus loin ;
+    // au-delà, sa teinte moyenne, plus claire que la mer mais pas blanche)
+    voile = max(voile, mix(bateau.y, bateau.x * 0.35, saturer(distance / 700.0)));
+    fraiche = max(fraiche, bateau.x);
     vec3 lumiereEcume = uAmbiance * 0.9 + uSoleil * (0.25 + 0.75 * max(dot(n, uDirSoleil), 0.0)) + uLune * 0.8 + vec3(uEclair * 0.5);
     // l'écume épaisse est blanche, la dentelle laisse voir l'eau verte en dessous
     vec3 couleurEcume = mix(vec3(0.55, 0.72, 0.72), vec3(0.88, 0.9, 0.92), fraiche) * lumiereEcume;
@@ -309,8 +405,10 @@ ${cascades.map((_, i) => `  p = texture(uPentes${i}, vSource / uGrille${i}.x);
       // (de toutes petites, qui clignotent ; au loin il n'en reste que la lueur)
       float etincelles = smoothstep(0.7, 0.9, texture(uBruit, vec3(vMonde.xz * 7.0, uTemps * 1.6)).a)
                        + 0.6 * smoothstep(0.74, 0.92, texture(uBruit, vec3(vMonde.zx * 3.3 + 7.0, uTemps * 1.1)).b);
-      etincelles *= 1.0 - smoothstep(15.0, 60.0, distance);
-      couleur += vec3(0.03, 0.4, 0.42) * uPlancton * bateau.w * (bateau.y * 0.05 + etincelles * 0.12 + 0.01);
+      // (au loin, on ne les distingue plus : il en reste leur lueur moyenne)
+      float loin = smoothstep(15.0, 60.0, distance);
+      etincelles *= 1.0 - loin;
+      couleur += vec3(0.03, 0.4, 0.42) * uPlancton * bateau.w * (bateau.y * 0.05 + etincelles * 0.12 + 0.01 + 0.035 * loin);
     }
   }
 
@@ -428,6 +526,11 @@ export class Eau {
       uDirVent: { value: new THREE.Vector2(1, 0) },
       uBateauInverse: { value: new THREE.Matrix4() },
       uClipCoque: { value: 0 },
+      uCargoInverse: { value: new THREE.Matrix4() },
+      uCargo: { value: new THREE.Vector4() },
+      uCargoSillage: { value: Array.from({ length: N_CARGO }, () => new THREE.Vector4()) },
+      uCargoSillageN: { value: 0 },
+      uCargoBoite: { value: new THREE.Vector4() },
       ...ciel.uniformsFront,
     };
     // une texture de déplacement, une de pentes et une fiche (taille, texel, flou max) par grille
@@ -507,6 +610,42 @@ export class Eau {
     u.uSillageBoite.value.set(x0 - 25, z0 - 25, x1 + 25, z1 + 25);
     u.uVitesseBateau.value = this.vitesse;
   }
+  // Le cargo (ou null quand il n'est pas là) : on garde où était sa poupe toutes les 7 s,
+  // comme pour le bateau ; son sillage s'efface quand il s'en va
+  suivreCargo(groupe, temps = 0, dt = 1 / 60) {
+    const u = this.uniforms;
+    const h = (this.historiqueCargo ??= []);
+    if (!groupe) {
+      u.uCargo.value.x = 0;
+      u.uCargoSillageN.value = 0;
+      h.length = 0;
+      this._poupeCargoAvant = null;
+      return;
+    }
+    u.uCargoInverse.value.copy(groupe.matrixWorld).invert();
+    const poupe = (this._poupeCargo ??= new THREE.Vector3()).set(0, 0, LONGUEUR_CARGO / 2).applyMatrix4(groupe.matrixWorld);
+    const avant = this._poupeCargoAvant;
+    // (un saut de plus de 100 m, ou l'horloge repartie : on efface)
+    if ((avant && avant.distanceTo(poupe) > 100) || (h.length && temps < h[0].t)) h.length = 0;
+    const vitesse = avant && dt > 0 ? Math.min(20, Math.hypot(poupe.x - avant.x, poupe.z - avant.z) / dt) : 0;
+    this.vitesseCargo = (this.vitesseCargo ?? 0) + (vitesse - (this.vitesseCargo ?? 0)) * Math.min(1, dt * 1.5);
+    (this._poupeCargoAvant ??= new THREE.Vector3()).copy(poupe);
+    if (!h.length || temps - h[0].t > 7) {
+      h.unshift({ x: poupe.x, z: poupe.z, t: temps, v: this.vitesseCargo });
+      if (h.length > N_CARGO - 1) h.length = N_CARGO - 1;
+    }
+    const points = u.uCargoSillage.value;
+    points[0].set(poupe.x, poupe.z, temps, this.vitesseCargo);
+    let x0 = poupe.x, x1 = poupe.x, z0 = poupe.z, z1 = poupe.z;
+    h.forEach((q, k) => {
+      points[k + 1].set(q.x, q.z, q.t, q.v);
+      x0 = Math.min(x0, q.x); x1 = Math.max(x1, q.x); z0 = Math.min(z0, q.z); z1 = Math.max(z1, q.z);
+    });
+    u.uCargoSillageN.value = h.length + 1;
+    u.uCargoBoite.value.set(x0 - 90, z0 - 90, x1 + 90, z1 + 90);
+    u.uCargo.value.set(1, this.vitesseCargo, 0, 0);
+  }
+
 
   // Lumières et ambiance (voir monde/meteo.js)
   regler(meteo, ecl) {

@@ -393,6 +393,9 @@ export class Monde3D {
       niveauEau: centre.y - 3,
     });
     this.cargo.maj(this.etatCargo, this.camera);
+    // (son sillage : c'est la mer qui le dessine)
+    if (this.etatCargo) this.cargo.groupe.updateMatrixWorld();
+    this.eau.suivreCargo(this.etatCargo ? this.cargo.groupe : null, this.temps, dt);
     this.trombe.maj(dt, this.etatTrombe, { temps: this.temps, directionVent: angleVers(m.directionVent), camera: this.camera });
     if (this.eau.brumeDeBase) this.eau.uniforms.uBrume.value = this.eau.brumeDeBase * (1 + 160 * this.trombe.brouillard ** 1.5);
     this.post.reglages.uEmbruns.value = this.dansLaCabine ? 0 : this.trombe.brouillard ** 1.5;

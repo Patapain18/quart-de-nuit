@@ -435,15 +435,31 @@ qui ne répond plus) ; ce qui est dur, c'est **barrer, tenir un cap** ; l'élect
     écume s'allume du plancton. (Le pont est dessiné des deux côtés : on tient compte de la
     face vue, sinon la nappe ignorait le passavant.)
 
+16. ✅ **Le sillage du cargo** (`ecumeDuCargo` dans `src/rendu/eau.js`, la forme de sa coque
+    partagée dans `src/rendu/forme-cargo.js`) — à la place du « V » d'écume plat qu'il
+    traînait (il flottait au-dessus des vagues dans la tempête), la mer dessine elle-même :
+    la grosse vague d'étrave qui s'enroule autour de l'étrave et l'eau repoussée le long
+    de sa coque ; les deux bras du « V » qui quittent la coque aux épaules de l'étrave puis
+    s'ouvrent à 19,5° de sa route (l'angle de Kelvin, le même derrière tous les navires),
+    en courtes crêtes en biais qui ne brisent que par endroits ; derrière l'hélice, un
+    remous blanc large comme lui (30 m) qui s'étale d'un mètre toutes les trois secondes,
+    aux bords déchiquetés, puis une longue cicatrice d'eau lisse qui dure des minutes. On
+    garde où était sa poupe toutes les 7 s (près de trois minutes, plus d'un kilomètre) :
+    quand il vire pour nous éviter, son sillage tourne avec lui. La nuit, le plancton
+    allume sa vague d'étrave et son remous ; au loin, il en reste la lueur moyenne (les
+    étincelles s'effacent, pas leur lumière). L'atelier de la mer a un cargo d'essai
+    (« Le cargo » : distance, vitesse, « Il vire de 50° », et le point de vue « Autour du
+    cargo » ; `?cargo=400` dans l'adresse), et ses photos vont plus vite dans un onglet
+    caché (une pause toutes les 30 images, pas à chaque image). Coût : rien de mesurable.
+
 Et en passant : sous la pluie et dans les embruns, **le pont ruisselle** (le gelcoat et
 l'antidérapant deviennent brillants, le teck fonce : seulement la rugosité et la teinte des
 matériaux, sans rien recompiler) ; le navigateur qui refuse un instant de capturer la souris
 (juste après Échap) ne laisse plus d'erreur. Images : `docs/etape7-inspection-du-pont.jpg`,
 `docs/etape8-le-compas-et-le-radar-du-cockpit.jpg`, `docs/etape10-*.jpg` (la trombe),
 `docs/etape11-la-nuit-noire-et-la-lampe.jpg`, `docs/etape12-*.jpg` (le radar),
-`docs/etape13-*.jpg` (le sillage), `docs/etape14-*.jpg` (le front orageux), `docs/etape15-*.jpg` (le paquet de mer).
+`docs/etape13-*.jpg` (le sillage), `docs/etape14-*.jpg` (le front orageux), `docs/etape15-*.jpg` (le paquet de mer), `docs/etape16-*.jpg` (le sillage du cargo).
 
 ## 4. Pistes graphiques notées pour plus tard
 
-- Le sillage du cargo (celui du voilier est fait : étape 13).
 - Le bruit de la mer calculé dans un « worker » (fil de calcul séparé) pour libérer 3 ms par image.

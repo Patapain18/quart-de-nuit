@@ -11,14 +11,12 @@
 // on voit. Plus les hublots du château, la passerelle, et les projecteurs du pont.
 //
 // Quand il est près, ou dans un éclair, on devine sa masse : la coque noire, les piles de
-// conteneurs, le château blanc, la cheminée, et la vague blanche à son étrave.
+// conteneurs, le château blanc, la cheminée. Sa vague d'étrave et son sillage sont dessinés
+// par la mer elle-même (eau.js : ecumeDuCargo).
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { brumeCommeLaMer } from './cote.js';
-
-const LONGUEUR = 185;
-const DEMI_LARGEUR = 15;
-const FRANC_BORD = 7; // hauteur du pont au-dessus de l'eau
+import { LONGUEUR, DEMI_LARGEUR, FRANC_BORD, demiLargeur } from './forme-cargo.js';
 
 function hasard(n) {
   const x = Math.sin(n * 127.1 + 311.7) * 43758.5453;
@@ -36,15 +34,6 @@ function boite(lx, ly, lz, x, y, z, couleur) {
   g.setAttribute('color', new THREE.BufferAttribute(couleurs, 3));
   g.deleteAttribute('uv');
   return g;
-}
-
-// La demi-largeur de la coque à l'abscisse z (avant en -z) : un arrière carré, un long
-// milieu droit, une étrave effilée sur les 40 derniers mètres
-function demiLargeur(z) {
-  const u = (z + LONGUEUR / 2) / LONGUEUR; // 0 à l'étrave, 1 à la poupe
-  if (u < 0.22) return DEMI_LARGEUR * Math.sqrt(Math.max(0, 1 - ((0.22 - u) / 0.22) ** 2)) ** 1.15;
-  if (u > 0.94) return DEMI_LARGEUR * (1 - 0.12 * ((u - 0.94) / 0.06) ** 2);
-  return DEMI_LARGEUR;
 }
 
 function geometrieCoque() {
@@ -214,11 +203,6 @@ export class Cargo3D {
     }));
     this.feux.frustumCulled = false;
     this.groupe.add(this.feux);
-    // la vague d'étrave : de l'écume blanche qui s'ouvre en V devant la coque
-    this.vague = new THREE.Mesh(geometrieVagueEtrave(), brumeCommeLaMer(new THREE.MeshStandardMaterial({
-      color: 0xdfe6e8, roughness: 1, transparent: true, opacity: 0.8, depthWrite: false, side: THREE.DoubleSide,
-    }), eau, 'cargo-vague'));
-    this.groupe.add(this.vague);
     this.groupe.visible = false;
     scene.add(this.groupe);
     this._q = new THREE.Quaternion();
@@ -257,28 +241,4 @@ export class Cargo3D {
     this.feux.geometry.attributes.intensite.needsUpdate = true;
     this.uniformsFeux.uEchelle.value = camera.userData.hauteurPixels / (2 * Math.tan(THREE.MathUtils.degToRad(camera.fov / 2)));
   }
-}
-
-// La vague d'étrave : un V d'écume, posé sur l'eau devant l'étrave
-function geometrieVagueEtrave() {
-  const positions = [];
-  const z0 = -LONGUEUR / 2;
-  for (const s of [-1, 1]) {
-    // une bande qui part de l'étrave et s'écarte vers l'arrière, en s'élargissant
-    const pts = [];
-    for (let k = 0; k <= 10; k++) {
-      const t = k / 10;
-      pts.push([s * (1 + t * 22), 0.3 - t * 0.2, z0 + 2 + t * 45, 1.5 + t * 4]);
-    }
-    for (let k = 0; k < 10; k++) {
-      const [x0, y0, za, l0] = pts[k];
-      const [x1, y1, zb, l1] = pts[k + 1];
-      positions.push(x0, y0, za, x1, y1, zb, x0 + s * l0, y0, za);
-      positions.push(x1, y1, zb, x1 + s * l1, y1, zb, x0 + s * l0, y0, za);
-    }
-  }
-  const g = new THREE.BufferGeometry();
-  g.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
-  g.computeVertexNormals();
-  return g;
 }
