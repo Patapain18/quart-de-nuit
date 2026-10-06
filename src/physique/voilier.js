@@ -29,7 +29,7 @@
 // il tourne aussi dans Node, pour les tests et la « polaire » (scripts/polaire.js).
 import { Vector3, Quaternion } from 'three';
 import {
-  COQUE, ROUF, MAT, COCKPIT, zDe, fondCoque, hauteurLivet, demiLargeurA, bordInterieur, hauteurRouf, hauteurPont,
+  COQUE, ROUF, MAT, COCKPIT, TIMONERIE, zDe, fondCoque, hauteurLivet, demiLargeurA, bordInterieur, hauteurRouf, hauteurPont,
 } from '../bateau/forme.js';
 
 const RHO_EAU = 1025;
@@ -85,6 +85,19 @@ function decouperCoque() {
     const h = hauteurRouf(uc, 0) - y0;
     for (const cote of [-1, 1]) {
       volumes.push({ c: new Vector3(cote * e / 2, y0 + h / 2, zDe(uc)), v: e * h * dz, taille: new Vector3(e, h, dz), surface: e * dz });
+    }
+  }
+  // la timonerie (fermée elle aussi : quand le bateau se couche, elle flotte, et l'aide à
+  // se redresser, comme sur les vrais voiliers à timonerie)
+  for (let i = 0; i < 3; i++) {
+    const z = TIMONERIE.zArriere + ((i + 0.5) / 3) * (TIMONERIE.zAvant + 0.1 - TIMONERIE.zArriere);
+    const u = (z - COQUE.zArriere) / (COQUE.zAvant - COQUE.zArriere);
+    const e = bordInterieur(u) - ROUF.rentree - 0.04;
+    const dz = Math.abs(TIMONERIE.zAvant + 0.1 - TIMONERIE.zArriere) / 3;
+    const y0 = hauteurRouf(u, e);
+    const h = TIMONERIE.toit - y0;
+    for (const cote of [-1, 1]) {
+      volumes.push({ c: new Vector3(cote * e / 2, y0 + h / 2, z), v: e * h * dz, taille: new Vector3(e, h, dz), surface: e * dz });
     }
   }
   // l'aileron de quille et le bulbe (toujours sous l'eau, sauf si le bateau chavire)
@@ -503,7 +516,9 @@ export class PhysiqueVoilier {
     const surfaceFoc = 18 * this.deroule * (this.focDechire ? 0.5 : 1);
     // centre de poussée de chaque voile = son barycentre (un triangle : au tiers de la
     // hauteur du guindant et au tiers de la bordure)
-    const vit = 2.2;
+    // (le vit-de-mulet : le pied de la bôme, rehaussé de 44 cm pour passer au-dessus de
+    // la timonerie ; le mât l'a été d'autant : les voiles gardent leur taille)
+    const vit = 2.64;
     const guindantGV = [10.6, 9.15, 7.7, 0][this.ris];
     const voiles = [
       { cle: 'GV', surface: surfaceGV, pied: new Vector3(0, vit + guindantGV / 3, zDe(MAT.u) + 0.1), corde: 3.55 },

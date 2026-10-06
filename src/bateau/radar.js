@@ -1,4 +1,4 @@
-// Le radar du bord : l'écran principal à la table à cartes, et un répétiteur dans le
+// Le radar du bord : l'écran principal sur la console de la timonerie, et un répétiteur dans le
 // cockpit, au-dessus du compas (les deux montrent la même image).
 //
 // Comment marche un radar : l'antenne, en haut du mât, tourne sur elle-même (24 tours
@@ -15,6 +15,7 @@
 // réglé tout seul.)
 import * as THREE from 'three';
 import { zDe, ROUF } from './forme.js';
+import { poserSurPupitre } from './interieur-timonerie.js';
 
 export const PORTEES = [0.75, 1.5, 3, 6]; // milles nautiques
 const MILLE = 1852;
@@ -64,14 +65,14 @@ export class Radar {
       color: 0x000000, roughness: 0.15, metalness: 0, emissive: 0xffffff, emissiveMap: this.texture, emissiveIntensity: 1,
     });
     const noir = bateau.materiaux.noir;
-    // l'écran de la table à cartes : contre le panneau, tourné vers le carré (comme la VHF)
+    // l'écran principal : sur le pupitre de la console de la timonerie, à gauche du traceur,
+    // tourné vers le siège de quart
     const principal = new THREE.Group();
-    const boitier = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.2, 0.05), noir);
-    const vitre = new THREE.Mesh(new THREE.PlaneGeometry(0.17, 0.17), this.materiau);
-    vitre.position.z = 0.0255;
+    const boitier = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.2, 0.04), noir);
+    const vitre = new THREE.Mesh(new THREE.PlaneGeometry(0.165, 0.165), this.materiau);
+    vitre.position.z = 0.0205;
     principal.add(boitier, vitre);
-    principal.rotation.y = -Math.PI / 2;
-    principal.position.set(0.915, 0.74, 0.31);
+    poserSurPupitre(principal, 0.1, 0.6, 0.02);
     interieur.groupe.add(principal);
     this.positionPrincipal = principal.position.clone();
     // le répétiteur du cockpit, sur la cloison, au-dessus du compas

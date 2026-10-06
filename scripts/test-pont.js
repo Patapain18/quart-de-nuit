@@ -2,7 +2,7 @@
 import { Vector3 } from 'three';
 import { solEn, surfacesEn, ouvrirDescente } from '../src/joueur/pont.js';
 import { Marin } from '../src/joueur/marin.js';
-import { zDe, ROUF, PANNEAU_PONT } from '../src/bateau/forme.js';
+import { zDe, PANNEAU_PONT, TIMONERIE } from '../src/bateau/forme.js';
 
 let echecs = 0;
 const verifier = (c, m) => { console.log(`${c ? '  ✓' : '  ✗'} ${m}`); if (!c) echecs++; };
@@ -21,16 +21,19 @@ verifier(nom(0.3, zDe(0.8), 1.05) === 'pont-avant', 'le pont avant');
 verifier(nom(1.6, zDe(0.38), 0.97) === 'rien', 'les filières arrêtent au bord');
 verifier(nom(0, zDe(0.6), 1.4) === 'rien', 'le mât est un obstacle');
 
-console.log('La descente');
-verifier(nom(0, 1.35, 0.45) === 'descente', 'du cockpit, on descend la première marche');
-verifier(nom(0, 0.9, -0.05) === 'carre', 'puis on arrive dans le carré');
+console.log('La timonerie et l\'escalier');
+verifier(nom(0, TIMONERIE.zArriere - 0.1, 0.45) === 'timonerie', 'du cockpit, on entre dans la timonerie (une marche de 10 cm)');
+verifier(Math.abs(solEn(0.3, 1.2, 0.55).y - TIMONERIE.plancher) < 1e-6, 'son plancher est surélevé (0,55 m : on voit dehors)');
+verifier(nom(-0.3, 0.7, 0.55) === 'marches' && nom(-0.3, 0.5, 0.27) === 'marches', 'l\'escalier descend vers l\'avant, à bâbord');
+verifier(nom(-0.3, 0.3, -0.01) === 'carre', 'puis on arrive dans le carré');
+verifier(nom(0.2, 0.7, 0.55) === 'timonerie', 'à côté de l\'escalier, le plancher de la timonerie');
 verifier(nom(0, 0.0, -0.3) === 'carre' && nom(0, -0.7, -0.3) === 'rien', 'la table du carré est un obstacle');
 verifier(nom(0.4, -0.7, -0.3) === 'carre', 'on passe à côté de la table');
-verifier(nom(0, zDe(ROUF.uArriere) - 0.2, 1.45) === 'rien', 'descente ouverte : on ne marche pas dans le trou du toit');
-verifier(nom(0, zDe(ROUF.uArriere) - 0.8, 1.45) === 'rouf-capot', 'le capot ouvert a glissé vers l\'avant');
+verifier(nom(0, 0.7, 1.45) === 'rien', 'du toit du rouf, on ne tombe pas dans la timonerie (le pare-brise)');
+verifier(nom(1.0, 0.9, 0.55) === 'rien', 'de la timonerie, on ne passe pas sur le passavant (la paroi)');
+verifier(nom(0.5, 0.9, 0.97) === 'rien', 'du passavant, on n\'entre pas dans la timonerie (la paroi)');
 ouvrirDescente(false);
-verifier(nom(0, 1.35, 0.45) === 'rien', 'planches de descente en place : on ne passe pas');
-verifier(nom(0, zDe(ROUF.uArriere) - 0.2, 1.45) === 'rouf-capot', 'descente fermée : le capot couvre le trou');
+verifier(nom(0, TIMONERIE.zArriere, 0.45) === 'rien', 'porte fermée : on ne passe pas');
 ouvrirDescente(true);
 
 console.log('Un tour du pont, du cockpit à l\'étrave par tribord, sans jamais être bloqué');
@@ -83,9 +86,9 @@ console.log('Rentrer dans le cockpit depuis partout, le bateau droit ou gîté')
     'du passavant bâbord': [[-1.15, 0.92, zDe(0.2)], [[0, zDe(0.2)]]],
     'du passavant, en biais depuis le rouf': [[1.2, 0.92, zDe(0.4)], [[0, zDe(0.15)]]],
     'du pont arrière': [[0, 0.9, zDe(0.015)], [[0, zc]]],
-    'du toit du rouf (il saute sur le banc)': [[0, 1.4, zDe(0.5)], [[0.55, zDe(0.4)], [0.55, zDe(0.29)], [0.2, zc]]],
+    'du toit du rouf, par le passavant': [[0, 1.4, zDe(0.5)], [[0.6, -0.15], [1.15, -0.05], [1.15, zDe(0.2)], [0, zDe(0.2)]]],
     'du pont avant, par tribord': [[0.3, 1.05, zDe(0.8)], [[1.0, zDe(0.62)], [1.2, zDe(0.4)], [1.15, zDe(0.2)], [0, zDe(0.2)]]],
-    'du carré, par la descente': [[0, -0.3, 0.6], [[0, 1.6], [0, zc]]],
+    'du carré, par l\'escalier et la timonerie': [[-0.3, -0.3, 0.1], [[-0.3, 0.95], [0, 1.3], [0, zc]]],
   };
   for (const gite of [0, 15, -15, 30, -30]) {
     const rates = [];

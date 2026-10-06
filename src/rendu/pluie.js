@@ -20,6 +20,8 @@ uniform float uDensite;
 uniform vec3 uLampePosition;
 uniform vec3 uLampeDirection;
 uniform float uLampe;
+uniform mat4 uVersBateau; // (pour ne pas faire pleuvoir dans la timonerie)
+uniform float uAbri;
 varying float vAlpha;
 varying float vLampe;
 float hasard(vec3 p) { return fract(sin(dot(p, vec3(12.9898, 78.233, 45.164))) * 43758.5453); }
@@ -39,6 +41,9 @@ void main() {
   // les gouttes très proches sont floues et larges : on les estompe
   float distance = -vue.z;
   vAlpha = existe * smoothstep(0.4, 2.0, distance) * (1.0 - smoothstep(uTaille * 0.35, uTaille * 0.5, distance)) * (1.0 - bout * 0.85);
+  // pas de pluie sous le toit de la timonerie (on la voit derrière les vitres)
+  vec3 b = (uVersBateau * vec4(p, 1.0)).xyz;
+  vAlpha *= 1.0 - uAbri * step(abs(b.x), 0.84) * step(0.45, b.y) * step(b.y, 2.52) * step(0.2, b.z) * step(b.z, 1.52);
   gl_Position = projectionMatrix * vue;
 }
 `;
@@ -81,6 +86,8 @@ export class Pluie {
       uLampePosition: { value: new THREE.Vector3() },
       uLampeDirection: { value: new THREE.Vector3(0, 0, -1) },
       uLampe: { value: 0 },
+      uVersBateau: { value: new THREE.Matrix4() },
+      uAbri: { value: 0 },
     };
     this.mesh = new THREE.LineSegments(g, new THREE.ShaderMaterial({
       uniforms: this.uniforms,
@@ -97,8 +104,11 @@ export class Pluie {
 
   // intensite : 0 → 1 ; vent : vecteur (m/s) dans le plan horizontal ; eclairage :
   // couleur de la lumière ambiante, éclair : intensité du flash
-  maj(temps, camera, { intensite, vent, ambiance, eclair, lampe }) {
+  // versBateau : la matrice qui passe du monde au repère du bateau (sa timonerie est un abri)
+  maj(temps, camera, { intensite, vent, ambiance, eclair, lampe, versBateau = null }) {
     const u = this.uniforms;
+    u.uAbri.value = versBateau ? 1 : 0;
+    if (versBateau) u.uVersBateau.value.copy(versBateau);
     u.uTemps.value = temps;
     u.uCentre.value.copy(camera.position);
     u.uDensite.value = intensite * this.facteur;

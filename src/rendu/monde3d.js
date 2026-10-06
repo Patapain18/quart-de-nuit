@@ -379,6 +379,7 @@ export class Monde3D {
     this.pluie.maj(this.temps, this.camera, {
       intensite: m.pluie, vent, ambiance: new THREE.Vector3().fromArray(this.ecl.ambiance), eclair: this.eclair.intensite,
       lampe: this.lampe,
+      versBateau: this.bateau ? this.eau.uniforms.uBateauInverse.value : null,
     });
     // la lampe frontale suit le regard
     const regard = this.camera.getWorldDirection(new THREE.Vector3());

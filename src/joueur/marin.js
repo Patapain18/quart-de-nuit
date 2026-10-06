@@ -14,10 +14,10 @@
 //     qui bouge : il baisse la tête dessous, ou, trop basse, elle lui barre le passage.
 //     (La barre franche, à hauteur des genoux, on l'enjambe.)
 import { Vector3 } from 'three';
-import { solEn, plafondEn, margeAuBord } from './pont.js';
+import { solEn, plafondEn, margeAuBord, dansLaTimonerie } from './pont.js';
 import { zDe, MAT } from '../bateau/forme.js';
 
-const SUR_LE_PONT = new Set(['passavant', 'pont-avant', 'pont-arriere', 'rouf', 'rouf-capot', 'rouf-panneau', 'hiloire']);
+const SUR_LE_PONT = new Set(['passavant', 'pont-avant', 'pont-arriere', 'rouf', 'rouf-panneau', 'hiloire']);
 
 const YEUX_DEBOUT = 1.62;
 const YEUX_ACCROUPI = 1.1;
@@ -63,7 +63,9 @@ export class Marin {
     this._avant = new Vector3();
   }
 
-  get dehors() { return this.position.y > 0.3; }
+  // (dehors : sur le pont ou dans le cockpit ; la timonerie, l'escalier et le carré sont dedans)
+  get dehors() { return this.position.y > 0.3 && !dansLaTimonerie(this.position.x, this.position.z); }
+  get dansLaTimonerie() { return dansLaTimonerie(this.position.x, this.position.z); }
   get surLePont() { return SUR_LE_PONT.has(this.zone); }
 
   // Direction du regard dans le repère du bateau
@@ -91,6 +93,12 @@ export class Marin {
           h = Math.min(h, p.y - y - SOUS_PLAFOND);
         }
       }
+      // une paroi penchée au-dessus de soi (le pare-brise au bas de l'escalier de la
+      // timonerie) : on baisse la tête jusqu'à ce qu'elle passe (un mur droit, lui, reste
+      // un mur : plié en deux, la tête le touche encore, et le corps s'y arrête)
+      // (le même seuil que degagement() : sinon, entre les deux, la tête « passe » ici et
+      // « touche » là, et le marin reste coincé)
+      for (let k = 0; k < 6 && h > YEUX_PLIE + 0.05 && g.distance(x, y + h, z, RAYON_YEUX) < RAYON_YEUX; k++) h -= 0.06;
     }
     const b = this.pieces.bome;
     if (b) {
@@ -138,7 +146,7 @@ export class Marin {
     if (entrees.tenir) vitesse *= 0.4;
     if (this.accroupi) vitesse *= 0.55;
     if (!this.dehors) vitesse *= 0.8;
-    if (this.zone === 'descente') vitesse *= 0.6; // (l'échelle de descente est raide)
+    if (this.zone === 'marches') vitesse *= 0.6; // (l'escalier de la timonerie est raide)
     if (this.sousLaBome) vitesse *= 0.6;
     if (this.etourdi > 0) vitesse = 0;
     const f = this._f.set(-Math.sin(this.lacet), 0, -Math.cos(this.lacet));

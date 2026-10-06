@@ -438,7 +438,7 @@ export const LECONS = [
     titre: 'Préparer la nuit',
     heure: [16.75, 18.5],
     duree: 260,
-    reflexe: 'Avant la nuit : réduire la toile, fermer la descente, s\'attacher, allumer les feux.',
+    reflexe: 'Avant la nuit : réduire la toile, fermer la porte de la timonerie, s\'attacher, allumer les feux.',
     etapes: [
       {
         id: 'nuit.bulletin',
@@ -501,13 +501,13 @@ export const LISTE_NUIT = [
     id: 'gilet',
     texte: 'Ton gilet et ton ciré (dans la cabine)',
     fait: (ctx) => ctx.aBord.gilet,
-    rappel: 'Enfile ton gilet et ton ciré : ils sont pendus en bas des marches, dans la cabine.',
+    rappel: 'Enfile ton gilet et ton ciré : ils sont pendus dans la timonerie, à côté de la porte.',
   },
   {
     id: 'feux',
     texte: 'Les feux de navigation (tableau électrique)',
     fait: (ctx) => ctx.aBord.feux,
-    rappel: 'Allume tes feux de navigation : le tableau électrique est à la table à cartes.',
+    rappel: 'Allume tes feux de navigation : le tableau électrique est dans la timonerie, sur la paroi tribord, derrière le siège.',
   },
   {
     id: 'lampe',
@@ -517,9 +517,9 @@ export const LISTE_NUIT = [
   },
   {
     id: 'descente',
-    texte: 'La descente fermée (les planches)',
+    texte: 'La porte de la timonerie fermée',
     fait: (ctx) => !ctx.aBord.descenteOuverte,
-    rappel: 'Ferme la descente : remets les planches, sinon les vagues entreront dans la cabine.',
+    rappel: 'Ferme la porte de la timonerie : sinon les vagues qui remplissent le cockpit entreront à l\'intérieur.',
   },
   {
     id: 'harnais',

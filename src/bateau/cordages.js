@@ -4,11 +4,11 @@
 //  - les écoutes de foc : du coin de la voile (le point d'écoute) au chariot sur le
 //    pont, puis au winch du cockpit. Celle sous le vent est tendue, l'autre pend ;
 //  - les drisses : elles hissent les voiles, descendent le long du mât et reviennent
-//    au cockpit sur le toit du rouf.
+//    au cockpit sur le toit du rouf, puis le long de la timonerie, sur ses corniches.
 // Les morceaux droits sont des cylindres qu'on replace à chaque image (sans recréer
 // de géométrie) ; seule l'écoute qui pend est recalculée, et pas à chaque image.
 import * as THREE from 'three';
-import { zDe, hauteurPont, hauteurRouf, COCKPIT, ROUF } from './forme.js';
+import { zDe, uDe, hauteurPont, hauteurRouf, COCKPIT, TIMONERIE } from './forme.js';
 
 const HAUT = new THREE.Vector3(0, 1, 0);
 
@@ -49,15 +49,20 @@ export class Cordages {
     groupe.add(this.molle);
     this.ageMolle = 1;
 
-    // les drisses (fixes) : le long du mât, puis sur le toit jusqu'au cockpit
+    // les drisses (fixes) : le long du mât, puis sur le toit du rouf, le long de la
+    // timonerie sur sa corniche, jusqu'au winch du bout de l'hiloire
     const drisses = [];
-    for (const [dx, tete] of [[0.03, m.tete - 0.1], [-0.03, m.capelage - 0.3]]) {
+    const xCorniche = TIMONERIE.demiLargeur + 0.06;
+    const surLeToit = (x, z) => [x, hauteurRouf(uDe(z), Math.abs(x)) + 0.012, z];
+    for (const [s, tete] of [[1, m.tete - 0.1], [-1, m.capelage - 0.3]]) {
       const pts = [
-        [dx, tete, m.zMat - 0.075],
-        [dx, m.piedMat + 0.25, m.zMat - 0.075],
-        [dx * 3, m.piedMat + 0.04, m.zMat + 0.12],
-        [dx * 9, hauteurRouf(0.4, dx * 9) + 0.02, zDe(0.4)],
-        [dx * 12, hauteurRouf(0.335, dx * 12) + 0.03, zDe(0.335) - 0.05],
+        [s * 0.03, tete, m.zMat - 0.075],
+        [s * 0.03, m.piedMat + 0.25, m.zMat - 0.075],
+        [s * 0.09, m.piedMat + 0.04, m.zMat + 0.12],
+        surLeToit(s * 0.4, -0.25),
+        surLeToit(s * xCorniche, TIMONERIE.zAvant + 0.05),
+        surLeToit(s * xCorniche, TIMONERIE.zArriere - 0.08),
+        [s * (COCKPIT.demiLargeur + 0.04), hauteurPont(0.302, COCKPIT.demiLargeur) + COCKPIT.hiloire + 0.1, zDe(0.302)],
       ];
       const courbe = new THREE.CatmullRomCurve3(pts.map((p) => new THREE.Vector3(...p)), false, 'centripetal', 0.2);
       drisses.push(new THREE.TubeGeometry(courbe, 80, 0.005, 5, false));

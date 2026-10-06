@@ -479,6 +479,67 @@ matériaux, sans rien recompiler) ; le navigateur qui refuse un instant de captu
 `docs/etape11-la-nuit-noire-et-la-lampe.jpg`, `docs/etape12-*.jpg` (le radar),
 `docs/etape13-*.jpg` (le sillage), `docs/etape14-*.jpg` (le front orageux), `docs/etape15-*.jpg` (le paquet de mer), `docs/etape16-*.jpg` (le sillage du cargo).
 
+### Le chantier de la peur (octobre 2026) : « l'ambiance est encore trop chill »
+
+Demandé par Mathis le 2026-10-06 : une ambiance bien plus horrifique (paranoïa à cause de
+la mer, bruits bizarres, vagues immenses de 10 m…) et un étage pour le bateau, avec une vue
+panoramique et la plupart de l'électronique dedans. Ses choix :
+- **une timonerie vitrée** sur l'arrière du rouf : on y tient debout, on y monte depuis la
+  cabine et on en sort vers le cockpit ; le gréement est rehaussé en conséquence (comme sur
+  les vrais voiliers à timonerie) ;
+- **on y barre au pilote** (+1°, +10°…) ; il faut sortir pour les voiles, les réparations, et
+  quand le pilote lâche ;
+- **l'étrange bien plus fort, mais jamais confirmé** : des formes du coin de l'œil qui
+  disparaissent quand on les regarde, quelque chose de grand sous la coque, des bruits
+  qu'on ne s'explique pas, son nom à la radio ; pas de « screamer » gratuit, quelques vrais
+  sursauts bien placés ;
+- **des vagues scélérates de 10 m**, deux ou trois, mises en scène et annoncées (un
+  grondement, Jos, le radar), tenables si on les prend par l'arrière ou de trois quarts ;
+  de travers, le bateau se couche.
+
+Feuille de route :
+
+18. ✅ **La timonerie** (`src/bateau/timonerie.js`, `interieur-timonerie.js`,
+    `electronique.js`, `vitres.js`) — un étage vitré sur l'arrière du rouf, de la cloison
+    du cockpit jusqu'à 1,24 m vers l'avant, moins large que le rouf (1,16 m) : assis au
+    bord du banc, le barreur voit devant lui le long de ses parois, et sur les côtés
+    courent des corniches où passent les drisses. Son pare-brise penche vers l'arrière, en
+    trois vitres avec deux essuie-glaces (ils balaient tant qu'il pleut) ; neuf vitres en
+    tout, sur lesquelles la pluie se pose en gouttes qui grossissent et coule en filets
+    qui zigzaguent (le pare-brise essuyé reste à peu près clair, les côtés ruissellent) ;
+    une porte de 52 cm vers le cockpit, deux battants qui coulissent à l'intérieur, contre
+    la paroi (dehors, ils cachaient le compas et les afficheurs). Dedans, le plancher est
+    au niveau du seuil du cockpit : on y tient debout et l'on voit la mer tout autour. La
+    console, sous le pare-brise : le radar (déménagé de la table à cartes), un traceur de
+    cartes (la côte, les bouées, le trajet parcouru, la ligne du cap, la vitesse et la
+    sonde ; E et Maj + E : de 0,75 à 12 milles), la commande du pilote (un écran à cristaux
+    liquides : veille, AUTO ou ALARME, le cap voulu, le cap suivi, l'angle de barre) et un
+    compas ; au plafond, deux répétiteurs des afficheurs du cockpit (la vitesse et le cap,
+    le vent apparent). Sur la paroi tribord, la VHF, le baromètre, la pendule et le
+    tableau électrique ; derrière, le siège de quart, un coin cuisine, le ciré pendu près
+    de la porte, des étagères sous les corniches ; trois marches descendent au carré, à
+    bâbord, par une ouverture dans la cloison. **On y barre au pilote** : E sur le siège, puis Q / D pour 1°, Maj + Q / D pour
+    10°, Espace pour se lever ; on agit d'assis sur la VHF, le radar et le traceur. Le mât
+    et la bôme sont rehaussés de 44 cm (les voiles gardent leur taille), et la timonerie
+    compte dans la flottabilité : couché, le bateau s'appuie sur elle pour se relever. La
+    lumière : le carré et la timonerie sont maintenant deux pièces (les lampes de l'une
+    n'éclairent l'autre que par l'escalier) ; la nuit, en rouge, le plafonnier de la
+    timonerie n'est plus qu'une veilleuse (le bois sombre, les écrans pour seule vraie
+    lumière) ; l'œil ne s'y habitue qu'à moitié (on y regarde surtout dehors) ; la pluie
+    s'arrête à ses vitres. Les outils d'essai suivent : le marin automatique fait 16 tours
+    du bord (la porte, la VHF, le tableau, le traceur, le poste, le siège, l'escalier dans
+    les deux sens, le ciré…), `npm run test-pont` vérifie les nouvelles surfaces et les
+    plafonds (on se baisse sous le pare-brise en montant l'escalier), et les sept essais
+    passent. Images : `docs/etape18-*.jpg`.
+19. **Les vagues scélérates** — une vague de 10 à 12 m dans la houle (image et physique),
+    sa crête qui déferle, son annonce, comment la prendre ; un atelier et un essai
+    automatique.
+20. **La peur** — paranoïa (le coin de l'œil, le reflet dans les vitres de la timonerie,
+    la chose sous la coque), sons (la mer qui gémit, la coque, ton nom), quelques vrais
+    sursauts, une tension qui monte avec la nuit ; un atelier de la peur pour tout régler.
+21. **L'ambiance** — le son et la lumière de la nuit, plus oppressants ; vérification
+    complète (la nuit jouée en entier, les marins automatiques, les performances).
+
 ## 4. Pistes graphiques notées pour plus tard
 
 Toutes celles du grand chantier sont faites (étapes 13 à 17).

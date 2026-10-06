@@ -8,13 +8,13 @@
 // chose à moins de 15 cm de ce point ? ») ne regarde que les triangles des boîtes voisines :
 // quelques dizaines au lieu de 40 000.
 //
-// Les pièces qui bougent (la bôme, la barre, le capot, les planches de la descente) n'y
-// sont pas : le marin les traite à part (marin.js, pont.js), là où elles sont à l'instant.
+// Les pièces qui bougent (la bôme, la barre, la porte de la timonerie) n'y sont pas : le
+// marin les traite à part (marin.js, pont.js), là où elles sont à l'instant.
 
 // Ce qui ne compte pas : les voiles, les câbles fins, l'eau, les cordages, et les pièces mobiles
 const IGNORER = new Set([
   'grand-voile', 'foc', 'haubans', 'filieres', 'lignes-de-vie', 'cordages', 'eau-cockpit', 'eau-cabine',
-  'pivot-bome', 'pivot-safran', 'voile-ferlee', 'capot-descente', 'planches-descente', 'doublure-capot', 'pompe',
+  'pivot-bome', 'pivot-safran', 'voile-ferlee', 'porte-timonerie', 'essuie-glace', 'pompe',
 ]);
 const IGNORER_TOUJOURS = new Set(['grand-voile', 'foc', 'haubans', 'filieres', 'lignes-de-vie', 'cordages', 'eau-cockpit', 'eau-cabine']);
 const Y_MIN = -0.7; // (sous le plancher de la cabine et au-dessus de la tête : inutile)

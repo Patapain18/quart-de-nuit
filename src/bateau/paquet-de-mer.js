@@ -43,8 +43,9 @@ vec2 paquetDeMer(float versLeCiel) {
   // elle s'étale le long du bateau en avançant
   float longueur = 1.6 + 2.8 * age;
   dans *= 1.0 - smoothstep(longueur * 0.7, longueur, abs(l) + irregulier * 0.8);
-  // seulement sur ce qui regarde le ciel
-  dans *= smoothstep(0.35, 0.75, versLeCiel);
+  // seulement sur ce qui regarde le ciel, et pas plus haut que le toit du rouf (la
+  // timonerie dépasse : l'eau la contourne)
+  dans *= smoothstep(0.35, 0.75, versLeCiel) * (1.0 - smoothstep(1.55, 1.75, vPaquetPos.y));
   // et elle s'écoule par-dessus bord
   float force = uPaquet.w * (1.0 - smoothstep(1.4, 3.2, age));
   float nappe = clamp(dans * force * 1.4, 0.0, 1.0);

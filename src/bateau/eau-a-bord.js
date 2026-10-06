@@ -159,7 +159,7 @@ class Surface {
     };
     // (dans la cabine, la lumière de la cabine)
     if (dedans) {
-      for (const cle of ['uBateauVersMonde', 'uSourcePos', 'uSourceDir', 'uSourceCouleur', 'uSourceForme', 'uAmbianceCabine', 'uTableCabine']) {
+      for (const cle of ['uBateauVersMonde', 'uSourcePos', 'uSourceDir', 'uSourceCouleur', 'uSourceForme', 'uAmbianceCabine', 'uAmbianceTimonerie', 'uTableCabine']) {
         this.uniforms[cle] = bateau.interieur.uniforms[cle];
       }
     }

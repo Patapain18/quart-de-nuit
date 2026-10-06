@@ -11,10 +11,11 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import {
-  COQUE, COCKPIT, ROUF, MAT, DESCENTE_ROUF, HUBLOTS, zDe, uDe, demiLargeur, hauteurLivet, fondCoque, pointCoque,
-  hauteurPont, bordInterieur, hauteurRouf, bordsHublot, xCoteRouf, U_TROU_DESCENTE, trancheToit, PANNEAU_PONT,
+  COQUE, COCKPIT, ROUF, MAT, HUBLOTS, zDe, uDe, demiLargeur, hauteurLivet, fondCoque, pointCoque,
+  hauteurPont, bordInterieur, hauteurRouf, bordsHublot, xCoteRouf, trancheToit, PANNEAU_PONT, U_TIMONERIE,
 } from './forme.js';
 import { texturesTeck, texturesAntiderapant, texturesCordage } from './textures.js';
+import { construireTimonerie, geometrieCorniches } from './timonerie.js';
 
 // ---------- Matériaux ----------
 export function creerMateriaux() {
@@ -29,6 +30,8 @@ export function creerMateriaux() {
     verre: std({ color: 0x0d1418, roughness: 0.06, metalness: 0.1 }),
     // les vitres des hublots et le plexiglas du panneau : teintés, à moitié transparents
     vitre: std({ color: 0x1c2a30, roughness: 0.04, metalness: 0, transparent: true, opacity: 0.42, depthWrite: false }),
+    // les vitres de la timonerie : grandes et claires (on doit bien voir dehors)
+    vitreTimonerie: std({ color: 0x14242a, roughness: 0.03, metalness: 0, transparent: true, opacity: 0.2, depthWrite: false }),
     alu: std({ color: 0xc4c8cc, roughness: 0.34, metalness: 0.92 }),
     inox: std({ color: 0xdfe2e5, roughness: 0.16, metalness: 1 }),
     cable: std({ color: 0x7c8186, roughness: 0.42, metalness: 0.85 }),
@@ -355,22 +358,21 @@ function geometrieRouf() {
       ].map(([x, y]) => [s * x, y]);
     }, (i, j) => !(j === 1 && dansUnHublot(us[i], us[i + 1]))));
   }
-  // le toit, bombé, percé du trou de la descente (à l'arrière, au milieu) : la grille a
-  // des tranches et des colonnes exactement sur les bords du trou
-  const D = DESCENTE_ROUF;
-  const tranche = (a) => trancheToit(Math.round(a * 32));
+  // le toit, bombé, devant la timonerie, percé du panneau de pont : la grille a des
+  // tranches et des colonnes exactement sur les bords du trou (±22 cm)
+  const C = 0.33; // (les colonnes du milieu : de -33 à +33 cm, tous les 11 cm)
+  const tranche = (a) => trancheToit(Math.round(a * 24));
   const colonne = (w, b) => {
     const j = Math.round(b * 16);
-    if (j <= 5) return -w + (w - D.demiLargeur) * (j / 5);
-    if (j <= 11) return -D.demiLargeur + 2 * D.demiLargeur * ((j - 5) / 6);
-    return D.demiLargeur + (w - D.demiLargeur) * ((j - 11) / 5);
+    if (j <= 5) return -w + (w - C) * (j / 5);
+    if (j <= 11) return -C + 2 * C * ((j - 5) / 6);
+    return C + (w - C) * ((j - 11) / 5);
   };
-  const toit = percer(grille(32, 16, (a, b) => {
+  const toit = percer(grille(24, 16, (a, b) => {
     const u = tranche(a);
     const x = colonne(bordInterieur(u) - R.rentree, b);
     return { p: [x, hauteurRouf(u, x), zDe(u)] };
-  }), (x, z) => (Math.abs(x) < D.demiLargeur && z > zDe(U_TROU_DESCENTE))
-    || (Math.abs(x) < TROU_PANNEAU.demiLargeur && z > TROU_PANNEAU.z0 && z < TROU_PANNEAU.z1));
+  }), (x, z) => Math.abs(x) < TROU_PANNEAU.demiLargeur && z > TROU_PANNEAU.z0 && z < TROU_PANNEAU.z1);
   // la face avant (inclinée vers l'arrière : le haut est en retrait de 12 cm)
   const avant = grille(1, 16, (a, b) => {
     const e = bordInterieur(R.uAvant);
@@ -383,38 +385,6 @@ function geometrieRouf() {
       ? { p: [xBas, hauteurPont(R.uAvant, xBas), zBas] }
       : { p: [xHaut, hauteurRouf(R.uAvant, xHaut), zHaut] };
   });
-  // la cloison arrière (face au cockpit), du plancher du cockpit jusqu'au toit, échancrée
-  // par la descente : une fente du seuil jusqu'au toit, que prolonge le trou du toit
-  // (ouverte, on y passe debout ; fermée, les planches la bouchent et le capot la coiffe)
-  const zc = zDe(R.uArriere);
-  const e = bordInterieur(R.uArriere);
-  const w = e - R.rentree;
-  const largeurDescente = 0.34;
-  const basDescente = D.seuil;
-  const hautDescente = largeurDescente - 0.02;
-  const forme = new THREE.Shape();
-  forme.moveTo(-e, COCKPIT.plancher);
-  forme.lineTo(e, COCKPIT.plancher);
-  forme.lineTo(e, hauteurPont(R.uArriere, e));
-  for (let k = 0; k <= 16; k++) {
-    const x = w - (2 * w * k) / 16;
-    if (Math.abs(x) < hautDescente) continue;
-    forme.lineTo(x, hauteurRouf(R.uArriere, x));
-    if (x > 0 && w - (2 * w * (k + 1)) / 16 < hautDescente) {
-      forme.lineTo(hautDescente, hauteurRouf(R.uArriere, hautDescente));
-      forme.lineTo(largeurDescente, basDescente);
-      forme.lineTo(-largeurDescente, basDescente);
-      forme.lineTo(-hautDescente, hauteurRouf(R.uArriere, hautDescente));
-    }
-  }
-  forme.lineTo(-e, hauteurPont(R.uArriere, e));
-  const cloison = new THREE.ShapeGeometry(forme, 4);
-  cloison.translate(0, 0, zc);
-  // les planches de la descente (en retrait de 4 cm) : du teck
-  const planches = boite(largeurDescente * 2, hauteurRouf(R.uArriere, 0) - basDescente, 0.03, [0, (basDescente + hauteurRouf(R.uArriere, 0)) / 2, zc - 0.04]);
-  // le capot coulissant de la descente, sur le toit : fermé, il couvre le trou (et
-  // dépasse de 2 cm au-dessus de la cloison)
-  const capot = boite(0.78, 0.07, 0.84, [0, hauteurRouf(R.uArriere + 0.04, 0) + 0.035, zc - 0.40]);
   // le panneau de pont, au-dessus de la table du carré : un cadre d'aluminium et un
   // plexiglas fumé, qui laisse entrer le jour dans la cabine
   const P = PANNEAU_PONT;
@@ -449,7 +419,7 @@ function geometrieRouf() {
   for (const s of [1, -1]) {
     const pts = [];
     for (let k = 0; k <= 12; k++) {
-      const u = 0.35 + (0.58 - 0.35) * (k / 12);
+      const u = U_TIMONERIE + 0.015 + (0.58 - U_TIMONERIE - 0.015) * (k / 12);
       const x = s * (bordInterieur(u) - R.rentree - 0.14);
       pts.push([x, hauteurRouf(u, x) + 0.07, zDe(u)]);
     }
@@ -460,10 +430,8 @@ function geometrieRouf() {
     }
   }
   return {
-    blanc: mergeGeometries([...cotes, avant, cloison]),
-    capot,
+    blanc: mergeGeometries([...cotes, avant]),
     panneau: { cadre, plexi },
-    planches: uvDessus(planches, 3),
     antiderapant: uvDessus(toit, 2),
     verre: mergeGeometries(vitres),
     teck: mergeGeometries(mains.map((g) => uvDessus(g, 3))),
@@ -624,7 +592,8 @@ function geometrieAccastillage() {
   const yHiloire = hauteurPont(uw, COCKPIT.demiLargeur) + COCKPIT.hiloire;
   for (const s of [1, -1]) {
     winch(s * (COCKPIT.demiLargeur + 0.04), yHiloire, zDe(uw));
-    winch(s * 0.55, hauteurRouf(0.335, 0.55), zDe(0.335));
+    // (celui des drisses et de l'enrouleur : au bout avant de l'hiloire, devant la timonerie)
+    winch(s * (COCKPIT.demiLargeur + 0.04), hauteurPont(0.302, COCKPIT.demiLargeur) + COCKPIT.hiloire, zDe(0.302));
     // taquets sur le pont arrière
     noir.push(boite(0.2, 0.04, 0.05, [s * 1.0, hauteurPont(0.02, 1.0) + 0.03, zDe(0.02)]));
   }
@@ -681,9 +650,16 @@ export function construireBateau() {
   ajouter(cockpit.blanc, materiaux.gelcoat, 'cockpit');
   const rouf = geometrieRouf();
   ajouter(rouf.blanc, materiaux.gelcoat, 'rouf');
-  const capot = ajouter(rouf.capot, materiaux.gelcoat, 'capot-descente');
-  const planches = ajouter(rouf.planches, materiaux.teck, 'planches-descente');
-  ajouter(rouf.antiderapant, materiaux.antiderapant, 'rouf-toit');
+  ajouter(mergeGeometries([rouf.antiderapant, geometrieCorniches()]), materiaux.antiderapant, 'rouf-toit');
+  // la timonerie (timonerie.js) : ses parois, ses vitres, sa porte, ses essuie-glaces
+  const timonerie = construireTimonerie(materiaux);
+  ajouter(timonerie.blanc, materiaux.gelcoat, 'timonerie');
+  ajouter(timonerie.verre, materiaux.vitreTimonerie, 'timonerie-vitres').castShadow = false;
+  ajouter(timonerie.joints, materiaux.noir, 'timonerie-joints');
+  ajouter(timonerie.mains, materiaux.inox, 'timonerie-mains-courantes');
+  const porte = timonerie.porte;
+  groupe.add(porte);
+  for (const e of timonerie.essuieGlaces) groupe.add(e.pivot);
   ajouter(rouf.verre, materiaux.vitre, 'hublots').castShadow = false;
   ajouter(rouf.panneau.cadre, materiaux.alu, 'panneau-cadre');
   ajouter(rouf.panneau.plexi, materiaux.vitre, 'panneau-plexi').castShadow = false;
@@ -744,5 +720,5 @@ export function construireBateau() {
   groupe.add(pivotSafran);
 
   const levierPompe = groupe.getObjectByName('pompe').children[1];
-  return { groupe, materiaux, pivotBome, pivotSafran, mesures: m, capot, planches, levierPompe };
+  return { groupe, materiaux, pivotBome, pivotSafran, mesures: m, porte, essuieGlaces: timonerie.essuieGlaces, levierPompe };
 }

@@ -31,7 +31,7 @@ const COULEURS = {
 export async function inspecterPont(bateau, { pas = 0.04, tolerance = 0.035, encombrement = null } = {}) {
   const t0 = performance.now();
   const fixe = encombrement ?? construireEncombrement(bateau);
-  const dessin = construireEncombrement(bateau, { tout: true }); // (avec le capot, les planches…)
+  const dessin = construireEncombrement(bateau, { tout: true }); // (avec la porte de la timonerie…)
   const marin = new Marin();
   marin.encombrement = fixe;
   marin.suivrePieces(bateau);

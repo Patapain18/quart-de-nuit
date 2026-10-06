@@ -42,14 +42,13 @@ export const ROUF = {
   bouge: 0.08,
   rentree: 0.1, // les côtés penchent vers l'intérieur
 };
-export const MAT = { u: 0.6, hauteur: 11.6, bome: 3.7, hauteurBome: 0.78 };
-// La descente (l'entrée de la cabine) : une porte dans la cloison arrière du rouf (que
-// ferment les planches), prolongée par un trou dans le toit (que ferme le capot coulissant)
+// (le mât et la bôme ont été rehaussés de 44 cm pour passer au-dessus de la timonerie)
+export const MAT = { u: 0.6, hauteur: 12.04, bome: 3.7, hauteurBome: 1.22 };
+// L'entrée : la porte de la timonerie, dans la cloison du cockpit (son seuil est 6 cm
+// au-dessus du plancher du cockpit : l'eau du cockpit n'entre que s'il est bien plein)
 export const DESCENTE_ROUF = {
-  demiLargeur: 0.33,
-  longueur: 0.78, // le trou dans le toit, de la cloison vers l'avant
-  seuil: COCKPIT.plancher + 0.06, // le bas de la porte, 6 cm au-dessus du cockpit
-  course: 0.55, // le capot glisse de 55 cm vers l'avant quand on ouvre
+  demiLargeur: 0.31,
+  seuil: COCKPIT.plancher + 0.06,
 };
 
 const lisse = (a, b, x) => {
@@ -136,9 +135,9 @@ export function hauteurRouf(u, x) {
   return base + h + ROUF.bouge * (1 - r * r);
 }
 
-// Les hublots du rouf : deux de chaque côté, longs et profilés (ils s'affinent vers
-// l'avant), entre ces tranches u
-export const HUBLOTS = [[0.345, 0.47], [0.49, 0.585]];
+// Les hublots du rouf : un de chaque côté, long et profilé (il s'affine vers l'avant),
+// entre ces tranches u (à l'arrière, ce sont les vitres de la timonerie)
+export const HUBLOTS = [[0.47, 0.59]];
 
 // Le bas et le haut d'un hublot dans la tranche u
 export function bordsHublot(u, ua, ub) {
@@ -160,15 +159,59 @@ export function xCoteRouf(u, y) {
   return e - ROUF.rentree * 0.85 * ((y - pont) / (toit - 0.035 - pont));
 }
 
-// Les tranches du toit du rouf : 8 jusqu'au bord avant du trou de la descente, 24 ensuite
-export const U_TROU_DESCENTE = uDe(zDe(ROUF.uArriere) - DESCENTE_ROUF.longueur);
-export const trancheToit = (i) => (i <= 8
-  ? ROUF.uArriere + (U_TROU_DESCENTE - ROUF.uArriere) * (i / 8)
-  : U_TROU_DESCENTE + (ROUF.uAvant - U_TROU_DESCENTE) * ((i - 8) / 24));
+// ---------- La timonerie ----------
+// Un étage vitré sur l'arrière du rouf, de la cloison du cockpit jusqu'à 1,24 m vers
+// l'avant. Elle est moins large que le rouf (1,16 m) : le barreur, assis au bord du banc,
+// voit devant lui le long de ses parois. Son pare-brise penche vers l'arrière. Dedans, le
+// plancher est surélevé (au niveau du seuil du cockpit : on y tient debout et l'on voit
+// dehors) ; en bas, l'intérieur garde toute la largeur du rouf (des étagères courent sous
+// les bords de son toit) ; trois marches descendent au carré, à bâbord.
+export const TIMONERIE = {
+  zArriere: zDe(ROUF.uArriere), // la cloison du cockpit
+  zAvant: 0.25, // le pied du pare-brise, sur le toit du rouf
+  recul: 0.22, // le haut du pare-brise est 22 cm plus en arrière que son pied
+  demiLargeur: 0.58, // les parois, au pied
+  rentree: 0.03, // (elles penchent un peu vers l'intérieur)
+  toit: 2.42, // le toit, au bord (au-dessus de l'eau)
+  bouge: 0.04, // (il est bombé : 4 cm de plus au milieu)
+  plancher: 0.55,
+  vitreHaut: 2.3,
+  // la porte vers le cockpit, au milieu de la paroi arrière : deux battants qui coulissent
+  // à l'intérieur, contre la paroi, chacun de son côté (dehors, ils cacheraient le compas
+  // et les afficheurs du cockpit)
+  porte: { demiLargeur: 0.26, haut: 2.3 },
+};
+export const U_TIMONERIE = uDe(TIMONERIE.zAvant); // (sa tranche avant)
+// Le pied de la paroi (sur le toit du rouf) dans la tranche u
+export function piedTimonerie(u) {
+  const x = TIMONERIE.demiLargeur;
+  return { x, y: hauteurRouf(u, x) };
+}
+// La paroi à la hauteur y de la tranche u (elle rentre de 3 cm jusqu'au toit)
+export function xParoiTimonerie(u, y) {
+  const p = piedTimonerie(u);
+  const t = Math.min(1, Math.max(0, (y - p.y) / (TIMONERIE.toit - p.y)));
+  return p.x - TIMONERIE.rentree * t;
+}
+// Le toit, à la position x (bombé)
+export function toitTimonerie(u, x) {
+  const w = xParoiTimonerie(u, TIMONERIE.toit);
+  const r = Math.min(1, Math.abs(x) / Math.max(w, 0.1));
+  return TIMONERIE.toit + TIMONERIE.bouge * (1 - r * r);
+}
+// Le pare-brise : sa position z à la hauteur y (il recule en montant)
+export function zPareBrise(y) {
+  const pied = hauteurRouf(U_TIMONERIE, 0);
+  const t = Math.min(1, Math.max(0, (y - pied) / (TIMONERIE.toit - pied)));
+  return TIMONERIE.zAvant + TIMONERIE.recul * t;
+}
+
+// Les tranches du toit du rouf (devant la timonerie) : 24, régulières
+export const trancheToit = (i) => U_TIMONERIE + (ROUF.uAvant - U_TIMONERIE) * (i / 24);
 // Le panneau de pont (le « hublot » du toit) au-dessus de la table du carré : son
-// ouverture tombe sur deux tranches du toit (25 et 21) et deux de ses colonnes (±22 cm) ;
+// ouverture tombe sur deux tranches du toit (15 et 10) et deux de ses colonnes (±22 cm) ;
 // son cadre d'aluminium la déborde de 4 cm
-const TROU_PANNEAU = { demiLargeur: 0.22, z0: zDe(trancheToit(25)), z1: zDe(trancheToit(21)) };
+const TROU_PANNEAU = { demiLargeur: 0.22, z0: zDe(trancheToit(15)), z1: zDe(trancheToit(10)) };
 export const PANNEAU_PONT = {
   trou: TROU_PANNEAU,
   demiLargeur: TROU_PANNEAU.demiLargeur + 0.04,

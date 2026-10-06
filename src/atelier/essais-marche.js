@@ -19,7 +19,7 @@ function tournees(interieur) {
     { nom: 'le winch bâbord', chemin: [[-0.32, zDe(0.25)]], geste: 'winch-babord' },
     { nom: 'la pompe de cale', chemin: [[-0.2, zDe(0.12)]], geste: 'pompe' },
     { nom: 'l\'écoute de grand-voile', chemin: [[0.25, zDe(0.09)]], geste: 'ecoute-gv' },
-    { nom: 'la descente', chemin: [[0, zDe(0.24)]], geste: 'descente' },
+    { nom: 'la porte de la timonerie', chemin: [[0, zDe(0.24)]], geste: 'descente' },
     {
       nom: 'le pied de mât, par tribord',
       chemin: [[0.6, zDe(0.2)], [1.12, zDe(0.2)], [1.15, zDe(0.42)], [0.95, zDe(0.58)]],
@@ -31,10 +31,20 @@ function tournees(interieur) {
       chemin: [[-0.95, zDe(0.68)], [-1.15, zDe(0.45)], [-1.12, zDe(0.2)], [-0.25, zDe(0.2)]],
       geste: null,
     },
-    { nom: 'la radio, en bas', chemin: [[0, zDe(0.27)], [0, 1.2], [0.2, radio.z + 0.1]], geste: 'radio' },
-    { nom: 'le tableau électrique', chemin: [[0.25, tableau.z - 0.05]], geste: 'tableau' },
-    { nom: 'le ciré', chemin: [[-0.2, cire.z + 0.25]], geste: 'cire' },
-    { nom: 'remonter, et prendre la barre', chemin: [[0, 1.0], [0, zDe(0.24)], [0.3, zDe(0.15)]], geste: 'barre' },
+    // la timonerie : on entre par la porte, on va à la radio, au tableau, au radar, au poste
+    { nom: 'la radio, dans la timonerie', chemin: [[0, zDe(0.27)], [-0.12, 1.25], [-0.15, 1.0]], geste: 'radio' },
+    { nom: 'le tableau électrique', chemin: [[-0.1, 1.3]], geste: 'tableau' },
+    { nom: 'le radar et le traceur', chemin: [[-0.15, 1.0]], geste: 'traceur' },
+    { nom: 'le pilote, au poste', chemin: [[-0.15, 0.98]], geste: 'poste' },
+    { nom: 'le siège de quart', chemin: [[-0.15, 1.1]], geste: 'siege' },
+    // en bas : l'escalier (à bâbord), le ciré au pied de l'escalier, le carré
+    { nom: 'descendre au carré', chemin: [[-0.18, 1.0], [-0.3, 0.88], [-0.3, 0.3], [-0.3, 0.0], [0.39, -0.25], [0.39, -1.05]], geste: null },
+    { nom: 'le ciré, au pied de l\'escalier', chemin: [[0.39, -0.2], [0.1, 0.0]], geste: 'cire' },
+    {
+      nom: 'remonter, et prendre la barre',
+      chemin: [[-0.3, 0.0], [-0.3, 0.3], [-0.3, 0.6], [-0.25, 0.95], [-0.1, 1.3], [0, zDe(0.24)], [0.3, zDe(0.15)]],
+      geste: 'barre',
+    },
   ];
 }
 

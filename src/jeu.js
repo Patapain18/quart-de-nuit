@@ -33,7 +33,8 @@ import { Nuit, DIFFICULTES, EAU, HEURE_LEVER } from './jeu/nuit.js';
 import { lireOptions, changerOptions, quandOptionsChangent } from './jeu/options.js';
 import { Bouees } from './rendu/bouees.js';
 import { distanceALaTerre } from './rendu/cote.js';
-import { COCKPIT, MAT, zDe } from './bateau/forme.js';
+import { COCKPIT, MAT, TIMONERIE, zDe } from './bateau/forme.js';
+import { SIEGE, YEUX_POSTE } from './bateau/interieur-timonerie.js';
 
 const parametres = new URLSearchParams(location.search);
 const canvas = document.getElementById('scene');
@@ -97,7 +98,7 @@ const etat = {
   majMer: 0,
   carnet: false,
 };
-const siege = { x: -0.62 }; // à la barre, assis au vent
+const siege = { x: -0.76 }; // à la barre, assis au vent (au bord du banc)
 
 // ---------- Ce que le jeu sait faire (appelé par les gestes) ----------
 const VITESSE_ECOUTE = 0.45;
@@ -147,6 +148,26 @@ const jeu = {
   radarFiltre() {
     bateau.radar.filtreMer = !bateau.radar.filtreMer;
     afficherMessage(bateau.radar.filtreMer ? 'Radar : filtre de mer (le fouillis des vagues proches est atténué)' : 'Radar : filtre de mer coupé (attention au fouillis près du bateau)');
+  },
+  // le traceur : l'échelle de la carte (0,75 à 12 milles)
+  zoomTraceur(sens) {
+    const e = bateau.electronique;
+    const echelles = [0.75, 1.5, 3, 6, 12];
+    const k = Math.max(0, Math.min(echelles.length - 1, echelles.indexOf(e.milles) + sens));
+    e.milles = echelles[k];
+    e.age = 1;
+    afficherMessage(`Traceur : ${String(e.milles).replace('.', ',')} milles`);
+  },
+  // s'asseoir au poste de pilotage de la timonerie : à l'abri, on règle le cap du pilote
+  allerAuPoste() {
+    etat.mode = 'poste';
+    etat.action = null;
+    marin.lacet = 0;
+    marin.site = -0.18;
+    afficherMessage(etat.pilote !== null
+      ? `Au poste : le pilote tient le ${String(etat.pilote).padStart(3, '0')}° (Q / D : 1° de plus ou de moins, Maj : 10°)`
+      : 'Au poste : enclenche le pilote (P), puis Q / D pour régler son cap');
+    majAide();
   },
   prendreBarre() {
     etat.mode = 'barre';
@@ -206,7 +227,8 @@ const jeu = {
   basculerDescente() {
     bateau.ouvrirDescente(!bateau.descenteOuverte);
     ouvrirDescente(bateau.descenteOuverte);
-    afficherMessage(bateau.descenteOuverte ? 'Descente ouverte' : 'Descente fermée : l\'eau n\'entrera pas dans la cabine');
+    audio.clic?.();
+    afficherMessage(bateau.descenteOuverte ? 'Porte de la timonerie ouverte' : 'Porte fermée : l\'eau du cockpit n\'entrera pas à l\'intérieur');
   },
   pomper(dt) {
     const avant = Math.floor((etat.phasePompe ?? 0) / Math.PI);
@@ -328,7 +350,7 @@ function touchesAppuyees() {
       afficherMessage(etat.regleurAuto ? 'Réglage automatique des voiles : activé' : 'Réglage automatique : désactivé, à toi les écoutes');
     } else if (code === TOUCHES.pilote.code) {
       if (etat.pilote === null && nuit?.avaries.pilote === 'panne') {
-        afficherMessage('Le pilote est en panne : réarme son disjoncteur au tableau électrique (en bas)');
+        afficherMessage('Le pilote est en panne : réarme son disjoncteur au tableau électrique (dans la timonerie)');
         continue;
       }
       etat.pilote = etat.pilote === null ? Math.round(physique.mesures.cap) : null;
@@ -336,16 +358,37 @@ function touchesAppuyees() {
       afficherMessage(etat.pilote !== null ? `Pilote automatique : il tient le cap ${String(etat.pilote).padStart(3, '0')}°` : 'Pilote automatique débrayé');
     } else if (code === TOUCHES.aide.code) {
       changerOptions({ aide: !etat.aide });
+    } else if (etat.mode === 'poste' && (code === TOUCHES.barreGauche.code || code === TOUCHES.barreDroite.code)) {
+      reglerPilote((code === TOUCHES.barreDroite.code ? 1 : -1) * (maj ? 10 : 1));
+    } else if (etat.mode === 'poste' && code === TOUCHES.lever.code) {
+      quitterLePoste();
     } else if (etat.mode === 'barre' && code === TOUCHES.lever.code) {
       seLever();
     } else if (etat.mode === 'barre' && code === TOUCHES.ris.code) {
       afficherMessage('Pour prendre un ris, va au pied du mât (Espace pour te lever)');
     } else if ((etat.mode === 'pied' || etat.mode === 'barre') && code === TOUCHES.harnais.code) {
       basculerHarnais();
-    } else if (etat.mode === 'pied' && code === TOUCHES.agir.code) {
+    } else if ((etat.mode === 'pied' || etat.mode === 'poste') && code === TOUCHES.agir.code) {
       commencerAction(maj ? 'secondaire' : 'principal');
     }
   }
+}
+
+// Au poste de pilotage : le cap du pilote, degré par degré (ou par dizaines)
+function reglerPilote(ecart) {
+  if (etat.pilote === null) {
+    afficherMessage('Le pilote n\'est pas enclenché : appuie sur P');
+    return;
+  }
+  etat.pilote = (etat.pilote + ecart + 360) % 360;
+  audio.clic?.();
+  afficherMessage(`Pilote : cap ${String(Math.round(etat.pilote)).padStart(3, '0')}°`);
+}
+function quitterLePoste() {
+  etat.mode = 'pied';
+  // debout, juste derrière le siège
+  marin.placer(SIEGE.x - 0.08, TIMONERIE.plancher, SIEGE.z + 0.32);
+  majAide();
 }
 
 function seLever() {
@@ -457,7 +500,7 @@ const _origine = new THREE.Vector3();
 const _trombe = new THREE.Vector3();
 function simuler(dt) {
   etat.bordage = 0;
-  const enJeu = etat.mode === 'barre' || etat.mode === 'pied';
+  const enJeu = etat.mode === 'barre' || etat.mode === 'pied' || etat.mode === 'poste';
   if (!enJeu) {
     commandes.lireAppuis();
     // un pilote automatique garde le bateau à 60° du vent
@@ -520,6 +563,11 @@ function simuler(dt) {
     etat.geste = gesteVise(gestes, oeil, marin.direction());
     poursuivreAction(dt);
     dangers();
+  } else if (etat.mode === 'poste') {
+    // assis au poste de la timonerie : on peut aussi agir sur ce que l'on regarde (la VHF,
+    // le radar, le traceur, le tableau électrique…), sans se lever
+    etat.geste = gesteVise(gestes.filter((g) => g.id !== 'poste' && g.id !== 'siege'), YEUX_POSTE, marin.direction(), 1.3);
+    poursuivreAction(dt);
   } else {
     etat.geste = null;
   }
@@ -551,6 +599,20 @@ function simuler(dt) {
   r.angleSafran = physique.barre;
   bateau.instruments.maj(dt, m, monde.ecl.nuit);
   majRadar(dt);
+  // le traceur de cartes et la commande du pilote, sur la console de la timonerie
+  const fond = physique.vitesse;
+  bateau.electronique.maj(dt, {
+    x: physique.position.x, z: physique.position.z, cap: m.cap, vitesse: m.vitesse,
+    route: (Math.atan2(fond.x, -fond.z) * 180 / Math.PI + 360) % 360,
+    pilote: etat.pilote, panne: nuit?.avaries.pilote === 'panne', barre: physique.barre,
+    bouees: [...(journee?.bouees?.values() ?? [])].map((b) => ({ x: b.x, z: b.z, couleur: { jaune: '#ffd23a', rouge: '#ff4a3a', verte: '#3ad06a' }[b.couleur] })),
+    nuit: monde.ecl.nuit,
+  });
+  // les essuie-glaces : sous la pluie, ou quand les embruns arrosent le pare-brise ; et
+  // l'eau qui ruisselle sur les vitres de la timonerie
+  const eauDansLAir = Math.min(1, meteo.pluie * 1.3 + (monde.embruns.densiteAutour ?? 0) * 2.5 + Math.max(0, meteo.vent - 28) / 30);
+  bateau.balayage = eauDansLAir > 0.05 ? Math.min(1, eauDansLAir * 1.2) : 0;
+  bateau.pluieSurLesVitres = eauDansLAir;
   mouillerLePont(dt);
   // l'eau embarquée : dans le cockpit, et dans la cabine au-dessus des planchers
   bateau.eauABord.maj(dt, bateau.groupe, {
@@ -572,11 +634,14 @@ function simuler(dt) {
     pression,
     heure: meteo.heure,
   });
-  const dedans = etat.mode === 'pied' && !marin.dehors;
+  const dedans = (etat.mode === 'pied' && !marin.dehors) || etat.mode === 'poste';
+  const enTimonerie = etat.mode === 'poste' || (etat.mode === 'pied' && marin.dansLaTimonerie);
   // l'œil s'habitue à la pénombre de la cabine (et le dehors paraît éblouissant) :
-  // dedans, l'exposition dépend de la lumière de la cabine
-  const expositionCabine = bateau.interieur.exposition(monde.ecl.nuit);
-  etat.adaptation = (etat.adaptation ?? 0) + ((dedans ? 1 : 0) - (etat.adaptation ?? 0)) * Math.min(1, dt * (dedans ? 0.9 : 2.2));
+  // dedans, l'exposition dépend de la lumière de la cabine ; dans la timonerie, on voit
+  // surtout dehors, par les vitres : l'œil ne s'y habitue qu'à moitié
+  const expositionCabine = bateau.interieur.exposition(monde.ecl.nuit, enTimonerie);
+  const adaptationVoulue = dedans ? (enTimonerie ? 0.5 : 1) : 0;
+  etat.adaptation = (etat.adaptation ?? 0) + (adaptationVoulue - (etat.adaptation ?? 0)) * Math.min(1, dt * (dedans ? 0.9 : 2.2));
   const reglages = monde.post.reglages;
   // (on mélange les expositions « en photographe » : en diaphragmes, pas en valeurs)
   reglages.uExposition.value = Math.exp(THREE.MathUtils.lerp(Math.log(monde.ecl.exposition), Math.log(expositionCabine), etat.adaptation));
@@ -587,7 +652,8 @@ function simuler(dt) {
   reglages.uSaturation.value = THREE.MathUtils.lerp(et.saturation, 1.05, etat.adaptation);
   reglages.uBalance.value.set(...et.balance.map((b) => THREE.MathUtils.lerp(b, 1, etat.adaptation)));
   monde.lampeFrontale(etat.lampe || (etat.mode === 'accueil' && monde.ecl.nuit > 0.6));
-  monde.pluie.mesh.visible = !dedans && meteo.pluie > 0.01;
+  // (dans la timonerie, on voit la pluie par les vitres ; dans le carré, plus du tout)
+  monde.pluie.mesh.visible = (!dedans || enTimonerie) && meteo.pluie > 0.01;
   monde.dansLaCabine = dedans;
   // (des gouttes sur l'écran seulement quand on est à bord, pas sur l'écran d'accueil)
   monde.gouttesActives = options.gouttes && (etat.mode === 'barre' || etat.mode === 'pied');
@@ -726,7 +792,7 @@ function commencerJournee({ reprise = null } = {}) {
   marin.attache = false;
   marin.lacet = 0;
   marin.site = -0.12;
-  siege.x = physique.mesures.angleVentApparent >= 0 ? 0.62 : -0.62;
+  siege.x = physique.mesures.angleVentApparent >= 0 ? 0.76 : -0.76;
   if (reprise) appliquerBateau(reprise.bateau);
   journee
     .on('journal', majCarnet)
@@ -986,7 +1052,7 @@ function commencerNuit({ depuisJournee = false, bateau: bateauGarde = null, repr
     marin.attache = false;
     nuit.dire([
       `${JOS} pour Morgane. Tu pars pour la nuit sans avoir préparé ton bateau ? Alors vite, avant que ça souffle :`,
-      'deux ris dans la grand-voile, le foc roulé aux deux tiers, ton gilet et ton ciré, les feux, la descente fermée, et ton harnais. La liste est en haut à gauche.',
+      'deux ris dans la grand-voile, le foc roulé aux deux tiers, ton gilet et ton ciré, les feux, la porte de la timonerie fermée, et ton harnais. La liste est en haut à gauche.',
     ]);
   }
   if (bateauGarde) appliquerBateau(bateauGarde);
@@ -1007,7 +1073,7 @@ function commencerNuit({ depuisJournee = false, bateau: bateauGarde = null, repr
   marin.placer(-0.2, COCKPIT.plancher, zDe(0.17));
   marin.lacet = 0;
   marin.site = -0.12;
-  siege.x = physique.mesures.angleVentApparent >= 0 ? 0.62 : -0.62;
+  siege.x = physique.mesures.angleVentApparent >= 0 ? 0.76 : -0.76;
   nuit
     .on('journal', majCarnet)
     .on('chapitre', (ch) => {
@@ -1050,7 +1116,7 @@ function commencerNuit({ depuisJournee = false, bateau: bateauGarde = null, repr
       }[nom]);
     })
     .on('etrange', (nom) => vivreEtrange(nom))
-    .on('cargo', () => afficherMessage('Un cargo en route de collision ! Appelle-le à la radio (canal 16), à la table à cartes'))
+    .on('cargo', () => afficherMessage('Un cargo en route de collision ! Appelle-le à la radio (canal 16), dans la timonerie'))
     .on('cargo-klaxon', () => audio.corne?.(5))
     .on('trombe', () => afficherMessage('Une trombe marine ! Écarte-toi de sa route : lofe et file de travers au vent'))
     .on('trombe-proche', () => afficherMessage('La trombe arrive sur toi ! Harnais (X), et tiens-toi (Maj)'))
@@ -1424,19 +1490,23 @@ function placerCamera(dt) {
     return;
   }
   // la tête tourne avec la souris
-  if (etat.mode === 'barre' || etat.mode === 'pied') {
+  if (etat.mode === 'barre' || etat.mode === 'pied' || etat.mode === 'poste') {
     const souris = commandes.lireSouris();
     const k = 0.0022 * options.sensibilite;
     marin.lacet -= souris.dx * k;
     marin.site = THREE.MathUtils.clamp(marin.site - souris.dy * k * (options.inverser ? -1 : 1), -1.35, 1.4);
     if (etat.mode === 'barre') marin.lacet = THREE.MathUtils.clamp(marin.lacet, -2.9, 2.9);
   }
-  const aLaBarre = etat.mode === 'barre' || (etat.mode !== 'pied' && etat.avantPause === 'barre');
+  const aLaBarre = etat.mode === 'barre' || (etat.mode !== 'pied' && etat.mode !== 'poste' && etat.avantPause === 'barre');
+  const auPoste = etat.mode === 'poste' || (etat.mode !== 'pied' && etat.mode !== 'barre' && etat.avantPause === 'poste');
   let local;
-  if (aLaBarre) {
+  if (auPoste) {
+    // assis au poste de pilotage, face au pare-brise
+    local = YEUX_POSTE.clone();
+  } else if (aLaBarre) {
     // assis au vent, la barre à la main
     const auVent = physique.mesures.angleVentApparent >= 0 ? 1 : -1;
-    siege.x += (auVent * 0.62 - siege.x) * Math.min(1, dt * 1.1);
+    siege.x += (auVent * Bateau.POSTES.barreur.x - siege.x) * Math.min(1, dt * 1.1);
     local = Bateau.POSTES.barreur.clone();
     local.x = siege.x;
   } else {
@@ -1447,7 +1517,7 @@ function placerCamera(dt) {
   // la tête compense une partie du roulis et du tangage (debout, on se tient plus droit) ;
   // l'option « horizon stable » la fait compenser presque tout (contre le mal de mer)
   _e.setFromQuaternion(physique.orientation, 'YXZ');
-  const naturel = aLaBarre ? 0.5 : 0.35;
+  const naturel = aLaBarre || auPoste ? 0.5 : 0.35;
   const compense = naturel + (0.92 - naturel) * options.stabilisation;
   _e.x *= Math.min(1, compense + 0.1);
   _e.z *= compense;
@@ -1505,6 +1575,15 @@ const AIDE = {
     [`${TOUCHES.lampe.nom} · ${TOUCHES.carnet.nom}`, 'lampe frontale · carnet de bord'],
     [`${TOUCHES.passerPhrase.nom} · ${TOUCHES.aide.nom}`, 'passer la phrase · cacher l\'aide'],
   ],
+  poste: [
+    [`${TOUCHES.barreGauche.nom} ${TOUCHES.barreDroite.nom}`, 'cap du pilote : 1° de moins, de plus'],
+    ['E', 'agir sur ce que tu regardes (VHF, radar…)'],
+    [`Maj + ${TOUCHES.barreGauche.nom} ${TOUCHES.barreDroite.nom}`, 'cap du pilote : 10° de moins, de plus'],
+    [TOUCHES.pilote.nom, 'pilote automatique : l\'enclencher, le débrayer'],
+    [TOUCHES.lever.nom, 'se lever'],
+    [`${TOUCHES.lampe.nom} · ${TOUCHES.carnet.nom}`, 'lampe frontale · carnet de bord'],
+    [`${TOUCHES.passerPhrase.nom} · ${TOUCHES.aide.nom}`, 'passer la phrase · cacher l\'aide'],
+  ],
   pied: [
     ['Z Q S D', 'marcher'],
     ['E', 'agir sur ce que tu regardes'],
@@ -1520,7 +1599,7 @@ const AIDE = {
 let modeAide = null;
 function majAide() {
   const enMain = etat.geste && /winch|ecoute|enrouleur/.test(etat.geste.id);
-  document.getElementById('viseur').hidden = etat.mode !== 'pied';
+  document.getElementById('viseur').hidden = etat.mode !== 'pied' && etat.mode !== 'poste';
   // (les jauges de réglage : quand on tient une écoute, et pas tant que les voiles se règlent seules)
   document.getElementById('reglages').hidden = (etat.mode !== 'barre' && !enMain) || (etat.regleurAuto && (!!journee || !!nuit));
   if (modeAide === etat.mode) return;
@@ -1581,7 +1660,7 @@ function afficherInstruments() {
 // vent et le cône où l'on ne peut pas aller ; la nuit, au plus fort, la zone de la fuite
 const compas = new Compas(document.getElementById('compas'));
 function afficherCompas() {
-  const visible = etat.mode === 'barre';
+  const visible = etat.mode === 'barre' || etat.mode === 'poste';
   const zone = document.getElementById('compas');
   if (zone.hidden === visible) zone.hidden = !visible;
   if (!visible) return;
@@ -1601,7 +1680,7 @@ let gesteAffiche = '';
 function afficherGeste() {
   const zone = document.getElementById('geste');
   const g = etat.geste;
-  if (!g || etat.mode !== 'pied') {
+  if (!g || (etat.mode !== 'pied' && etat.mode !== 'poste')) {
     if (!zone.hidden) zone.hidden = true;
     gesteAffiche = '';
     return;
@@ -1629,7 +1708,7 @@ function embarquer() {
     etat.mode = 'barre';
     marin.lacet = 0;
     marin.site = -0.12;
-    siege.x = physique.mesures.angleVentApparent >= 0 ? 0.62 : -0.62;
+    siege.x = physique.mesures.angleVentApparent >= 0 ? 0.76 : -0.76;
     barreAssistee.reprendre(physique.mesures.cap);
   }
   accueil.hidden = true;
@@ -1660,7 +1739,7 @@ function finir(raison) {
     bome: ['Assommé par la bôme', 'Pendant l\'empannage, la bôme a traversé le cockpit et t\'a jeté à l\'eau. Accroupis-toi ou reste à l\'écart quand le vent passe derrière.'],
     cailloux: ['Sur les cailloux', 'Le bateau a touché les rochers de la côte. Au large, on a toujours de l\'eau sous la quille : garde tes distances avec la terre.'],
     emporte: ['Emporté par une déferlante', 'Une vague a balayé le bateau couché, et tu n\'étais pas attaché. Dans la tempête, le harnais reste accroché, même à la barre (X).'],
-    naufrage: ['Le bateau a coulé', 'Trop d\'eau à bord : Morgane s\'est alourdie, puis enfoncée. Garde la descente fermée, et pompe dès que l\'eau passe au-dessus des planchers.'],
+    naufrage: ['Le bateau a coulé', 'Trop d\'eau à bord : Morgane s\'est alourdie, puis enfoncée. Garde la porte de la timonerie fermée, et pompe dès que l\'eau passe au-dessus des planchers.'],
     chavirage: ['Chaviré', 'Le bateau s\'est retourné et n\'a pas pu se redresser. Moins de toile, et jamais les déferlantes de travers : mets-les sur l\'arrière.'],
     collision: ['Abordé par le cargo', 'Le cargo ne t\'a pas vu. La nuit, allume tes feux ; et quand un navire vient sur toi, appelle-le à la radio (canal 16) ou écarte-toi franchement.'],
   };
@@ -1769,7 +1848,7 @@ document.getElementById('passer-lecon').addEventListener('click', () => {
 canvas.addEventListener('click', () => { if (etat.mode === 'pause') embarquer(); });
 document.addEventListener('pointerlockchange', () => {
   // (etat.essai : les outils de mise au point jouent sans souris capturée)
-  if ((etat.mode === 'barre' || etat.mode === 'pied') && document.pointerLockElement !== canvas && !etat.essai) {
+  if ((etat.mode === 'barre' || etat.mode === 'pied' || etat.mode === 'poste') && document.pointerLockElement !== canvas && !etat.essai) {
     // la souris est libérée (Échap) : pause (le bateau continue de naviguer)
     etat.avantPause = etat.mode;
     etat.mode = 'pause';

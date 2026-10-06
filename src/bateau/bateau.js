@@ -13,13 +13,21 @@ import { Interieur } from './interieur.js';
 import { EauABord } from './eau-a-bord.js';
 import { Radar } from './radar.js';
 import { PaquetDeMer } from './paquet-de-mer.js';
-import { zDe, demiLargeur, COCKPIT, DESCENTE_ROUF, hauteurLivet, hauteurPont } from './forme.js';
+import { Electronique } from './electronique.js';
+import { mouillerLesVitres } from './vitres.js';
+import { zDe, demiLargeur, COCKPIT, hauteurLivet, hauteurPont } from './forme.js';
+import { LARGEUR_BATTANT } from './timonerie.js';
 
 export class Bateau {
   constructor() {
-    const { groupe, materiaux, pivotBome, pivotSafran, mesures, capot, planches, levierPompe } = construireBateau();
-    this.capot = capot;
-    this.planches = planches;
+    const { groupe, materiaux, pivotBome, pivotSafran, mesures, porte, essuieGlaces, levierPompe } = construireBateau();
+    this.porte = porte; // la porte coulissante de la timonerie, vers le cockpit
+    this.essuieGlaces = essuieGlaces;
+    this.balayage = 0; // (les essuie-glaces : 0 arrêtés → 1 au plus vite, réglé par le jeu)
+    // la pluie sur les vitres de la timonerie (réglée par le jeu : pluie 0 → 1)
+    this.vitres = mouillerLesVitres(materiaux.vitreTimonerie);
+    this.pluieSurLesVitres = 0;
+    this._phaseEssuie = 0;
     this.levierPompe = levierPompe;
     this.groupe = groupe;
     this.materiaux = materiaux;
@@ -34,7 +42,8 @@ export class Bateau {
     this.cordages = new Cordages(this);
     this.instruments = new Instruments(this);
     this.interieur = new Interieur(this);
-    this.radar = new Radar(this, this.interieur); // (à la table à cartes, et son répétiteur dans le cockpit)
+    this.radar = new Radar(this, this.interieur); // (sur la console de la timonerie, et son répétiteur dans le cockpit)
+    this.electronique = new Electronique(this, this.interieur, this.instruments); // (le traceur, le pilote)
     this.paquet = new PaquetDeMer(this); // (l'eau verte qui balaie le pont quand une déferlante frappe)
     this.eauABord = new EauABord(this); // l'eau embarquée (la nuit de tempête)
     this.descenteOuverte = true;
@@ -87,11 +96,16 @@ export class Bateau {
     g.quaternion.setFromEuler(this._e);
   }
 
-  // La descente : planches enlevées et capot glissé vers l'avant (ouverte), ou en place
+  // L'entrée de la timonerie : la porte coulissante, glissée vers bâbord (ouverte) ou fermée
+  // (on garde le nom « descente » : c'est toujours le chemin vers l'intérieur)
   ouvrirDescente(ouverte) {
     this.descenteOuverte = ouverte;
-    this.planches.visible = !ouverte;
-    this.capot.position.z = ouverte ? -DESCENTE_ROUF.course : 0;
+    const [gauche, droite] = this.porte.userData.battants;
+    const l = LARGEUR_BATTANT;
+    // (ouverte, chacun a coulissé contre la paroi : il dépasse de 3 cm dans l'ouverture, et
+    // ne touche pas le lambris, qui se resserre vers le haut)
+    gauche.position.x = ouverte ? -2 * l + 0.03 : -l;
+    droite.position.x = ouverte ? l - 0.03 : 0;
   }
 
   // Le levier de la pompe de cale (angle en radians)
@@ -160,12 +174,27 @@ export class Bateau {
     this.pivotSafran.rotation.y = r.angleSafran ?? -r.barre * 0.55;
     this.voiles.maj(dt, r);
     this.cordages.maj(dt);
+    // les essuie-glaces : un aller-retour d'une seconde et demie (ou deux par seconde au plus
+    // vite), qui finit son balayage avant de s'arrêter
+    if (this.balayage > 0.01 || Math.sin(this._phaseEssuie) > 0.02) {
+      this._phaseEssuie += dt * (1.6 + 3 * this.balayage);
+      if (this.balayage <= 0.01 && Math.sin(this._phaseEssuie) <= 0.02) this._phaseEssuie = 0;
+    }
+    // (au repos, couchés en bas de la vitre ; ils balayent ensemble jusqu'à la verticale)
+    const balai = Math.max(0, Math.sin(this._phaseEssuie)) ** 0.8;
+    for (const e of this.essuieGlaces) e.balancier.rotation.z = e.repos * (1 - balai);
+    // (l'eau sur les vitres : elle arrive vite, et met un moment à s'égoutter)
+    const v = this.vitres;
+    v.uTempsVitre.value += dt;
+    v.uPluieVitre.value += (this.pluieSurLesVitres - v.uPluieVitre.value) * Math.min(1, dt * (this.pluieSurLesVitres > v.uPluieVitre.value ? 1.5 : 0.08));
+    v.uEssuie.value += ((this.balayage > 0.01 ? 1 : 0) - v.uEssuie.value) * Math.min(1, dt * 2);
   }
 
   // Les points de vue à bord (repère du bateau)
   static POSTES = {
-    // assis au vent sur le banc tribord, la barre à la main
-    barreur: new THREE.Vector3(0.62, COCKPIT.banc + 0.82, zDe(0.16)),
+    // assis au vent sur le bord du banc tribord, la barre à la main (il voit devant lui le
+    // long de la timonerie)
+    barreur: new THREE.Vector3(0.76, COCKPIT.banc + 0.82, zDe(0.16)),
     // debout dans le cockpit, devant la descente
     debout: new THREE.Vector3(0.0, COCKPIT.plancher + 1.62, zDe(0.27)),
     // au pied du mât (pour prendre un ris)

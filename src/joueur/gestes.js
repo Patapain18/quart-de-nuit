@@ -8,7 +8,8 @@
 // touche : border un winch, pomper), soit « longue » (il faut tenir un certain temps
 // pour qu'elle aboutisse : prendre un ris demande 4 secondes au pied du mât).
 import { Vector3 } from 'three';
-import { COCKPIT, MAT, zDe, hauteurPont, hauteurRouf, hauteurLivet } from '../bateau/forme.js';
+import { COCKPIT, MAT, TIMONERIE, zDe, hauteurPont, hauteurRouf, hauteurLivet } from '../bateau/forme.js';
+import { SIEGE, surPupitre } from '../bateau/interieur-timonerie.js';
 
 // jeu : l'objet qui sait agir (voir jeu.js) ; interieur : pour placer radio et tableau
 export function creerGestes(jeu, interieur) {
@@ -47,7 +48,7 @@ export function creerGestes(jeu, interieur) {
     },
     {
       id: 'enrouleur',
-      point: new Vector3(0.55, hauteurRouf(0.335, 0.55) + 0.12, zDe(0.335)),
+      point: new Vector3(COCKPIT.demiLargeur + 0.04, hauteurPont(0.302, COCKPIT.demiLargeur) + COCKPIT.hiloire + 0.12, zDe(0.302)),
       rayon: 0.2,
       titre: () => 'Bosse d\'enrouleur (le foc)',
       principal: { texte: 'enrouler le foc', maintenir: true, faire: (dt) => jeu.enrouler(-dt) },
@@ -95,11 +96,27 @@ export function creerGestes(jeu, interieur) {
       },
     },
     {
+      // la porte coulissante de la timonerie (on l'atteint des deux côtés)
       id: 'descente',
-      point: new Vector3(0, 1.0, zDe(0.31) + 0.04),
-      rayon: 0.32,
-      titre: () => 'La descente',
-      principal: { texte: () => (jeu.bateau.descenteOuverte ? 'mettre les planches (fermer)' : 'enlever les planches (ouvrir)'), faire: () => jeu.basculerDescente() },
+      point: new Vector3(0, 1.35, TIMONERIE.zArriere),
+      rayon: 0.34,
+      titre: () => 'La porte de la timonerie',
+      principal: { texte: () => (jeu.bateau.descenteOuverte ? 'fermer la porte' : 'ouvrir la porte'), faire: () => jeu.basculerDescente() },
+    },
+    {
+      // le poste de pilotage : on s'assied, et l'on règle le cap du pilote automatique
+      id: 'poste',
+      point: surPupitre(0.08, 0.14).position,
+      rayon: 0.16,
+      titre: () => 'Le poste de pilotage : la commande du pilote',
+      principal: { texte: 't\'asseoir au poste (barrer au pilote)', faire: () => jeu.allerAuPoste() },
+    },
+    {
+      id: 'siege',
+      point: new Vector3(SIEGE.x, SIEGE.assise + 0.1, SIEGE.z),
+      rayon: 0.25,
+      titre: () => 'Le siège de quart',
+      principal: { texte: 't\'asseoir au poste (barrer au pilote)', faire: () => jeu.allerAuPoste() },
     },
     {
       id: 'pompe',
@@ -111,7 +128,7 @@ export function creerGestes(jeu, interieur) {
     {
       id: 'radio',
       point: interieur.positionRadio.clone(),
-      rayon: 0.16,
+      rayon: 0.13,
       titre: () => `Radio VHF (canal ${jeu.radio.canal})`,
       principal: { texte: 'écouter la météo', faire: () => jeu.radio.bulletin(jeu.meteo) },
       // pendant la journée et la nuit, on appelle Jos ; quand un cargo arrive sur nous, on
@@ -128,8 +145,8 @@ export function creerGestes(jeu, interieur) {
       titre: () => 'Ton ciré et ton gilet de sauvetage',
       principal: { texte: () => (jeu.etat.gilet ? 'les ôter' : 'les enfiler'), faire: () => jeu.basculerGilet() },
     },
-    // le radar : l'écran de la table à cartes, et son répétiteur dans le cockpit
-    ...[['radar', jeu.bateau.radar.positionPrincipal, 0.14, 'Radar (table à cartes)'], ['radar-cockpit', jeu.bateau.radar.positionRepetiteur, 0.12, 'Radar (répétiteur du cockpit)']]
+    // le radar : l'écran de la console de la timonerie, et son répétiteur dans le cockpit
+    ...[['radar', jeu.bateau.radar.positionPrincipal, 0.13, 'Radar (timonerie)'], ['radar-cockpit', jeu.bateau.radar.positionRepetiteur, 0.12, 'Radar (répétiteur du cockpit)']]
       .map(([id, point, rayon, nom]) => ({
         id,
         point: point.clone(),
@@ -138,6 +155,15 @@ export function creerGestes(jeu, interieur) {
         principal: { texte: 'changer de portée', faire: () => jeu.radarPortee() },
         secondaire: { texte: () => (jeu.bateau.radar.filtreMer ? 'couper le filtre de mer' : 'remettre le filtre de mer'), faire: () => jeu.radarFiltre() },
       })),
+    {
+      // le traceur de cartes : on change l'échelle de la carte
+      id: 'traceur',
+      point: jeu.bateau.electronique.positionTraceur.clone(),
+      rayon: 0.12,
+      titre: () => `Traceur de cartes : ${String(jeu.bateau.electronique.milles).replace('.', ',')} milles`,
+      principal: { texte: 'agrandir la carte', faire: () => jeu.zoomTraceur(-1) },
+      secondaire: { texte: 'voir plus loin', faire: () => jeu.zoomTraceur(1) },
+    },
     {
       id: 'tableau',
       point: interieur.positionTableau.clone(),

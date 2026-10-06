@@ -21,25 +21,26 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import {
-  ROUF, MAT, DESCENTE_ROUF, HUBLOTS, zDe, uDe, demiLargeurA, hauteurRouf, hauteurPont, hauteurLivet, bordInterieur,
-  bordsHublot, xCoteRouf,
+  ROUF, MAT, DESCENTE_ROUF, HUBLOTS, TIMONERIE, zDe, uDe, demiLargeurA, hauteurRouf, hauteurPont, hauteurLivet,
+  bordInterieur, bordsHublot, xCoteRouf,
 } from './forme.js';
 import { PANNEAU_PONT, tranchesCoteRouf, dansUnHublot } from './modele.js';
-import { CARRE, DESCENTE, TABLE } from '../joueur/pont.js';
+import { CARRE, TABLE, TREMIE } from '../joueur/pont.js';
+import { boite, entre, uvBois, echelleUV, teinter, bande, preparer } from './outils-geometrie.js';
+import { construireInterieurTimonerie } from './interieur-timonerie.js';
 import { texturesBoisVerni, texturesSolCabine, texturesLattes, texturesPlafond, texturesTissu } from './textures.js';
-import { ecranRadio, carteMarine, cadranBarometre, cadranPendule, angleBarometre } from './peintures.js';
+import { ecranRadio, cadranBarometre, cadranPendule, angleBarometre } from './peintures.js';
 
 // ---------- Les mesures de la cabine ----------
 const EP = 0.07; // le plafond est 7 cm sous le pont (l'épaisseur du pont et du vaigrage)
 const RETRAIT = 0.035; // le vaigrage est à 3,5 cm de la coque
 const Y_SOL = CARRE.plancher;
-const Z_ARRIERE = zDe(ROUF.uArriere) - 0.015; // la cloison arrière (celle de la descente)
+// (le carré va de la cloison avant jusqu'au pied de la timonerie : derrière, sous son
+// plancher surélevé, il n'y a plus que la machine et les coffres)
+const Z_ARRIERE = TIMONERIE.zAvant; // la contremarche du plancher de la timonerie
 const Z_AVANT = CARRE.zAvant - 0.015; // la cloison avant
 const U_ARRIERE = uDe(Z_ARRIERE);
 const U_AVANT = uDe(Z_AVANT);
-const Z_TROU = zDe(ROUF.uArriere) - DESCENTE_ROUF.longueur; // le bord avant du trou de la descente
-const U_TROU = uDe(Z_TROU);
-const Y_MARCHE = DESCENTE.marches[0][1]; // la marche du haut
 const TROU_PANNEAU = PANNEAU_PONT.trou; // l'ouverture du panneau de pont, dans le toit
 
 // Le profil tribord de la cabine dans la tranche u, du plancher au milieu du toit :
@@ -78,13 +79,11 @@ const ajouterTranches = (u0, u1, n, premier) => {
 };
 const U_PANNEAU_ARRIERE = uDe(TROU_PANNEAU.z1);
 const U_PANNEAU_AVANT = uDe(TROU_PANNEAU.z0);
-ajouterTranches(U_ARRIERE, U_TROU, 8, true);
-ajouterTranches(U_TROU, U_PANNEAU_ARRIERE, 12);
+ajouterTranches(U_ARRIERE, U_PANNEAU_ARRIERE, 10, true);
 ajouterTranches(U_PANNEAU_ARRIERE, U_PANNEAU_AVANT, 4);
 ajouterTranches(U_PANNEAU_AVANT, U_AVANT, 6);
-// les trous du plafond : la descente et le panneau de pont
-const dansUnTrou = (x, z) => (Math.abs(x) < DESCENTE_ROUF.demiLargeur && z > Z_TROU)
-  || (Math.abs(x) < TROU_PANNEAU.demiLargeur && z > TROU_PANNEAU.z0 && z < TROU_PANNEAU.z1);
+// le trou du plafond : le panneau de pont
+const dansUnTrou = (x, z) => Math.abs(x) < TROU_PANNEAU.demiLargeur && z > TROU_PANNEAU.z0 && z < TROU_PANNEAU.z1;
 const PROFILS = TRANCHES.map(profil);
 // l'abscisse de chaque point le long du profil, depuis le plancher (pour les textures)
 const ABSCISSES = PROFILS.map((pts) => {
@@ -97,15 +96,6 @@ const ABSCISSES = PROFILS.map((pts) => {
 const plafondEn = (x, z) => hauteurRouf(uDe(z), x) - EP;
 
 // ---------- Petits outils de géométrie ----------
-function boite(l, h, p, x, y, z) {
-  const g = new THREE.BoxGeometry(l, h, p);
-  g.translate(x, y, z);
-  return g;
-}
-// une boîte entre deux coins (dans n'importe quel ordre)
-function entre(x0, x1, y0, y1, z0, z1) {
-  return boite(Math.abs(x1 - x0), Math.abs(y1 - y0), Math.abs(z1 - z0), (x0 + x1) / 2, (y0 + y1) / 2, (z0 + z1) / 2);
-}
 
 // Le vaigrage de la coque à la hauteur y, à l'endroit z (son x, côté tribord). Plus haut
 // que la coque, c'est le dessous du pont : rien ne limite.
@@ -134,31 +124,6 @@ function meuble(x0, x1, y0, y1, z0, z1, nz = 10) {
   return uvBois(epouserLaCoque(g));
 }
 
-// Des coordonnées de texture en mètres (× echelle), projetées selon la face : le dessus
-// des meubles garde le fil le long du bateau, les côtés le gardent vertical
-function uvBois(g, echelle = 2) {
-  const p = g.attributes.position;
-  const n = g.attributes.normal;
-  const uv = new Float32Array(p.count * 2);
-  for (let i = 0; i < p.count; i++) {
-    const ny = Math.abs(n.getY(i));
-    const nx = Math.abs(n.getX(i));
-    if (ny > 0.5) {
-      uv[i * 2] = p.getX(i) * echelle;
-      uv[i * 2 + 1] = p.getZ(i) * echelle;
-    } else {
-      uv[i * 2] = (nx > 0.5 ? p.getZ(i) : p.getX(i)) * echelle;
-      uv[i * 2 + 1] = p.getY(i) * echelle;
-    }
-  }
-  g.setAttribute('uv', new THREE.BufferAttribute(uv, 2));
-  return g;
-}
-function echelleUV(g, k) {
-  const uv = g.attributes.uv;
-  for (let i = 0; i < uv.count; i++) uv.setXY(i, uv.getX(i) * k, uv.getY(i) * k);
-  return g;
-}
 
 // Une boîte aux arêtes adoucies (coussins)
 function coussin(l, h, p, x, y, z) {
@@ -181,15 +146,6 @@ function coussin(l, h, p, x, y, z) {
   return uvBois(epouserLaCoque(g, 0.01), 4);
 }
 
-// Colore une géométrie d'une seule couleur (pour le matériau « objets », à couleurs par sommet)
-function teinter(g, couleur) {
-  const c = new THREE.Color(couleur);
-  const n = g.attributes.position.count;
-  const col = new Float32Array(n * 3);
-  for (let i = 0; i < n; i++) c.toArray(col, i * 3);
-  g.setAttribute('color', new THREE.BufferAttribute(col, 3));
-  return g;
-}
 
 // Une partie du vaigrage, sur toute la longueur de la cabine : les points [i0..i1] du profil
 // de chaque tranche, d'un côté (cote = 1 tribord, -1 bâbord). Les textures y sont posées en
@@ -316,6 +272,25 @@ function geometrieCloison(u, z, encoche = null) {
   return g;
 }
 
+// La paroi arrière du carré (sous la timonerie) : toute la section de la cabine, du
+// plancher au plafond, percée de l'ouverture de l'escalier (à bâbord)
+function geometrieContremarche() {
+  const pts = profil(U_ARRIERE);
+  const f = new THREE.Shape();
+  const yHaut = 1.3; // (le haut de l'ouverture, sous le plafond du carré)
+  f.moveTo(TREMIE.x1, Y_SOL);
+  for (let j = 0; j <= 19; j++) f.lineTo(pts[j][0], pts[j][1]);
+  for (let j = 18; j >= 0; j--) f.lineTo(-pts[j][0], pts[j][1]);
+  f.lineTo(TREMIE.x0, Y_SOL);
+  f.lineTo(TREMIE.x0, yHaut);
+  f.lineTo(TREMIE.x1, yHaut);
+  f.lineTo(TREMIE.x1, Y_SOL);
+  const g = new THREE.ShapeGeometry(f, 2);
+  echelleUV(g, 2);
+  g.translate(0, 0, Z_ARRIERE);
+  return g;
+}
+
 // Le contour d'un hublot vu de l'intérieur (la même forme profilée que dehors), posé sur
 // le vaigrage du côté du rouf (ou sur la face extérieure du rouf). decalage : vers
 // l'intérieur de la cabine (m) ; marge : agrandit le contour (m, pour le cadre).
@@ -346,22 +321,6 @@ function contourHublot(cote, ua, ub, decalage, marge = 0, exterieur = false) {
   return { haut, bas, centre: new THREE.Vector3().addVectors(haut[n / 2], bas[n / 2]).multiplyScalar(0.5) };
 }
 
-// Une bande entre deux lignes de points (même nombre de points)
-function bande(a, b) {
-  const positions = [];
-  for (let k = 0; k < a.length; k++) positions.push(a[k].x, a[k].y, a[k].z, b[k].x, b[k].y, b[k].z);
-  const indices = [];
-  for (let k = 0; k < a.length - 1; k++) {
-    const i = k * 2;
-    indices.push(i, i + 1, i + 2, i + 1, i + 3, i + 2);
-  }
-  const g = new THREE.BufferGeometry();
-  g.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
-  g.setAttribute('uv', new THREE.Float32BufferAttribute(new Float32Array((positions.length / 3) * 2), 2));
-  g.setIndex(indices);
-  g.computeVertexNormals();
-  return g;
-}
 
 // ---------- L'éclairage de la cabine, dans ses matériaux ----------
 //
@@ -382,8 +341,18 @@ uniform vec3 uSourceDir[NB_SOURCES];
 uniform vec3 uSourceCouleur[NB_SOURCES];
 uniform vec2 uSourceForme[NB_SOURCES];
 uniform vec3 uAmbianceCabine;
+uniform vec3 uAmbianceTimonerie;
 uniform vec4 uTableCabine; // centre (x, z) et demi-dimensions de la table
 varying vec3 vPosBateau;
+
+// La timonerie et le carré sont deux pièces : le toit du rouf cache presque toute l'une
+// aux lampes de l'autre (elles ne se voient que par l'ouverture de l'escalier)
+float dansTimonerie(vec3 p) { return smoothstep(0.2, 0.32, p.z) * smoothstep(0.75, 1.0, p.y); }
+float visibiliteSource(int i, vec3 p) {
+  if (i < 5) return 1.0 - dansTimonerie(p); // (les lampes, les hublots, le panneau du carré)
+  if (i == 6) return 1.0; // (les vitres de la timonerie : il en descend un peu dans le carré)
+  return smoothstep(-0.5, 0.3, p.z); // (le plafonnier et les écrans de la timonerie)
+}
 
 // La table du carré cache les lampes au plancher et aux banquettes
 float ombreTable(vec3 p, vec3 s) {
@@ -407,14 +376,26 @@ export const GLSL_CABINE = /* glsl */ `
     float lobe = mix(max(dot(-l, uSourceDir[i]), 0.0), 1.0, uSourceForme[i].y);
     IncidentLight lumiere;
     lumiere.direction = normalize(versVue * l);
-    lumiere.color = c * lobe / (d2 + uSourceForme[i].x) * ombreTable(vPosBateau, uSourcePos[i]);
+    lumiere.color = c * lobe / (d2 + uSourceForme[i].x) * ombreTable(vPosBateau, uSourcePos[i]) * visibiliteSource(i, vPosBateau);
     lumiere.visible = true;
     RE_Direct(lumiere, geometryPosition, geometryNormal, geometryViewDir, geometryClearcoatNormal, material, reflectedLight);
   }
   float occlusion = mix(0.42, 1.0, smoothstep(-0.32, 0.65, vPosBateau.y));
-  irradiance += uAmbianceCabine * occlusion;
+  float zoneTimonerie = smoothstep(0.2, 0.32, vPosBateau.z) * smoothstep(0.45, 0.8, vPosBateau.y);
+  irradiance += mix(uAmbianceCabine, uAmbianceTimonerie, zoneTimonerie) * occlusion;
 }
 `;
+
+// (la même chose qu'en GLSL, pour mesurer la lumière d'une pièce)
+const lisse = (e0, e1, x) => {
+  const t = Math.min(1, Math.max(0, (x - e0) / (e1 - e0)));
+  return t * t * (3 - 2 * t);
+};
+function visibiliteSource(i, p) {
+  if (i < 5) return 1 - lisse(0.2, 0.32, p.z) * lisse(0.75, 1.0, p.y);
+  if (i === 6) return 1;
+  return lisse(-0.5, 0.3, p.z);
+}
 
 function eclairerDansLaCabine(materiau, uniforms) {
   materiau.onBeforeCompile = (shader) => {
@@ -426,7 +407,7 @@ function eclairerDansLaCabine(materiau, uniforms) {
       .replace('#include <common>', `#include <common>\n${GLSL_CABINE_DECLARATIONS}`)
       .replace('#include <lights_fragment_end>', `${GLSL_CABINE}\n#include <lights_fragment_end>`);
   };
-  materiau.customProgramCacheKey = () => 'cabine-v1';
+  materiau.customProgramCacheKey = () => 'cabine-v2';
   return materiau;
 }
 
@@ -450,6 +431,7 @@ export class Interieur {
       uSourceCouleur: { value: Array.from({ length: NB_SOURCES }, () => new THREE.Color(0, 0, 0)) },
       uSourceForme: { value: Array.from({ length: NB_SOURCES }, () => new THREE.Vector2(0.05, 0)) },
       uAmbianceCabine: { value: new THREE.Color(0, 0, 0) },
+      uAmbianceTimonerie: { value: new THREE.Color(0, 0, 0) },
       uTableCabine: { value: new THREE.Vector4(0, (TABLE.z0 + TABLE.z1) / 2, TABLE.demiLargeur + 0.015, (TABLE.z1 - TABLE.z0) / 2) },
     };
 
@@ -517,42 +499,7 @@ export class Interieur {
     ajouter(cotesDuRouf(), mat.bois, 'cotes-du-rouf');
     ajouter(geometriePlancher(), mat.sol, 'plancher');
     boisGeos.push(geometrieCloison(U_AVANT, Z_AVANT));
-    boisGeos.push(geometrieCloison(U_ARRIERE, Z_ARRIERE, Y_MARCHE));
-
-    // --- la descente : les marches (deux blocs), la contremarche jusqu'au seuil, les
-    // montants de la porte et l'encadrement du trou dans le toit ---
-    const d = DESCENTE_ROUF.demiLargeur;
-    const zCloison = zDe(ROUF.uArriere);
-    boisGeos.push(uvBois(entre(-0.3, 0.3, Y_SOL, Y_MARCHE, DESCENTE.marches[0][0], Z_ARRIERE)));
-    boisGeos.push(uvBois(entre(-0.3, 0.3, Y_SOL, DESCENTE.marches[1][1], DESCENTE.marches[1][0], DESCENTE.marches[0][0])));
-    for (const [z, y] of DESCENTE.marches) {
-      // les bandes antidérapantes au nez des marches
-      for (const dz of [0.03, 0.07]) noirGeos.push(entre(-0.25, 0.25, y, y + 0.004, z + dz - 0.012, z + dz + 0.012));
-    }
-    boisGeos.push(uvBois(entre(-d - 0.01, d + 0.01, Y_MARCHE, DESCENTE_ROUF.seuil, Z_ARRIERE - 0.002, zCloison + 0.004)));
-    for (const s of [1, -1]) {
-      boisGeos.push(uvBois(entre(s * d - 0.012, s * d + 0.012, Y_MARCHE, plafondEn(d, Z_ARRIERE) + EP, Z_ARRIERE - 0.02, zCloison + 0.004)));
-    }
-    // l'encadrement du trou du toit : de la surface du toit jusqu'au plafond
-    const nE = 8;
-    const devant = [];
-    const devantBas = [];
-    for (let k = 0; k <= nE; k++) {
-      const x = -d + (2 * d * k) / nE;
-      devant.push(new THREE.Vector3(x, hauteurRouf(U_TROU, x) + 0.002, Z_TROU));
-      devantBas.push(new THREE.Vector3(x, hauteurRouf(U_TROU, x) - EP - 0.002, Z_TROU));
-    }
-    boisGeos.push(uvBois(bande(devant, devantBas)));
-    for (const s of [1, -1]) {
-      const haut = [];
-      const bas = [];
-      for (let k = 0; k <= nE; k++) {
-        const z = Z_TROU + ((zCloison - Z_TROU) * k) / nE;
-        haut.push(new THREE.Vector3(s * d, hauteurRouf(uDe(z), d) + 0.002, z));
-        bas.push(new THREE.Vector3(s * d, hauteurRouf(uDe(z), d) - EP - 0.002, z));
-      }
-      boisGeos.push(uvBois(bande(haut, bas)));
-    }
+    boisGeos.push(geometrieContremarche());
 
     // --- les banquettes : coffres, coussins, dossiers ; derrière, l'étagère et ses livres ---
     const coussins = [];
@@ -609,126 +556,7 @@ export class Interieur {
     epontille.translate(0, (yToit + Y_SOL) / 2, zDe(MAT.u));
     ajouter(epontille, mat.alu, 'epontille');
 
-    // --- la table à cartes (tribord) : le pupitre, la carte, le panneau des instruments ---
-    // (le panneau est sous le passavant, mais assez près du carré pour qu'on voie la radio
-    // et le tableau électrique debout, par-dessous le pied du rouf)
-    const zC0 = 0.17;
-    const zC1 = 0.99;
-    const X_PANNEAU = 0.95;
-    const yPanneau = Math.min(hauteurPont(uDe(zC0), X_PANNEAU), hauteurPont(uDe(zC1), X_PANNEAU)) - EP;
-    boisGeos.push(meuble(0.58, X_PANNEAU, 0.5, 0.54, zC0, zC1));
-    boisGeos.push(meuble(0.6, 1.16, Y_SOL, 0.5, zC0 + 0.02, zC1));
-    boisGeos.push(meuble(0.575, 0.595, 0.54, 0.565, zC0, zC1));
-    boisGeos.push(meuble(X_PANNEAU, X_PANNEAU + 0.03, 0.54, yPanneau, zC0, zC1));
-    // la carte, pliée en quatre sur le pupitre, et un crayon
-    const carte = new THREE.Mesh(new THREE.PlaneGeometry(0.42, 0.31), garder(new THREE.MeshStandardMaterial({ map: carteMarine(), roughness: 0.92 })));
-    carte.geometry.rotateX(-Math.PI / 2);
-    carte.geometry.rotateY(-Math.PI / 2);
-    carte.position.set(0.77, 0.5415, 0.42);
-    carte.receiveShadow = true;
-    carte.name = 'carte-marine';
-    this.groupe.add(carte);
-    const crayon = new THREE.CylinderGeometry(0.0045, 0.0045, 0.16, 6);
-    crayon.rotateX(Math.PI / 2);
-    crayon.rotateY(0.5);
-    crayon.translate(0.7, 0.547, 0.68);
-    objets.push(teinter(crayon, 0x2f6b3a));
-
-    // la radio VHF, posée contre le panneau, tournée vers le carré
-    this.radio = ecranRadio();
-    const radio = new THREE.Group();
-    const boitier = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.08, 0.14), mat.noir);
-    const ecran = new THREE.Mesh(new THREE.PlaneGeometry(0.12, 0.045), new THREE.MeshStandardMaterial({
-      color: 0x000000, emissive: 0xffffff, emissiveMap: this.radio.texture, emissiveIntensity: 0.9, roughness: 0.2,
-    }));
-    ecran.position.set(-0.02, 0.005, 0.0705);
-    const combine = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.1, 0.03), mat.noir);
-    combine.position.set(0.12, -0.02, 0.06);
-    radio.add(boitier, ecran, combine);
-    radio.rotation.y = -Math.PI / 2;
-    radio.position.set(X_PANNEAU - 0.07, 0.65, 0.62);
-    this.groupe.add(radio);
-    this.positionRadio = radio.position.clone();
-
-    // le tableau électrique : interrupteurs et voyants (feux de navigation, éclairage)
-    const xT = X_PANNEAU - 0.008;
-    const tableau = new THREE.Mesh(new THREE.BoxGeometry(0.016, 0.16, 0.24), mat.noir);
-    tableau.position.set(xT, 0.66, 0.86);
-    this.groupe.add(tableau);
-    this.positionTableau = tableau.position.clone();
-    for (let k = 0; k < 6; k++) {
-      inoxGeos.push(boite(0.014, 0.02, 0.012, xT - 0.014, 0.7 - Math.floor(k / 3) * 0.055, 0.79 + (k % 3) * 0.045));
-    }
-    this.voyants = [0, 1].map((i) => {
-      const v = new THREE.Mesh(new THREE.CircleGeometry(0.008, 12), new THREE.MeshBasicMaterial({ color: 0x331111 }));
-      v.rotation.y = -Math.PI / 2;
-      v.position.set(xT - 0.01, 0.7 - i * 0.055, 0.94);
-      this.groupe.add(v);
-      return v;
-    });
-
-    // le baromètre et la pendule, côte à côte sur la cloison avant (bâbord) : on les voit de
-    // tout le carré. Avant la tempête, l'aiguille du baromètre descend…
-    const instrument = (x, texture, nom) => {
-      const z = Z_AVANT;
-      const bord = new THREE.CylinderGeometry(0.06, 0.06, 0.03, 32);
-      bord.rotateX(Math.PI / 2);
-      bord.translate(x, 1.0, z + 0.015);
-      inoxGeos.push(bord);
-      const face = new THREE.Mesh(new THREE.CircleGeometry(0.051, 32), garder(new THREE.MeshStandardMaterial({ map: texture, roughness: 0.3 })));
-      face.position.set(x, 1.0, z + 0.031);
-      face.name = nom;
-      this.groupe.add(face);
-      const centre = new THREE.Group();
-      centre.position.set(x, 1.0, z + 0.034);
-      this.groupe.add(centre);
-      return centre;
-    };
-    const barometre = instrument(-0.24, cadranBarometre(), 'barometre');
-    const pendule = instrument(-0.4, cadranPendule(), 'pendule');
-    const aiguille = (parent, longueur, largeur) => {
-      const g = new THREE.BoxGeometry(largeur, longueur, 0.002);
-      g.translate(0, longueur * 0.42, 0);
-      const a = new THREE.Mesh(g, new THREE.MeshBasicMaterial({ color: 0x1a1a1a }));
-      parent.add(a);
-      return a;
-    };
-    this.aiguilles = {
-      pression: aiguille(barometre, 0.048, 0.003),
-      heures: aiguille(pendule, 0.03, 0.004),
-      minutes: aiguille(pendule, 0.043, 0.0028),
-    };
-
-    // --- la cuisine (bâbord) : le meuble, le plan de travail, l'évier, le réchaud ---
-    boisGeos.push(meuble(-1.16, -0.58, Y_SOL, 0.56, zC0 + 0.02, zC1));
-    ajouter(epouserLaCoque(entre(-1.16, -0.56, 0.56, 0.6, zC0, zC1)), mat.plan, 'plan-de-travail');
-    boisGeos.push(meuble(-0.585, -0.56, 0.6, 0.625, zC0, zC1));
-    boisGeos.push(meuble(-1.17, -1.14, 0.6, yPanneau, zC0, zC1));
-    inoxGeos.push(entre(-1.0, -0.72, 0.6, 0.604, 0.62, 0.9));
-    noirGeos.push(entre(-0.98, -0.74, 0.604, 0.606, 0.64, 0.88));
-    const robinet = new THREE.CylinderGeometry(0.01, 0.012, 0.14, 10);
-    robinet.translate(-1.06, 0.67, 0.76);
-    const bec = new THREE.CylinderGeometry(0.008, 0.008, 0.12, 8);
-    bec.rotateZ(Math.PI / 2);
-    bec.translate(-1.0, 0.735, 0.76);
-    inoxGeos.push(robinet, bec);
-    // le réchaud (sur cardan, pour rester horizontal quand le bateau gîte) et la bouilloire
-    noirGeos.push(entre(-1.1, -0.66, 0.6, 0.7, 0.2, 0.54));
-    for (const z of [0.29, 0.45]) {
-      const feu = new THREE.TorusGeometry(0.05, 0.006, 6, 24);
-      feu.rotateX(Math.PI / 2);
-      feu.translate(-0.88, 0.703, z);
-      inoxGeos.push(feu);
-    }
-    for (const z of [0.2, 0.535]) inoxGeos.push(entre(-1.1, -0.66, 0.73, 0.738, z, z + 0.008));
-    const bouilloire = new THREE.LatheGeometry([[0, 0], [0.072, 0], [0.082, 0.025], [0.08, 0.1], [0.058, 0.138], [0.026, 0.152], [0.022, 0.168], [0, 0.17]].map(([r, y]) => new THREE.Vector2(r, y)), 24);
-    bouilloire.translate(-0.88, 0.706, 0.29);
-    const verseur = new THREE.CylinderGeometry(0.008, 0.014, 0.09, 8);
-    verseur.rotateZ(0.9);
-    verseur.translate(-0.81, 0.79, 0.29);
-    inoxGeos.push(bouilloire, verseur);
-
-    // --- les portes : cabine avant, cabines arrière ---
+    // --- la porte de la cabine avant ---
     const porte = (x0, x1, y0, y1, z, sens) => {
       boisGeos.push(meuble(x0, x1, y0, y1, z, z + sens * 0.025, 1));
       // l'encadrement : trois baguettes
@@ -750,52 +578,12 @@ export class Interieur {
     };
     // (la porte avant est décalée sur tribord : l'épontille est au milieu)
     porte(0.1, 0.53, Y_SOL + 0.05, Y_SOL + 1.38, Z_AVANT, 1);
-    porte(0.45, 0.85, Y_SOL + 0.04, 0.72, Z_ARRIERE, -1);
-    porte(-0.85, -0.45, Y_SOL + 0.04, 0.72, Z_ARRIERE, -1);
-
-    // --- le ciré jaune, pendu à la porte bâbord, et l'extincteur, à tribord des marches ---
-    const profilCire = [[0.02, 0], [0.17, -0.02], [0.2, -0.1], [0.215, -0.4], [0.23, -0.72], [0.2, -0.76], [0, -0.76]].map(([r, y]) => new THREE.Vector2(r, y));
-    const cire = new THREE.LatheGeometry(profilCire, 18);
-    cire.scale(1, 1, 0.42);
-    cire.translate(-0.62, 1.1, Z_ARRIERE - 0.1);
-    const capuche = new THREE.SphereGeometry(0.11, 14, 10);
-    capuche.scale(1, 1.15, 0.6);
-    capuche.translate(-0.62, 1.08, Z_ARRIERE - 0.07);
-    const manches = [1, -1].map((s) => {
-      const g = new THREE.CylinderGeometry(0.05, 0.06, 0.55, 10);
-      g.rotateZ(s * 0.12);
-      g.translate(-0.62 + s * 0.21, 0.78, Z_ARRIERE - 0.11);
-      return g;
-    });
-    const bandeCire = new THREE.CylinderGeometry(0.218, 0.222, 0.035, 18, 1, true);
-    bandeCire.scale(1, 1, 0.42);
-    bandeCire.translate(-0.62, 0.62, Z_ARRIERE - 0.1);
-    // (un objet à part : quand on l'enfile, il quitte son crochet)
-    this.cire = new THREE.Mesh(mergeGeometries([
-      ...[cire, capuche, ...manches].map((g) => teinter(g, 0xf0b400)),
-      teinter(bandeCire, 0xb9bec4),
-    ].map((g) => preparer(g, ['color']))), mat.objets);
-    this.cire.name = 'cire-et-gilet';
-    this.cire.castShadow = true;
-    this.cire.receiveShadow = true;
-    this.groupe.add(this.cire);
-    this.positionCire = new THREE.Vector3(-0.62, 0.8, Z_ARRIERE - 0.1);
-    const crochet = new THREE.CylinderGeometry(0.008, 0.008, 0.06, 6);
-    crochet.rotateX(Math.PI / 2);
-    crochet.translate(-0.62, 1.12, Z_ARRIERE - 0.03);
-    inoxGeos.push(crochet);
-    const extincteur = new THREE.CylinderGeometry(0.04, 0.04, 0.3, 16);
-    extincteur.translate(0.385, 0.36, Z_ARRIERE - 0.055);
-    objets.push(teinter(extincteur, 0xc0201a));
-    const tete = new THREE.CylinderGeometry(0.018, 0.026, 0.05, 12);
-    tete.translate(0.385, 0.535, Z_ARRIERE - 0.055);
-    noirGeos.push(tete, entre(0.36, 0.41, 0.3, 0.33, Z_ARRIERE - 0.02, Z_ARRIERE));
 
     // --- les mains courantes du plafond, pour se tenir quand ça bouge ---
     for (const s of [1, -1]) {
       const pts = [];
       for (let k = 0; k <= 12; k++) {
-        const z = 0.6 - (1.78 * k) / 12;
+        const z = 0.15 - (1.33 * k) / 12;
         pts.push(new THREE.Vector3(s * 0.4, plafondEn(0.4, z) - 0.07, z));
       }
       boisGeos.push(uvBois(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts), 40, 0.016, 8, false), 4));
@@ -806,7 +594,7 @@ export class Interieur {
     }
 
     // --- les plafonniers ---
-    this.lampes = [0.25, -1.05].map((z) => {
+    this.lampes = [-0.12, -1.05].map((z) => {
       const y = plafondEn(0, z);
       const dome = new THREE.SphereGeometry(0.075, 24, 8, 0, Math.PI * 2, Math.PI / 2, Math.PI / 2);
       dome.scale(1, 0.45, 1);
@@ -864,14 +652,38 @@ export class Interieur {
       boisGeos.push(uvBois(entre(-w - 0.015, w + 0.015, yP - 0.03, yP + 0.012, zBord - 0.035 * s, zBord + 0.015 * s)));
     }
 
-    // le dessous du capot coulissant (on le voit par le trou du toit, descente fermée) :
-    // une doublure de bois, qui glisse avec lui
-    if (bateau.capot) {
-      const yCapot = hauteurRouf(ROUF.uArriere + 0.04, 0) - 0.003;
-      const doublure = new THREE.Mesh(uvBois(boite(0.74, 0.004, 0.8, 0, yCapot, zCloison - 0.4)), mat.bois);
-      doublure.name = 'doublure-capot';
-      bateau.capot.add(doublure);
-    }
+    // --- le ciré jaune et le gilet, pendus au pied de l'escalier (à tribord de l'ouverture) ---
+    const xC = 0.34;
+    const zC = Z_ARRIERE - 0.095;
+    const profilCire = [[0.02, 0], [0.17, -0.02], [0.2, -0.1], [0.215, -0.4], [0.23, -0.72], [0.2, -0.76], [0, -0.76]].map(([r, y]) => new THREE.Vector2(r, y));
+    const cireG = new THREE.LatheGeometry(profilCire, 18);
+    cireG.scale(1, 1, 0.42);
+    cireG.translate(xC, 1.1, zC);
+    const capuche = new THREE.SphereGeometry(0.11, 14, 10);
+    capuche.scale(1, 1.15, 0.6);
+    capuche.translate(xC, 1.08, zC + 0.03);
+    const manches = [1, -1].map((s) => new THREE.CylinderGeometry(0.05, 0.06, 0.55, 10).rotateZ(s * 0.12).translate(xC + s * 0.21, 0.78, zC - 0.01));
+    const bandeCire = new THREE.CylinderGeometry(0.218, 0.222, 0.035, 18, 1, true);
+    bandeCire.scale(1, 1, 0.42);
+    bandeCire.translate(xC, 0.62, zC);
+    this.cire = new THREE.Mesh(mergeGeometries([
+      ...[cireG, capuche, ...manches].map((g) => teinter(g, 0xf0b400)),
+      teinter(bandeCire, 0xb9bec4),
+    ].map((g) => preparer(g, ['color']))), mat.objets);
+    this.cire.name = 'cire-et-gilet';
+    this.cire.castShadow = true;
+    this.cire.receiveShadow = true;
+    this.groupe.add(this.cire);
+    this.positionCire = new THREE.Vector3(xC, 0.8, zC);
+    inoxGeos.push(new THREE.CylinderGeometry(0.008, 0.008, 0.06, 6).rotateX(Math.PI / 2).translate(xC, 1.12, Z_ARRIERE - 0.03));
+
+    // --- la timonerie (interieur-timonerie.js) : son plancher, son escalier, la console, le
+    // siège de quart, la cuisine, la VHF et le tableau électrique… ---
+    this.radio = ecranRadio();
+    construireInterieurTimonerie(this, {
+      mat, garder, ajouter, boisGeos, inoxGeos, noirGeos, objets,
+      cadrans: { barometre: cadranBarometre(), pendule: cadranPendule() },
+    });
 
     // tout le bois verni en un seul objet ; de même pour l'inox, le noir et les objets
     ajouter(mergeGeometries(boisGeos.map((g) => preparer(g, ['uv']))), mat.bois, 'boiseries');
@@ -886,17 +698,21 @@ export class Interieur {
       u.uSourceDir.value[i].copy(direction).normalize();
       u.uSourceForme.value[i].copy(forme);
     };
+    // 0, 1 : les plafonniers du carré ; 2, 3 : ses deux hublots ; 4 : le panneau de pont ;
+    // 5 : le plafonnier de la timonerie ; 6 : ses vitres (le jour, la timonerie est pleine de
+    // lumière, et il en descend un peu dans le carré) ; 7 : la lueur des écrans de la console
     this.lampes.forEach((l, i) => placer(i, l.position, new THREE.Vector3(0, -1, 0), new THREE.Vector2(0.03, 0.35)));
     // (un hublot éclaire aussi vers le haut : la lumière renvoyée par la mer et le pont)
     this.hublots.forEach((h, i) => placer(2 + i, h.position, h.direction, new THREE.Vector2(0.04, 0.15)));
-    // la descente : au milieu de la partie du toit que le capot découvre
-    const zOuvert = zCloison + 0.02 - DESCENTE_ROUF.course;
-    const zD = (zOuvert + zCloison) / 2;
-    placer(6, new THREE.Vector3(0, plafondEn(0, zD) + EP, zD), new THREE.Vector3(0, -1, -0.45), new THREE.Vector2(0.2, 0.05));
-    placer(7, new THREE.Vector3(0, yP + EP * 0.5, zP), new THREE.Vector3(0, -1, 0), new THREE.Vector2(0.06, 0.05));
+    placer(4, new THREE.Vector3(0, yP + EP * 0.5, zP), new THREE.Vector3(0, -1, 0), new THREE.Vector2(0.06, 0.05));
+    placer(5, this.lampeTimonerie.position, new THREE.Vector3(0, -1, 0), new THREE.Vector2(0.03, 0.35));
+    placer(6, new THREE.Vector3(0, 1.95, 0.86), new THREE.Vector3(0, -1, 0), new THREE.Vector2(0.45, 0.6));
+    placer(7, new THREE.Vector3(0.49, 1.36, 0.52), new THREE.Vector3(0, 0.45, 0.89), new THREE.Vector2(0.02, 0.15));
     // où l'on mesure la lumière de la cabine (pour l'œil qui s'habitue) : au milieu du carré
     this.pointMesure = new THREE.Vector3(0, 0.6, -0.3);
+    this.pointMesureTimonerie = new THREE.Vector3(0, 1.6, 0.95);
     this.luminance = 0;
+    this.luminanceTimonerie = 0;
 
     this.eclairage = 'eteint';
     this._ciel = new THREE.Color();
@@ -941,40 +757,53 @@ export class Interieur {
     L.g += eclair * 0.65;
     L.b += eclair * 0.8;
     const lampe = eclairage === 'blanc' ? LAMPE_BLANCHE : eclairage === 'rouge' ? LAMPE_ROUGE : NOIR;
-    for (let i = 0; i < 2; i++) {
-      S[i].copy(lampe);
-      this.lampes[i].diffuseur.material.emissive.copy(lampe).multiplyScalar(3.2);
+    // (le plafonnier de la timonerie est plus faible : on y veille la nuit, il ne doit pas
+    // éblouir — on garde sa vision de nuit pour voir dehors, par les vitres ; en rouge, ce
+    // n'est plus qu'une veilleuse : le bois sombre, les écrans pour seule vraie lumière)
+    const kTimonerie = eclairage === 'rouge' ? 0.12 : 0.35;
+    for (const [i, l, k] of [[0, this.lampes[0], 1], [1, this.lampes[1], 1], [5, this.lampeTimonerie, kTimonerie]]) {
+      S[i].copy(lampe).multiplyScalar(k);
+      l.diffuseur.material.emissive.copy(lampe).multiplyScalar(3.2 * k);
     }
-    // les hublots (≈ 4 dm² de vitre chacun), la descente (le trou du toit et la porte, qui
-    // voient surtout le ciel) et le panneau de pont (un plexiglas fumé : 35 % passe)
-    for (let i = 2; i < 6; i++) S[i].copy(L).multiplyScalar(0.07);
-    S[6].copy(L).multiplyScalar(0.03 + 0.9 * descente);
-    S[7].copy(L).multiplyScalar(0.18 * 0.6);
+    // les hublots du carré (≈ 4 dm² de vitre chacun), le panneau de pont (un plexiglas fumé :
+    // 35 % passe), les grandes vitres de la timonerie (et sa porte, quand elle est ouverte)
+    S[2].copy(L).multiplyScalar(0.07);
+    S[3].copy(L).multiplyScalar(0.07);
+    S[4].copy(L).multiplyScalar(0.18 * 0.6);
+    S[6].copy(L).multiplyScalar(0.5 + 0.08 * descente);
+    // (les écrans de la console : une faible lueur verte, toujours là)
+    S[7].setRGB(0.0012, 0.004, 0.0028);
 
-    // la lumière qui arrive au milieu du carré, et celle que renvoient les murs crème
-    const pm = this.pointMesure;
-    let r = 0;
-    let g = 0;
-    let b = 0;
-    for (let i = 0; i < NB_SOURCES; i++) {
-      const p = u.uSourcePos.value[i];
-      const dx = pm.x - p.x;
-      const dy = pm.y - p.y;
-      const dz = pm.z - p.z;
-      const d2 = dx * dx + dy * dy + dz * dz;
-      const dir = u.uSourceDir.value[i];
-      const cos = Math.max(0, (dx * dir.x + dy * dir.y + dz * dir.z) / Math.sqrt(d2));
-      const forme = u.uSourceForme.value[i];
-      const k = (forme.y + (1 - forme.y) * cos) / (d2 + forme.x);
-      r += S[i].r * k;
-      g += S[i].g * k;
-      b += S[i].b * k;
-    }
+    // la lumière qui arrive au milieu du carré et au milieu de la timonerie, et celle que
+    // renvoient les murs crème
+    const mesurer = (pm) => {
+      const c = [0, 0, 0];
+      for (let i = 0; i < NB_SOURCES; i++) {
+        const p = u.uSourcePos.value[i];
+        const dx = pm.x - p.x;
+        const dy = pm.y - p.y;
+        const dz = pm.z - p.z;
+        const d2 = dx * dx + dy * dy + dz * dz;
+        const dir = u.uSourceDir.value[i];
+        const cos = Math.max(0, (dx * dir.x + dy * dir.y + dz * dir.z) / Math.sqrt(d2));
+        const forme = u.uSourceForme.value[i];
+        const k = (forme.y + (1 - forme.y) * cos) / (d2 + forme.x) * visibiliteSource(i, pm);
+        c[0] += S[i].r * k;
+        c[1] += S[i].g * k;
+        c[2] += S[i].b * k;
+      }
+      return c;
+    };
+    const [r, g, b] = mesurer(this.pointMesure);
+    const timonerie = mesurer(this.pointMesureTimonerie);
     // (renvoyée par une cabine de bois verni : la lumière d'ambiance est plus chaude)
     u.uAmbianceCabine.value.setRGB(r * 0.6, g * 0.54, b * 0.45);
+    u.uAmbianceTimonerie.value.setRGB(timonerie[0] * 0.6, timonerie[1] * 0.54, timonerie[2] * 0.45);
     // (une lumière très colorée, comme le rouge, compte un peu plus que sa luminance :
     // sinon l'œil s'y habituerait jusqu'à voir la cabine en plein jour… rouge)
-    this.luminance = 1.45 * Math.max(0.2126 * r + 0.7152 * g + 0.0722 * b, 0.45 * Math.max(r, g, b));
+    const luminance = ([cr, cg, cb]) => 1.45 * Math.max(0.2126 * cr + 0.7152 * cg + 0.0722 * cb, 0.45 * Math.max(cr, cg, cb));
+    this.luminance = luminance([r, g, b]);
+    this.luminanceTimonerie = luminance(timonerie);
 
     // les voyants du tableau, l'aiguille du baromètre, les aiguilles de la pendule
     this.voyants[0].material.color.set(feux ? 0x30ff60 : 0x331111);
@@ -986,9 +815,10 @@ export class Interieur {
   }
 
   // L'exposition qui convient à la cabine (l'œil qui s'habitue) : comme dehors, plus il
-  // fait sombre, plus on ouvre… mais pas sans limite (la nuit, une cabine éteinte reste noire)
-  exposition(nuit) {
-    const e = 1.8 / Math.pow(this.luminance + 0.002, 0.72);
+  // fait sombre, plus on ouvre… mais pas sans limite (la nuit, une cabine éteinte reste noire).
+  // timonerie : on y est (sa lumière à elle)
+  exposition(nuit, timonerie = false) {
+    const e = 1.8 / Math.pow((timonerie ? this.luminanceTimonerie : this.luminance) + 0.002, 0.72);
     return THREE.MathUtils.clamp(e, 0.6, THREE.MathUtils.lerp(9, 3.2, nuit));
   }
 }
@@ -999,14 +829,3 @@ function hasardFixe(n) {
   return x - Math.floor(x);
 }
 
-// Pour fusionner des géométries, elles doivent toutes avoir les mêmes attributs (et
-// toutes, ou aucune, des indices) : on garde la position, la normale et ce qu'on demande
-function preparer(g, garder) {
-  const h = g.index ? g.toNonIndexed() : g;
-  for (const nom of Object.keys(h.attributes)) {
-    if (nom !== 'position' && nom !== 'normal' && !garder.includes(nom)) h.deleteAttribute(nom);
-  }
-  if (!h.attributes.normal) h.computeVertexNormals();
-  if (garder.includes('uv') && !h.attributes.uv) h.setAttribute('uv', new THREE.BufferAttribute(new Float32Array(h.attributes.position.count * 2), 2));
-  return h;
-}

@@ -34,7 +34,7 @@ export const CHAPITRES = [
     id: 'crepuscule', titre: 'Le crépuscule', de: HEURE_COUCHER, a: 21, duree: 190,
     dire: [
       `${NOM_BATEAU}, ici ${JOS}, sur le soixante-douze. Le soleil est couché, la nuit va être longue. Mais ton bateau est solide, et toi aussi.`,
-      'Rappelle-toi : moins de toile, les vagues sur l\'arrière, le harnais toujours accroché et la descente fermée. Je veille toute la nuit.',
+      'Rappelle-toi : moins de toile, les vagues sur l\'arrière, le harnais toujours accroché et la porte de la timonerie fermée. Je veille toute la nuit.',
     ],
   },
   {
@@ -67,7 +67,7 @@ const MOMENTS = [
   { heure: 28.9, dire: ['Regarde vers l\'ouest : on revoit des étoiles. Le plus dur est derrière toi.'] },
   { heure: 29.55, dire: ['À l\'est, le ciel pâlit. Encore un petit effort.'] },
   // (à la fin de la liste : les nuits gardées avant le radar retrouvent leurs moments)
-  { heure: 20.9, dire: ['Une chose encore : la nuit, regarde ton radar. L\'écran est à la table à cartes, et il y en a un petit dans le cockpit, au-dessus du compas.', 'Tu y verras les grains arriver, et les bateaux. Ce qui est près de toi, c\'est le fouillis des vagues : ne t\'en inquiète pas.'] },
+  { heure: 20.9, dire: ['Une chose encore : la nuit, regarde ton radar. L\'écran est sur la console de la timonerie, et il y en a un petit dans le cockpit, au-dessus du compas.', 'Tu y verras les grains arriver, et les bateaux. Ce qui est près de toi, c\'est le fouillis des vagues : ne t\'en inquiète pas. Et de la timonerie, tu peux tenir ton cap au pilote, à l\'abri.'] },
 ];
 
 // La difficulté (l'atelier de la tempête sert à la régler)
@@ -317,7 +317,7 @@ export class Nuit {
       const prise = angle < 90 ? 0.15 + 0.85 * Math.sin(r) : 0.75 + 0.25 * Math.sin(r);
       const litres = frappe.force * prise * 380;
       this.eau.cockpit = Math.min(EAU.cockpitMax, this.eau.cockpit + litres);
-      // (et un peu passe toujours en bas : autour des planches, par les aérateurs)
+      // (et un peu passe toujours à l'intérieur : sous la porte, par les aérateurs)
       this.eau.cale += frappe.force * prise * (ctx.aBord.descenteOuverte ? 70 : 6);
       this.stats.deferlantes++;
       this.suiviCoup = { t: 4, gite: 0, force: frappe.force, angle, prise };
@@ -441,7 +441,7 @@ export class Nuit {
       },
       pilote: {
         journal: 'Le pilote automatique a lâché.',
-        dire: ['Ton pilote a lâché ? Dans cette mer, il force trop, ça arrive.', 'Prends la barre d\'abord. Ensuite, tu pourras réarmer son disjoncteur, au tableau électrique, en bas.'],
+        dire: ['Ton pilote a lâché ? Dans cette mer, il force trop, ça arrive.', 'Prends la barre d\'abord. Ensuite, tu pourras réarmer son disjoncteur, au tableau électrique de la timonerie.'],
       },
     }[nom];
     if (nom === 'ecouteFoc') p.ecouteFocLibre = true;
@@ -625,7 +625,7 @@ export class Nuit {
     this.ecrire('Un cargo en route de collision.');
     this.dire([
       `${NOM_BATEAU}, ici ${JOS}. Je vois sur mon radar un cargo à ${milles < 1.3 ? 'un mille' : `${Math.round(milles)} milles`} de toi, ${directionRelative(ecartAngle(releve, ctx.m.cap))}. Il fait route au ${directionEnMots(cap)}, droit sur toi.`,
-      'Dans cette mer, il ne t\'a sûrement pas vu. Appelle-le sur le canal seize : la radio, en bas, à la table à cartes ! Tu le verras aussi sur ton radar.',
+      'Dans cette mer, il ne t\'a sûrement pas vu. Appelle-le sur le canal seize : la radio, dans la timonerie, à droite du siège ! Tu le verras aussi sur ton radar.',
     ], { urgent: true });
     this.emettre('cargo', c);
   }
@@ -805,7 +805,7 @@ export class Nuit {
       { id: 'focBat', apres: 8, repos: 30, si: (ctx) => this.avaries.ecouteFoc === 'cassee' && ctx.physique.deroule > 0.05, dire: 'Roule ce foc qui bat, vite ! À la barre, touche C.' },
       { id: 'gvDechiree', apres: 10, repos: 40, si: (ctx) => this.avaries.grandVoile === 'dechiree' && ctx.physique.ris < 3, dire: 'Ta grand-voile déchirée bat au vent : affale-la, au pied du mât.' },
       { id: 'pompe', apres: 3, repos: 45, si: () => this.eau.cale > 230, dire: () => `Tu as ${this.eau.cale > 700 ? 'beaucoup d\'eau' : 'de l\'eau'} dans le bateau. Pompe ! La pompe de cale est dans le cockpit, à bâbord.` },
-      { id: 'descente', apres: 8, repos: 45, si: (ctx) => this.meteo.vent >= 27 && ctx.aBord.descenteOuverte, dire: 'Ferme la descente ! Si une vague remplit le cockpit, tout descendra dans la cabine.' },
+      { id: 'descente', apres: 8, repos: 45, si: (ctx) => this.meteo.vent >= 27 && ctx.aBord.descenteOuverte, dire: 'Ferme la porte de la timonerie ! Si une vague remplit le cockpit, tout entrera à l\'intérieur.' },
       { id: 'toile', apres: 8, repos: 50, si: (ctx) => this.meteo.vent >= 29 && !toileOk(ctx.physique) && this.avaries.grandVoile === 'ok', dire: 'Tu as trop de toile pour ce vent ! Deux ris dans la grand-voile, au pied du mât, et roule ton foc presque entièrement.' },
       { id: 'travers', apres: 14, repos: 45, si: (ctx) => this.meteo.vent >= 30 && Math.abs(Math.abs(ctx.m.angleVentReel) - 90) < 28, dire: 'Tu prends les vagues de travers : c\'est comme ça qu\'on se fait coucher ! Abats, mets-les un peu sur l\'arrière.' },
       { id: 'affaler', apres: 25, repos: 120, si: (ctx) => this.meteo.vent >= 34 && ctx.physique.ris < 3 && this.avaries.grandVoile === 'ok', dire: 'Le vent passe les trente-cinq nœuds. Affale la grand-voile : au pied du mât, descends-la entièrement, et fuis sous un mouchoir de foc. Avec la grand-voile, la moindre déferlante te fera partir au lof.' },
