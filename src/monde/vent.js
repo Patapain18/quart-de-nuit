@@ -3,7 +3,10 @@
 //  - il tourne un peu : sa direction oscille de quelques degrés (les « bascules ») ;
 //  - les rafales : de temps en temps le vent forcit d'un coup pendant quelques secondes
 //    (+12 à +24 % par beau temps, +20 à +40 % dans les grains d'orage : par 40 nœuds de
-//    vent moyen, des rafales de 48 à 56 nœuds, comme dans un vrai coup de vent).
+//    vent moyen, des rafales de 48 à 56 nœuds, comme dans un vrai coup de vent) ; sous un
+//    grain (agitation : monde/grains.js), elles viennent bien plus souvent, mais un peu moins
+//    fort : la rafale du grain lui-même (l'air froid qui tombe de lui et s'étale sur la mer)
+//    s'y ajoute déjà.
 import { Vector3 } from 'three';
 import { NOEUD, angleVers } from './meteo.js';
 
@@ -30,14 +33,15 @@ export class Vent {
     this.facteurRafale = 0;
   }
 
-  // meteo : l'état du temps (vent moyen en nœuds, direction d'où il vient) ; dt en s
-  maj(t, dt, meteo) {
+  // meteo : l'état du temps (vent moyen en nœuds, direction d'où il vient) ; dt en s ;
+  // agitation : sous un grain (0 → 1)
+  maj(t, dt, meteo, agitation = 0) {
     const r = this.rafale;
     const orage = meteo.orage ?? 0;
-    // les rafales arrivent plus souvent et plus fort quand le temps se dégrade
-    r.prochaine -= dt;
+    // les rafales arrivent plus souvent et plus fort quand le temps se dégrade, et sous un grain
+    r.prochaine -= dt * (1 + 2 * agitation);
     if (r.prochaine <= 0 && r.duree <= 0) {
-      r.cible = (0.12 + this.aleatoire() * 0.12) * (1 + orage * 0.7) * Math.min(1, meteo.vent / 12);
+      r.cible = (0.12 + this.aleatoire() * 0.12) * (1 + orage * 0.7 * (1 - 0.45 * agitation)) * Math.min(1, meteo.vent / 12);
       r.duree = 3 + this.aleatoire() * 7;
       r.prochaine = (18 + this.aleatoire() * 40) * (1 - orage * 0.6);
     }

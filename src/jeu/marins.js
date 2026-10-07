@@ -5,9 +5,9 @@
 //
 // Chacun a sa façon de faire :
 //  - le prudent fait tout ce que Jos conseille : la toile réduite, puis la grand-voile
-//    affalée au plus fort, les vagues bien dans l'arrière, la descente fermée, le
-//    harnais ; il pompe, répare ce qui casse, appelle le cargo, s'écarte de la trombe, et
-//    met les vagues scélérates droit dans son arrière ;
+//    affalée au plus fort (et avant chaque grain qui vient sur lui), les vagues bien dans
+//    l'arrière, la descente fermée, le harnais ; il pompe, répare ce qui casse, appelle le
+//    cargo, s'écarte de la trombe, et met les vagues scélérates droit dans son arrière ;
 //  - le moyen garde ce qu'il avait au coucher du soleil (2 ris, le foc roulé aux deux
 //    tiers), le vent à 140°, et ne pompe que quand il y a beaucoup d'eau ;
 //  - l'imprudent garde toute la toile, de travers aux vagues, la descente ouverte, sans
@@ -38,7 +38,10 @@ export const MARINS = {
       return nuit.meteo.vent >= 28 ? 165 : 140;
     },
     voiles(nuit, b, e, dt) {
-      const vent = nuit.meteo.vent;
+      // (un grain qui vient sur lui, ou sa rafale : il réduit comme pour le vent qu'il fera dessous)
+      const m = nuit.menaceGrain;
+      const grain = m && m.distance < 2600 ? m.grain.force * 15 : (nuit.ici?.agitation ?? 0) > 0.15 ? 13 : 0;
+      const vent = nuit.meteo.vent + grain;
       if (nuit.avaries.grandVoile === 'dechiree' || vent >= 34) b.ris = 3;
       else b.ris = 2;
       if (nuit.avaries.foc === 'dechiree') b.deroule = 0;
@@ -105,7 +108,7 @@ export function jouerLaNuit({
     Object.assign(b, marin.debut);
     const e = {
       cle, marin, nuit, b, vent: new Vent(21 + graine), pilote: true, enPanne: 0, pompe: false, avaries: [], fin: null,
-      serie: { t: [], heure: [], vent: [], rafale: [], hs: [], gite: [], twa: [], vitesse: [], cale: [], cockpit: [] },
+      serie: { t: [], heure: [], vent: [], rafale: [], pluie: [], hs: [], gite: [], twa: [], vitesse: [], cale: [], cockpit: [] },
       deferlantes: [], scelerates: [],
     };
     nuit.on('cargo', () => { e.cargoVu = 15; });
@@ -122,6 +125,7 @@ export function jouerLaNuit({
   let ageNote = 99;
   let ageProgres = 0;
   const trombe = new Vector3();
+  const grain = new Vector3();
   while (equipages.some((e) => !e.fin)) {
     const enCours = equipages.find((e) => !e.fin);
     // la mer suit le temps qu'il fait (toutes les 3 secondes)
@@ -171,9 +175,12 @@ export function jouerLaNuit({
           e.cargoVu = undefined;
         }
       }
-      const v = e.vent.maj(t, pas, nuit.meteo).clone();
+      // le vent : le vent du moment (ses rafales, plus nombreuses sous un grain), la trombe,
+      // et l'air froid qui tombe des grains
+      const v = e.vent.maj(t, pas, nuit.meteo, nuit.ici?.agitation ?? 0).clone();
       nuit.ventTrombe(b.position.x, b.position.z, trombe);
-      v.add(trombe);
+      nuit.ventGrains(b.position.x, b.position.z, grain);
+      v.add(trombe).add(grain);
       b.avancer(pas, houle, v, sousPas);
       if (b.reprises) e.fin = 'instable';
       // la gîte après chaque déferlante
@@ -187,7 +194,8 @@ export function jouerLaNuit({
         s.t.push(t);
         s.heure.push(nuit.heure);
         s.vent.push(nuit.meteo.vent);
-        s.rafale.push(e.vent.vitesse + trombe.length() / 0.5144);
+        s.rafale.push(v.length() / 0.5144);
+        s.pluie.push(nuit.ici?.pluie ?? 0);
         s.hs.push(houle.hauteurSignificative);
         s.gite.push(Math.abs(m.gite));
         s.twa.push(Math.abs(m.angleVentReel));

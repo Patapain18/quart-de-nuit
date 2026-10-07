@@ -7,6 +7,8 @@
 //  - des avaries : l'écoute de foc qui casse (usée contre le hauban), une voile qui se
 //    déchire quand on en garde trop, le pilote automatique qui lâche ;
 //  - une trombe marine au crépuscule, un cargo qui croise la route vers 22 h 30 ;
+//  - des grains : des averses d'orage qui passent, chacune avec sa rafale (monde/grains.js) ;
+//    trois ou quatre passent sur le bateau, Jos les annonce ;
 //  - deux ou trois vagues scélérates de 18 à 22 m (annoncées : le grondement, Jos, le
 //    radar) : à prendre droit dans l'arrière, sinon elles couchent le bateau ;
 //  - Jos veille à la radio, depuis son sémaphore, et conseille quand ça va mal.
@@ -23,6 +25,7 @@ import { Vector3 } from 'three';
 import { AMBIANCES, etatMeteo, interpoler, angleVers } from '../monde/meteo.js';
 import { Deferlantes } from '../monde/deferlantes.js';
 import { Scelerates, chocScelerate } from '../monde/scelerates.js';
+import { Grains } from '../monde/grains.js';
 import { Peur } from './peur.js';
 import { directionEnMots } from './radio.js';
 import { NOM_BATEAU, JOS, HEURE_COUCHER, heureEnTexte } from './journee.js';
@@ -76,9 +79,9 @@ const MOMENTS = [
 
 // La difficulté (l'atelier de la tempête sert à la régler)
 export const DIFFICULTES = {
-  matelot: { nom: 'Matelot', deferlantes: 0.6, force: 0.85, fuite: 0.6, avaries: 0.7, vent: -3, scelerates: 2, hauteurScelerate: 18 },
-  marin: { nom: 'Marin', deferlantes: 1, force: 1, fuite: 1, avaries: 1, vent: 0, scelerates: 3, hauteurScelerate: 20 },
-  caphornier: { nom: 'Cap-hornier', deferlantes: 1.5, force: 1.12, fuite: 1.4, avaries: 1.3, vent: 4, scelerates: 3, hauteurScelerate: 22 },
+  matelot: { nom: 'Matelot', deferlantes: 0.6, force: 0.85, fuite: 0.6, avaries: 0.7, vent: -3, scelerates: 2, hauteurScelerate: 18, grains: 0.8 },
+  marin: { nom: 'Marin', deferlantes: 1, force: 1, fuite: 1, avaries: 1, vent: 0, scelerates: 3, hauteurScelerate: 20, grains: 1 },
+  caphornier: { nom: 'Cap-hornier', deferlantes: 1.5, force: 1.12, fuite: 1.4, avaries: 1.3, vent: 4, scelerates: 3, hauteurScelerate: 22, grains: 1.15 },
 };
 
 // ---------- Le temps qu'il fait pendant la nuit ----------
@@ -114,6 +117,32 @@ export function meteoDeLaNuit(heure, niveau = DIFFICULTES.marin) {
   m.vent += niveau.vent * Math.max(0, (m.vent - 24) / 18);
   return m;
 }
+
+// L'heure du jeu au bout de t secondes de nuit (les chapitres n'avancent pas au même pas)
+export function heureA(t) {
+  let reste = Math.max(0, t);
+  for (const ch of CHAPITRES) {
+    if (reste <= ch.duree) return ch.de + (reste / ch.duree) * (ch.a - ch.de);
+    reste -= ch.duree;
+  }
+  return HEURE_AUBE;
+}
+
+// ---------- Les grains qui viendront sur le bateau ----------
+// Les autres naissent et passent au loin, au gré du temps (monde/grains.js). Ceux-ci sont
+// lancés exprès, quatre minutes avant d'arriver (on les voit venir au radar, Jos les
+// annonce) ; chacun quand rien d'autre n'arrive, pour qu'on le vive pour lui-même : le
+// premier passe de côté juste après la trombe (on ne prend que le bord de sa rafale, et on
+// le voit à ses éclairs) ; le plus fort au cœur de la tempête ; le dernier, plus faible,
+// quand elle s'en va. (arrivee : s de nuit, quand son cœur passe ; force, orage : 0 → 1 ;
+// ecart : m, au plus près ; annonce : Jos le dit)
+export const DANS_GRAIN = 240;
+const GRAINS_DE_LA_NUIT = [
+  { arrivee: 360, force: 0.6, orage: 0.75, ecart: 1100, annonce: false },
+  { arrivee: 650, force: 0.8, orage: 0.6, ecart: 250 },
+  { arrivee: 820, force: 0.9, orage: 1, ecart: 120 },
+  { arrivee: 1010, force: 0.55, orage: 0.3, ecart: 450 },
+];
 
 // La trombe touche le bateau à moins de RAYON_TOUCHE mètres de son axe : dans le plus
 // épais de sa gerbe d'embruns (celle de la bête, rendu/trombe.js, a 52 m de cœur)
@@ -151,6 +180,22 @@ export function directionRelative(relatif) {
   if (a < 110) return `par le travers ${cote}`;
   if (a < 160) return `derrière, sur ${cote}`;
   return 'droit derrière';
+}
+
+// Une distance en milles, comme Jos la dit : « un mille et demi »
+export function millesEnMots(m) {
+  const n = m / 1852;
+  if (n < 0.75) return 'moins d\'un mille';
+  if (n < 1.25) return 'un mille';
+  if (n < 1.75) return 'un mille et demi';
+  if (n < 2.5) return 'deux milles';
+  return `${Math.round(n)} milles`;
+}
+
+// La toile est-elle prête pour ce vent ? (au-delà de 34 nœuds : la grand-voile affalée, un
+// mouchoir de foc ; en dessous : deux ris, le foc presque roulé)
+export function toilePrete(p, vent) {
+  return vent >= 34 ? p.ris >= 3 && p.deroule <= 0.3 : p.ris >= 2 && p.deroule <= 0.45;
 }
 
 // La toile en mots : « 2 ris, foc 30 % »
@@ -210,6 +255,15 @@ export class Nuit {
     heuresScelerates.slice(0, this.niveau.scelerates ?? 3).forEach((h, k) => { this.prevu[`scelerate${k}`] = h; });
     this.scelerates = null; // (le chef d'orchestre : monde/scelerates.js ; il lui faut la houle)
     this.aLancer = null; // (une vague à lancer tout de suite : pour vérifier)
+    // les grains (monde/grains.js) : ceux qui vivent alentour, et ceux qui viendront sur nous
+    // (encore un hasard à part : chaque grain prévu arrive à quelques secondes près, d'un
+    // côté ou de l'autre)
+    const hg = generateur(graine * 7727 + 19);
+    this.grains = new Grains(graine * 31337 + 7);
+    this.hasardGrains = hg;
+    this.plansGrains = GRAINS_DE_LA_NUIT.map((g) => ({ ...g, arrivee: g.arrivee + (hg() - 0.5) * 40, ecart: g.ecart * (hg() < 0.5 ? -1 : 1) }));
+    this.plansGrains.forEach((g, k) => { this.prevu[`grain${k}`] = heureA(g.arrivee - DANS_GRAIN); });
+    this.ici = null; // (ce que font les grains là où est le bateau : la pluie, leur vent…)
     // la peur (jeu/peur.js) : la tension, et ce qu'on voit du coin de l'œil
     this.peur = new Peur({ graine });
     this.silence = false; // (Jos ne répond plus)
@@ -220,7 +274,7 @@ export class Nuit {
     this.stats = {
       deferlantes: 0, coups: 0, giteMax: 0, couche: 0, pompee: 0, distance: 0, vitesseMax: 0, caleMax: 0,
       cargoDistance: Infinity, cargoAppele: false, trombeDistance: Infinity, aLaBarre: 0,
-      scelerates: 0, sceleratesCouche: 0,
+      scelerates: 0, sceleratesCouche: 0, grains: 0, rafaleMax: 0,
     };
     this.journal = [];
     this.conseils = {};
@@ -278,6 +332,7 @@ export class Nuit {
     this.retarderLumiere(dt);
     this.meteo = this.meteoIci();
     ctx.meteo = this.meteo;
+    this.suivreGrains(dt, ctx);
     this.suivreScelerates(dt, ctx);
     this.suivreDeferlantes(dt, ctx);
     this.suivreEau(dt, ctx);
@@ -462,10 +517,13 @@ export class Nuit {
       this.fatigue.foc += dt * (trop * surface / 60 + bat / 300) * this.niveau.avaries;
       if (this.fatigue.foc >= 1) this.avarie('foc', ctx);
     }
-    // l'écoute de foc s'use contre le hauban, et casse au plus fort de la tempête
-    if (av.ecouteFoc === 'ok' && av.foc === 'ok' && this.heure >= this.prevu.ecouteFoc && p.deroule > 0.08) this.avarie('ecouteFoc', ctx);
-    // le pilote automatique force trop dans les vagues de l'arrière, et lâche
-    if (av.pilote === 'ok' && this.heure >= this.prevu.pilote && ctx.pilote) this.avarie('pilote', ctx);
+    // l'écoute de foc s'use contre le hauban, et casse au plus fort de la tempête ; le pilote
+    // automatique force trop dans les vagues de l'arrière, et lâche. (Si la rafale d'un grain
+    // arrive un peu avant l'heure, c'est elle qui les achève.)
+    const rafale = (this.ici?.agitation ?? 0) > 0.45;
+    const lHeure = (nom) => this.heure >= this.prevu[nom] || (rafale && this.heure >= this.prevu[nom] - 0.6);
+    if (av.ecouteFoc === 'ok' && av.foc === 'ok' && lHeure('ecouteFoc') && p.deroule > 0.08) this.avarie('ecouteFoc', ctx, rafale);
+    if (av.pilote === 'ok' && lHeure('pilote') && ctx.pilote) this.avarie('pilote', ctx, rafale);
     // ce qui est réglé (le foc roulé, la grand-voile affalée)
     if (av.ecouteFoc === 'cassee' && p.deroule < 0.03 && !this.faits.has('foc-roule')) {
       this.faits.add('foc-roule');
@@ -477,7 +535,7 @@ export class Nuit {
     }
   }
 
-  avarie(nom, ctx) {
+  avarie(nom, ctx, dansLaRafale = false) {
     const p = ctx.physique;
     this.avaries[nom] = nom === 'pilote' ? 'panne' : nom === 'ecouteFoc' ? 'cassee' : 'dechiree';
     const textes = {
@@ -501,7 +559,7 @@ export class Nuit {
     if (nom === 'ecouteFoc') p.ecouteFocLibre = true;
     if (nom === 'grandVoile') p.grandVoileDechiree = true;
     if (nom === 'foc') p.focDechire = true;
-    this.ecrire(textes.journal);
+    this.ecrire(dansLaRafale ? `${textes.journal.replace(/\.$/, '')}, dans la rafale d'un grain.` : textes.journal);
     this.dire(textes.dire, { urgent: true });
     this.emettre('avarie', nom);
   }
@@ -692,6 +750,112 @@ export class Nuit {
     const vmax = 38 * t.force; // ~74 nœuds au bord du cœur
     const v = (d < coeur ? (vmax * d) / coeur : (vmax * coeur) / d) * (1 - lisse(300, 600, d));
     return sortie.set((dz / d) * v - (dx / d) * v * 0.3, 0, (-dx / d) * v - (dz / d) * v * 0.3);
+  }
+
+  // ---------- Les grains ----------
+  suivreGrains(dt, ctx) {
+    const p = ctx.physique.position;
+    const v = ctx.physique.vitesse;
+    // ceux qui viendront sur nous : lancés à leur heure
+    this.plansGrains.forEach((plan, k) => {
+      const id = `grain${k}`;
+      if (this.faits.has(id) || this.heure < this.prevu[id]) return;
+      this.faits.add(id);
+      this.lancerGrain(plan, ctx, DANS_GRAIN, k);
+    });
+    this.grains.maj(dt, this.meteo, p.x, p.z, v.x, v.z);
+    const ici = (this.ici = this.grains.mesurer(p.x, p.z, this.ici ?? {}));
+    // celui qui vient sur nous : à moins de 3,3 km, on le voit (le radar, l'écran, le
+    // journal) ; Jos l'annonce dès que la radio est libre, ou en coupant la parole s'il est
+    // déjà près
+    const m = this.grains.menace(p.x, p.z, v.x, v.z, { horizon: 260, cpaMax: 1300 });
+    if (m && !m.grain.faits.vu && m.distance < 3300) this.voirGrain(m, ctx);
+    this.menaceGrain = m && m.grain.faits.vu && !m.grain.faits.rafale ? m : null;
+    if (m && m.grain.faits.vu && !m.grain.faits.annonce && (m.distance < 1600 || this.radio.libre)) this.annoncerGrain(m, ctx);
+    // sa rafale arrive sur nous
+    const g = ici.grain;
+    if (g && ici.agitation > 0.3 && !g.faits.rafale) {
+      g.faits.rafale = true;
+      g.faits.ventMax = 0;
+      this.stats.grains++;
+      this.emettre('grain-rafale', g);
+    }
+    // (le vent le plus fort sous le grain : le vent du moment, plus celui du grain)
+    if (g?.faits.rafale && !g.faits.passe) {
+      const a = angleVers(this.meteo.directionVent);
+      const vx = Math.cos(a) * this.meteo.vent * 0.5144 + ici.vent.x;
+      const vz = Math.sin(a) * this.meteo.vent * 0.5144 + ici.vent.z;
+      g.faits.ventMax = Math.max(g.faits.ventMax, Math.hypot(vx, vz) / 0.5144);
+      this.stats.rafaleMax = Math.max(this.stats.rafaleMax, g.faits.ventMax);
+    }
+    // il est passé : on est derrière lui, sa rafale est finie, la pluie se calme
+    for (const x of this.grains.liste) {
+      if (!x.faits.rafale || x.faits.passe) continue;
+      const derriere = (p.x - x.x) * x.vx + (p.z - x.z) * x.vz < 0;
+      if (derriere && (ici.grain !== x || ici.agitation < 0.1) && ici.pluie < 0.7) {
+        x.faits.passe = true;
+        this.ecrire(`Le grain est passé${x.faits.ventMax ? ` (rafales à ${Math.round(x.faits.ventMax)} nœuds)` : ''}.`);
+        this.emettre('grain-passe', x);
+        if (x.prevu && x.faits.annonce && x.faits.annoncer && !this.silence && this.hasardGrains() < 0.6) {
+          this.dire([this.hasardGrains() < 0.5
+            ? 'Il est passé. Derrière lui, le vent va mollir un moment : n\'en profite pas pour renvoyer de la toile, il en viendra d\'autres.'
+            : 'Le grain est passé. Bien tenu, matelot.'], { siLibre: true });
+        }
+      }
+    }
+  }
+
+  lancerGrain(plan, ctx, dans, k) {
+    const p = ctx.physique.position;
+    const v = ctx.physique.vitesse;
+    const g = this.grains.lancer({
+      x: p.x, z: p.z, vbx: v.x, vbz: v.z, dans,
+      force: plan.force * (this.niveau.grains ?? 1), orage: plan.orage, ecart: plan.ecart,
+    });
+    g.plan = k;
+    g.dans = dans;
+    g.faits.annoncer = plan.annonce !== false;
+    return g;
+  }
+
+  // D'où vient le grain, vu du bateau (degrés compas)
+  releveGrain(g, ctx) {
+    const p = ctx.physique.position;
+    const c = this.grains.noyau(g, g.noyaux[0], {});
+    return ((Math.atan2(c.x - p.x, -(c.z - p.z)) * 180) / Math.PI + 360) % 360;
+  }
+
+  // Un grain vient sur nous : on le voit au radar (l'écran le dit, le journal le note)
+  voirGrain(m, ctx) {
+    const g = m.grain;
+    g.faits.vu = true;
+    const releve = this.releveGrain(g, ctx);
+    this.emettre('grain', { grain: g, releve, relatif: ecartAngle(releve, ctx.m.cap), distance: m.distance, dans: m.dans, cpa: m.cpa });
+    this.ecrire(`Un grain au ${directionEnMots(releve)}, à ${millesEnMots(m.distance)} : il vient sur nous.`);
+  }
+
+  // Jos le voit sur son radar : d'où il vient, à quelle distance, ce qu'il y aura dessous,
+  // et ce qu'il faut faire
+  annoncerGrain(m, ctx) {
+    const g = m.grain;
+    g.faits.annonce = true;
+    const releve = this.releveGrain(g, ctx);
+    if (!g.faits.annoncer || this.silence) return;
+    const rafale = this.meteo.vent + g.force * 15;
+    const pret = toilePrete(ctx.physique, rafale);
+    const phrases = [
+      `${NOM_BATEAU}, un grain dans ton ${directionEnMots(releve)}, à ${millesEnMots(m.distance)}. ${m.cpa < 500 ? 'Il vient droit sur toi.' : 'Il va passer tout près de toi.'}`,
+      pret
+        ? `Dessous, ça soufflera à ${Math.round(rafale / 5) * 5} nœuds dans les rafales, et il pleuvra à verse. Ta toile est bonne : garde les vagues dans l'arrière, et laisse-le passer.`
+        : `Dessous, ça soufflera à ${Math.round(rafale / 5) * 5} nœuds dans les rafales. Réduis maintenant, pas quand il sera sur toi : ${rafale >= 34 ? 'la grand-voile affalée, un mouchoir de foc' : 'deux ris, le foc presque roulé'}.`,
+    ];
+    if (g.orage > 0.6) phrases.push('Et il est plein d\'éclairs.');
+    this.dire(phrases, { siLibre: m.distance > 1600, urgent: m.distance <= 1600 });
+  }
+
+  // Le vent des grains au point (x, z) (m/s, à ajouter au vent, comme celui de la trombe)
+  ventGrains(x, z, sortie = new Vector3()) {
+    return this.grains.ventEn(x, z, sortie);
   }
 
   // ---------- Le cargo (vers 22 h 30) ----------
@@ -990,6 +1154,8 @@ export class Nuit {
     const toileOk = (p) => p.ris >= 2 && p.deroule <= 0.45;
     return [
       { id: 'pilote', apres: 3, repos: 30, si: (ctx) => this.avaries.pilote === 'panne' && ctx.mode !== 'barre', dire: 'Personne à la barre ! Prends-la, sinon le bateau va se mettre en travers des vagues.' },
+      // (un grain annoncé arrive, et la toile n'est pas réduite)
+      { id: 'grain', apres: 2, repos: 35, si: (ctx) => { const m = this.menaceGrain; return !!m && m.distance < 2000 && m.grain.faits.annoncer && !toilePrete(ctx.physique, this.meteo.vent + m.grain.force * 15); }, dire: 'Le grain est presque sur toi, et tu as encore trop de toile ! Réduis, vite.' },
       // (une vague scélérate arrive, et le bateau ne lui tourne pas le dos)
       { id: 'scelerate', apres: 3, repos: 14, si: (ctx) => { const w = this.scelerates?.vague; return !!w && w.faites.has('annonce') && w.distance > 150 && w.distance < 760 && Math.abs(ecartAngle(w.depuis, ctx.m.cap)) < 140; }, dire: 'Elle va te prendre par le travers ! Abats, mets-la droit dans ton arrière, vite !' },
       { id: 'harnais', apres: 4, repos: 40, si: (ctx) => this.meteo.vent >= 25 && ctx.aBord.dehors && !ctx.aBord.attache, dire: 'Accroche ton harnais, touche X ! Une déferlante peut t\'emporter.' },
@@ -1052,6 +1218,10 @@ export class Nuit {
     if (av.pilote === 'panne') liste.push({ texte: 'Pilote en panne (disjoncteur au tableau)', etat: 'alerte' });
     if (this.cargo) liste.push({ texte: `Cargo à ${this.cargo.distance > 1000 ? `${(this.cargo.distance / 1852).toFixed(1)} mille` : `${Math.round(this.cargo.distance / 10) * 10} m`}`, etat: this.cargo.etat === 'route' && this.cargo.cpa < 400 ? 'danger' : 'alerte' });
     if (this.trombe && this.trombe.force > 0.1) liste.push({ texte: `Trombe à ${Math.round(this.trombe.distance / 10) * 10} m`, etat: this.trombe.distance < 300 ? 'danger' : 'alerte' });
+    // (le grain qui vient sur nous, puis le grain sur nous)
+    const ici = this.ici;
+    if (ici && (ici.agitation > 0.3 || ici.pluie > 0.75)) liste.push({ texte: 'Sous le grain', etat: 'alerte' });
+    else if (this.menaceGrain) liste.push({ texte: `Grain à ${(this.menaceGrain.distance / 1852).toFixed(1).replace('.', ',')} mille`, etat: 'alerte' });
     return {
       numero: `Nuit · ${heureEnTexte(this.heure)}`,
       titre: this.chapitre.titre,
@@ -1106,6 +1276,7 @@ export class Nuit {
       ['La trombe', s.trombeDistance === Infinity ? 'pas vue' : `passée à ${metres(s.trombeDistance)}`],
       ['Les vagues scélérates', s.scelerates ? `${s.scelerates}${s.sceleratesCouche ? ` (dont ${s.sceleratesCouche} qui t'${s.sceleratesCouche > 1 ? 'ont' : 'a'} couché)` : ', passées sans être couché'}` : 'aucune'],
       ['Le cargo', s.cargoDistance === Infinity ? 'pas vu' : `${s.cargoAppele ? 'appelé à la radio, ' : ''}passé à ${metres(s.cargoDistance)}`],
+      ['Les grains', s.grains ? `${s.grains}, rafales jusqu'à ${Math.round(s.rafaleMax)} nœuds` : 'aucun sur toi'],
       ['À la barre', `${Math.round(s.aLaBarre / 60)} min (le reste au pilote)`],
       ['Distance parcourue', `${milles(s.distance)}, jusqu'à ${virgule(s.vitesseMax)} nœuds dans les surfs`],
     ];
@@ -1122,6 +1293,10 @@ export class Nuit {
     MOMENTS.forEach((mo, k) => { if (mo.heure <= this.heure) this.faits.add(`moment-${k}`); });
     for (const nom of ['trombe', 'cargo', 'lumiere', 'voix16', 'silence', 'coups', 'scelerate0', 'scelerate1', 'scelerate2']) if (this.prevu[nom] < this.heure) this.faits.add(nom);
     for (const nom of ['ecouteFoc', 'pilote']) if (this.prevu[nom] < this.heure) this.prevu[nom] = Infinity;
+    // (les grains : ceux d'avant cette heure sont passés ; les autres naîtront)
+    this.plansGrains.forEach((_, k) => { if (this.prevu[`grain${k}`] < this.heure) this.faits.add(`grain${k}`); });
+    this.grains.vider();
+    this.ici = null;
     this.silence = this.faits.has('silence') && this.heure < this.prevu.silence + 0.55;
     this.retardLumiere = 0;
     this.meteo = meteoDeLaNuit(this.heure, this.niveau);
@@ -1149,6 +1324,9 @@ export class Nuit {
       stats: { ...this.stats },
       peur: this.peur.instantane(),
       voiles: { ris: p.ris, deroule: p.deroule, ecouteFocLibre: p.ecouteFocLibre, grandVoileDechiree: p.grandVoileDechiree, focDechire: p.focDechire },
+      // (les grains en route vers nous : on les relance à la reprise, d'où sera le bateau)
+      grainsEnRoute: this.grains.liste.filter((g) => g.prevu && !g.faits.rafale && g.plan !== undefined)
+        .map((g) => ({ plan: g.plan, dans: Math.max(90, (g.dans ?? DANS_GRAIN) - g.age) })),
     };
   }
 
@@ -1170,13 +1348,18 @@ export class Nuit {
       c: s.c, heure: s.heure, eau: { ...s.eau }, avaries: { ...s.avaries }, fatigue: { ...s.fatigue },
       // (une partie gardée avant les vagues scélérates : elles arrivent quand même)
       prevu: { ...this.prevu, ...s.prevu }, faits: new Set(s.faits),
-      stats: { scelerates: 0, sceleratesCouche: 0, ...s.stats, trombeDistance: s.stats.trombeDistance ?? Infinity, cargoDistance: s.stats.cargoDistance ?? Infinity },
+      stats: { scelerates: 0, sceleratesCouche: 0, grains: 0, rafaleMax: 0, ...s.stats, trombeDistance: s.stats.trombeDistance ?? Infinity, cargoDistance: s.stats.cargoDistance ?? Infinity },
       etat: 'nuit', raison: null, cargo: null, trombe: null, suiviCoup: null, renverse: 0, annonceVue: null, commence: true,
     });
     this.sauvegarde = { ...s, faits: new Set(s.faits) };
-    for (const nom of ['trombe', 'cargo', 'ecouteFoc', 'pilote', 'lumiere', 'voix16', 'silence', 'coups', 'scelerate0', 'scelerate1', 'scelerate2']) this.prevu[nom] ??= Infinity; // (JSON : Infinity devient null)
+    for (const nom of ['trombe', 'cargo', 'ecouteFoc', 'pilote', 'lumiere', 'voix16', 'silence', 'coups', 'scelerate0', 'scelerate1', 'scelerate2', 'grain0', 'grain1', 'grain2', 'grain3']) this.prevu[nom] ??= Infinity; // (JSON : Infinity devient null)
     this.scelerates?.finir();
     this.aLancer = null;
+    // (les grains : ceux d'alentour renaîtront ; ceux qui venaient sur nous repartent)
+    this.grains.vider();
+    this.ici = null;
+    this.menaceGrain = null;
+    for (const r of s.grainsEnRoute ?? []) if (this.plansGrains[r.plan]) this.lancerGrain(this.plansGrains[r.plan], ctx, r.dans, r.plan);
     this.peur.restaurer(s.peur);
     this.silence = this.faits.has('silence') && this.heure < this.prevu.silence + 0.55;
     this.dernierEtrange = null;

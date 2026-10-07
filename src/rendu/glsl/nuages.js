@@ -5,6 +5,7 @@
 // renvoie vers l'œil, en tenant compte de ce qu'il cache derrière lui.
 //
 // Besoin de : GLSL_ATMOSPHERE (traverserSphere, RAYON_TERRE) et GLSL_OUTILS.
+import { GLSL_CARTE_GRAINS } from './grains.js';
 
 export const UNIFORMS_NUAGES = {
   uBruitNuages: { value: null },
@@ -23,6 +24,8 @@ export const UNIFORMS_NUAGES = {
   uEclair: { value: null }, // position (m) et intensité d'un éclair
   uCirrus: { value: 0.3 }, // voile de cirrus très haut (0 → 1)
   uTrombeCiel: { value: null }, // le nuage d'orage qui porte la trombe : x, z, rayon (m), force (0 : pas de trombe)
+  uCarteGrains: { value: null }, // le ciel bouché au-dessus des grains, vu d'en haut (rendu/grains.js)
+  uCarteGrainsCentre: { value: null },
 };
 
 export const GLSL_NUAGES = /* glsl */ `
@@ -42,6 +45,7 @@ uniform vec3 uAmbBas;
 uniform vec4 uEclair;
 uniform float uCirrus;
 uniform vec4 uTrombeCiel;
+${GLSL_CARTE_GRAINS}
 
 const float ECHELLE_FORME = 1.0 / 9000.0;   // le motif de forme se répète tous les 9 km
 const float ECHELLE_DETAIL = 1.0 / 1300.0;  // le motif de détail tous les 1,3 km
@@ -62,11 +66,16 @@ float densiteNuage(vec3 p, float h, bool detaille) {
     parent = uTrombeCiel.w * (1.0 - smoothstep(uTrombeCiel.z * 0.4, uTrombeCiel.z, length(p.xz - uTrombeCiel.xy)));
     zone = max(zone, parent);
   }
+  // au-dessus d'un grain, son nuage d'orage : le ciel y est bouché, épais, en tours
+  float grain = grainsCiel(p.xz);
+  zone = max(zone, grain);
+  parent = max(parent, grain * 0.85);
   if (zone <= 0.0) return 0.0;
 
   // Profil vertical : base plate, puis la densité diminue avec la hauteur, ce qui
   // arrondit les sommets en dômes (cumulus) ; l'orage fait des tours plus hautes
-  float profil = smoothstep(0.0, mix(0.07, 0.03, uOrage), h) * pow(1.0 - h, mix(0.9, 0.45, uOrage));
+  float orage = max(uOrage, grain);
+  float profil = smoothstep(0.0, mix(0.07, 0.03, orage), h) * pow(1.0 - h, mix(0.9, 0.45, orage));
 
   float forme = texture(uBruitNuages, q * ECHELLE_FORME + vec3(0.0, uTemps * 0.0006, 0.0)).r;
   // au cœur d'une zone, le seuil est bas (gros nuages serrés) ; en bordure, il est haut

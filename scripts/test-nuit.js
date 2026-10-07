@@ -35,6 +35,7 @@ for (const r of resultats) {
   console.log(`  eau : ${Math.round(s.caleMax)} L au plus dans la cale, ${Math.round(s.pompee)} L pompés · ${(s.distance / 1852).toFixed(1)} milles, ${s.vitesseMax.toFixed(1)} nds au plus`);
   console.log(`  trombe à ${Math.round(s.trombeDistance)} m · cargo à ${Math.round(s.cargoDistance)} m${s.cargoAppele ? ' (appelé)' : ''} · avaries : ${r.avaries.map((a) => `${heureEnTexte(a.heure)} ${a.nom}`).join(', ') || 'aucune'}`);
   console.log(`  vagues scélérates : ${r.scelerates.map((v) => `${heureEnTexte(v.heure)} prise à ${Math.round(v.angle)}°, gîte ${Math.round(v.gite)}°`).join(' · ') || 'aucune'}`);
+  console.log(`  grains : ${r.journal.filter((j) => j.texte.startsWith('Le grain est passé')).map((j) => `${heureEnTexte(j.heure)} ${j.texte.match(/rafales à \d+/)?.[0] ?? ''}`).join(' · ') || 'aucun'}`);
 }
 const [prudent, moyen, imprudent] = resultats;
 console.log('');
@@ -51,6 +52,10 @@ verifier(prudent.scelerates.length === 3, 'trois vagues scélérates sont passé
 verifier(prudent.scelerates.every((v) => v.angle > 140), 'le prudent les a toutes prises par l\'arrière (à plus de 140°)');
 verifier(prudent.stats.sceleratesCouche <= 1, 'elles ne l\'ont pas couché (une fois au plus)');
 verifier(prudent.heureFin >= HEURE_AUBE, 'la nuit va jusqu\'à 6 h');
+const annonces = prudent.journal.filter((j) => j.texte.startsWith('Un grain au')).length;
+verifier(prudent.stats.grains >= 3 && annonces >= 3, `des grains sont passés sur le prudent (${prudent.stats.grains}), annoncés par Jos (${annonces})`);
+verifier(prudent.stats.rafaleMax > 45, `leurs rafales soufflent fort (jusqu'à ${Math.round(prudent.stats.rafaleMax)} nœuds)`);
+verifier(Math.max(...prudent.serie.pluie) > 0.9 && Math.min(...prudent.serie.pluie.filter((_, i) => prudent.serie.heure[i] > 22 && prudent.serie.heure[i] < 27)) < 0.5, 'il pleut à verse sous les grains, moins entre eux');
 
 console.log(echecs ? `\n${echecs} vérification(s) en échec` : '\nTout est bon.');
 process.exit(echecs ? 1 : 0);

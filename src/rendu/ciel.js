@@ -15,6 +15,8 @@ import { GLSL_NUAGES, UNIFORMS_NUAGES } from './glsl/nuages.js';
 import { glslFront } from './glsl/front.js';
 import { GLSL_OUTILS, PassePleinEcran, SOMMET_PLEIN_ECRAN } from './outils.js';
 import { creerBruitNuages } from './bruit-nuages.js';
+import { glslGrains } from './glsl/grains.js';
+import { GrainsRendu } from './grains.js';
 import { INTENSITE_SOLEIL, geometrieFront } from '../monde/meteo.js';
 
 // Correspondance direction ↔ carte du ciel : la hauteur est « étirée » près de
@@ -77,6 +79,31 @@ void main() {
 }
 `;
 
+// Les rideaux de pluie des grains devant le ciel (rendu/glsl/grains.js), dans une petite
+// image (ils sont doux : un quart de la largeur de l'écran suffit ; le fond les agrandit).
+// Au loin, ils se fondent dans la couleur de l'air.
+const FRAGMENT_RIDEAUX = /* glsl */ `
+in vec2 vUv;
+uniform mat4 uVueProjectionInverse;
+uniform vec3 uPositionCamera;
+uniform sampler2D uCarteCiel;
+uniform highp sampler3D uBruitNuages;
+const float PI = 3.14159265359;
+${GLSL_CARTE_CIEL}
+${glslGrains('uBruitNuages')}
+void main() {
+  vec4 lointain = uVueProjectionInverse * vec4(vUv * 2.0 - 1.0, 1.0, 1.0);
+  vec3 d = normalize(lointain.xyz / lointain.w - uPositionCamera);
+  // (sous l'horizon, la mer les dessine elle-même : le fond y est caché)
+  if (d.y < -0.02) {
+    gl_FragColor = vec4(0.0, 0.0, 0.0, 1.0);
+    return;
+  }
+  vec3 air = texture(uCarteCiel, uvCarteCiel(normalize(vec3(d.x, max(d.y, 0.0), d.z)))).rgb;
+  gl_FragColor = rideaux(uPositionCamera, d, 1e6, uRideauxReglages.z, air);
+}
+`;
+
 // Accumulation d'une image à l'autre : chaque image ne calcule qu'une partie des pas
 // (décalés au hasard) ; on mélange avec les images précédentes, retrouvées à leur place
 // même si la caméra a tourné (les nuages sont si loin que seule la rotation compte).
@@ -131,6 +158,7 @@ ${GLSL_ATMOSPHERE}
 ${GLSL_CARTE_CIEL}
 ${GLSL_NUAGES}
 ${glslFront('uBruitNuages')}
+${glslGrains('uBruitNuages')}
 void main() {
   vec3 d = normalize(vDirection);
   vec3 dCiel = vec3(d.x, max(d.y, 0.0), d.z);
@@ -144,6 +172,11 @@ void main() {
   c = c * (1.0 - ci.a) + ci.rgb;
   float tNuage = traverserSphere(vec3(0.0, RAYON_TERRE + 2.0, 0.0), normalize(dCiel + vec3(0.0, 0.001, 0.0)), RAYON_TERRE + uBaseNuages).y;
   c = c * (1.0 - n.a * voileNuages(tNuage)) + n.rgb;
+  // les rideaux de pluie des grains (la mer les reflète)
+  if (uRideauxN > 0) {
+    vec4 r = rideaux(origine, d, 1e6, uRideauxReglages.z, c);
+    c = c * r.a + r.rgb;
+  }
   gl_FragColor = vec4(c, 1.0);
 }
 `;
@@ -179,6 +212,9 @@ uniform float uOrage;
 ${GLSL_ATMOSPHERE}
 ${GLSL_CARTE_CIEL}
 ${glslFront('uBruitLune')}
+uniform int uRideauxN;
+uniform vec4 uRideauxReglages;
+uniform sampler2D uRideauxEcran;
 float voileNuages(float t) { return exp(-t / mix(55000.0, 22000.0, uOrage)); }
 
 uvec3 pcg3d(uvec3 v) {
@@ -292,6 +328,12 @@ void main() {
   c += derriere * (1.0 - n.a);
   c = c * (1.0 - n.a * voile) + n.rgb;
   c += vec3(0.6, 0.65, 0.8) * uEclairCiel * (0.4 + 0.6 * n.a);
+  // les rideaux de pluie des grains, devant le ciel (et devant les nuages : ils pendent sous
+  // leur base), calculés dans une petite image
+  if (uRideauxN > 0 && uRideauxReglages.w > 0.5) {
+    vec4 r = texture(uRideauxEcran, gl_FragCoord.xy / uTailleEcran);
+    c = c * r.a + r.rgb;
+  }
   gl_FragColor = vec4(c, 1.0);
 }
 `;
@@ -302,10 +344,15 @@ export class Ciel {
     this.bruit = creerBruitNuages(renderer, 128);
 
     const v3 = () => new THREE.Vector3();
+    // les grains (rendu/grains.js) : leurs rideaux de pluie, leurs rafales sur la mer, le ciel
+    // bouché au-dessus d'eux
+    this.grains = new GrainsRendu();
     // Les réglages des nuages, partagés par toutes les passes qui les dessinent
     this.uniformsNuages = THREE.UniformsUtils.clone(UNIFORMS_NUAGES);
     const u = this.uniformsNuages;
     u.uBruitNuages.value = this.bruit;
+    u.uCarteGrains.value = this.grains.carte;
+    u.uCarteGrainsCentre.value = this.grains.uniformsCarte.uCarteGrainsCentre.value;
     u.uDeriveNuages.value = new THREE.Vector2();
     for (const nom of ['uDirSoleil', 'uSoleilNuages', 'uDirLune', 'uLuneNuages', 'uAmbHaut', 'uAmbBas']) u[nom].value = v3();
     u.uEclair.value = new THREE.Vector4();
@@ -371,6 +418,21 @@ export class Ciel {
     this.passeAccumulation.materiau.uniforms.uPositionCamera.value = this.passeNuages.materiau.uniforms.uPositionCamera.value;
     this.numeroImage = 0;
 
+    // 2 bis. les rideaux de pluie des grains devant le ciel (taille réglée par redimensionner)
+    this.rideauxEcran = new THREE.WebGLRenderTarget(4, 4, {
+      type: THREE.HalfFloatType, magFilter: THREE.LinearFilter, minFilter: THREE.LinearFilter, depthBuffer: false,
+    });
+    this.passeRideaux = new PassePleinEcran(new THREE.ShaderMaterial({
+      uniforms: {
+        ...this.grains.uniforms,
+        uBruitNuages: u.uBruitNuages,
+        uCarteCiel: { value: this.carte.texture },
+        uVueProjectionInverse: { value: this.passeNuages.materiau.uniforms.uVueProjectionInverse.value },
+        uPositionCamera: { value: v3() },
+      },
+      vertexShader: SOMMET_PLEIN_ECRAN, fragmentShader: FRAGMENT_RIDEAUX, depthTest: false, depthWrite: false,
+    }));
+
     // 3. le fond du ciel
     this.fond = new THREE.Mesh(
       new THREE.BoxGeometry(2, 2, 2),
@@ -393,6 +455,8 @@ export class Ciel {
           uBaseNuages: u.uBaseNuages,
           uOrage: u.uOrage,
           ...this.uniformsFront,
+          ...this.grains.uniforms,
+          uRideauxEcran: { value: this.rideauxEcran.texture },
         },
         vertexShader: SOMMET_FOND, fragmentShader: FRAGMENT_FOND,
         side: THREE.BackSide, depthWrite: false, depthTest: false,
@@ -412,7 +476,7 @@ export class Ciel {
     this.cameraCube.updateCoordinateSystem();
     this.sceneCube = new THREE.Scene();
     this.materiauCube = new THREE.ShaderMaterial({
-      uniforms: { ...u, ...this.uniformsFront, uCarteCiel: { value: this.carte.texture }, uPositionCamera: { value: v3() } },
+      uniforms: { ...u, ...this.uniformsFront, ...this.grains.uniforms, uCarteCiel: { value: this.carte.texture }, uPositionCamera: { value: v3() } },
       vertexShader: SOMMET_CUBE, fragmentShader: FRAGMENT_CUBE, side: THREE.BackSide, depthWrite: false, depthTest: false,
     });
     this.sceneCube.add(new THREE.Mesh(new THREE.BoxGeometry(2, 2, 2), this.materiauCube));
@@ -431,6 +495,7 @@ export class Ciel {
     this.nuagesEcran.setSize(l, h);
     for (const rt of this.historique) rt.setSize(l, h);
     this.passeAccumulation.materiau.uniforms.uTexel.value.set(1 / l, 1 / h);
+    this.rideauxEcran.setSize(Math.max(1, Math.round(l * 0.5)), Math.max(1, Math.round(h * 0.5)));
     this.reinitialiserNuages = true;
     this.fond.material.uniforms.uTailleEcran.value.set(largeur, hauteur);
   }
@@ -504,6 +569,12 @@ export class Ciel {
     this.fond.material.uniforms.uNuagesEcran.value = cible.texture;
     this.vueProjectionPrecedente.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse);
     this.reinitialiserNuages = false;
+    // les rideaux de pluie devant le ciel
+    const ug = this.grains.uniforms;
+    if (ug.uRideauxN.value > 0 && ug.uRideauxReglages.value.w > 0.5) {
+      this.passeRideaux.materiau.uniforms.uPositionCamera.value.copy(camera.position);
+      this.passeRideaux.rendre(r, this.rideauxEcran);
+    }
 
     const ecran = r.getDrawingBufferSize(new THREE.Vector2());
     const fov = THREE.MathUtils.degToRad(camera.fov);

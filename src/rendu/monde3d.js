@@ -18,6 +18,7 @@ import { Cargo3D } from './cargo.js';
 import { Trombe3D } from './trombe.js';
 import { LumiereEtrange } from './lumiere-etrange.js';
 import { ChronoGPU } from './chrono-gpu.js';
+import { REGLAGES_GRAINS } from '../monde/grains.js';
 
 // Les niveaux de qualité de l'image (les options du jeu) : la finesse de l'image (au plus
 // tant de pixels par point de l'écran), l'anticrénelage, la taille de la carte des
@@ -95,6 +96,10 @@ export class Monde3D {
     this.lumiereEtrange = new LumiereEtrange(this.scene, this.houle);
     this.etatCargo = null;
     this.etatTrombe = null;
+    // les grains (monde/grains.js : le jeu donne ceux de la nuit, ou ceux du décor) ; et ce
+    // qu'ils font là où est la caméra (la pluie qui tombe ici, leur vent…)
+    this.etatGrains = null;
+    this.ici = { pluie: 0, agitation: 0, ombre: 0, approche: 0, vent: { x: 0, y: 0, z: 0 }, grain: null };
     this.bateau = null;
     this.aPrecompiler = []; // (d'autres objets qui n'apparaissent que plus tard : le jeu les ajoute)
 
@@ -234,7 +239,8 @@ export class Monde3D {
     // (noirMax : les options peuvent adoucir le noir d'encre de la nuit d'orage)
     this.ecl = eclairage(this.noirMax < 1 ? { ...meteo, noirMax: this.noirMax } : meteo);
     this.ciel.regler(meteo, this.ecl, this.temps, { brusque });
-    this.eau.regler(meteo, this.ecl);
+    // (la pluie des grains a ses propres rideaux : la brume ne compte que celle de partout)
+    this.eau.regler(meteo, this.ecl, { pluie: this.etatGrains ? meteo.pluie * REGLAGES_GRAINS.pluieFond : meteo.pluie });
     const r = this.post.reglages;
     r.uExposition.value = this.ecl.exposition;
     const e = etalonnage(meteo, this.ecl);
@@ -245,33 +251,54 @@ export class Monde3D {
     r.uVignettage.value = e.vignettage;
   }
 
-  // Les éclairs : des flashs groupés par deux ou trois, de plus en plus fréquents avec l'orage
+  // Les éclairs : des flashs groupés par deux ou trois, de plus en plus fréquents avec l'orage.
+  // Ils sortent des nuages d'orage : de la trombe, des grains (d'autant plus souvent qu'ils
+  // sont orageux et forts), ou de l'orage au loin.
   majEclairs(dt) {
     const e = this.eclair;
     const orage = this.meteo.orage;
     e.intensite = 0;
     // (la cellule orageuse de la trombe crache des éclairs autour d'elle)
     const trombe = this.etatTrombe?.force > 0.5 ? this.etatTrombe : null;
-    if (orage > 0.5) {
-      e.prochain -= dt * (orage - 0.4) * (trombe ? 2.5 : 1);
+    const grains = this.etatGrains;
+    let poids = 0;
+    for (const g of grains?.liste ?? []) poids += g.orage * grains.intensite(g);
+    if (orage > 0.5 || poids > 0.05) {
+      e.prochain -= dt * (Math.max(0, orage - 0.4) * (trombe ? 2.5 : 1) + 0.35 * poids);
       if (e.prochain <= 0) {
         const angle = Math.random() * Math.PI * 2;
         const autourTrombe = trombe && Math.random() < 0.6;
-        // (plus souvent loin que près : la plupart illuminent les nuages et l'horizon, un sur
-        // trois tombe à moins de 4 km et montre toute la mer autour de nous)
-        const distance = autourTrombe ? Math.random() * 700 : 1200 + Math.random() ** 1.6 * 9800;
-        const origine = autourTrombe ? new THREE.Vector3(trombe.x, 0, trombe.z) : this.camera.position;
-        const centre = new THREE.Vector3(
-          origine.x + Math.cos(angle) * distance,
-          this.ciel.uniformsNuages.uBaseNuages.value + (autourTrombe ? 100 : 400) + Math.random() * 1200,
-          origine.z + Math.sin(angle) * distance,
-        );
+        // (un grain, tiré au sort selon ses éclairs)
+        let grain = null;
+        if (!autourTrombe && poids > 0 && Math.random() < poids / (poids + 0.35)) {
+          let tirage = Math.random() * poids;
+          for (const g of grains.liste) {
+            tirage -= g.orage * grains.intensite(g);
+            if (tirage <= 0) { grain = g; break; }
+          }
+        }
+        // (au loin, plus souvent loin que près : la plupart illuminent les nuages et
+        // l'horizon, un sur trois tombe à moins de 4 km et montre toute la mer autour de nous)
+        let centre;
+        if (grain) {
+          const c = grains.noyau(grain, grain.noyaux[0], {});
+          const r = Math.sqrt(Math.random()) * grain.rayon * 0.9;
+          centre = new THREE.Vector3(c.x + Math.cos(angle) * r, this.ciel.uniformsNuages.uBaseNuages.value + 150 + Math.random() * 1300, c.z + Math.sin(angle) * r);
+        } else {
+          const distance = autourTrombe ? Math.random() * 700 : 1200 + Math.random() ** 1.6 * 9800;
+          const origine = autourTrombe ? new THREE.Vector3(trombe.x, 0, trombe.z) : this.camera.position;
+          centre = new THREE.Vector3(
+            origine.x + Math.cos(angle) * distance,
+            this.ciel.uniformsNuages.uBaseNuages.value + (autourTrombe ? 100 : 400) + Math.random() * 1200,
+            origine.z + Math.sin(angle) * distance,
+          );
+        }
         const debut = this.temps;
         const nb = 1 + Math.floor(Math.random() * 3);
-        // un éclair sur deux descend jusqu'à la mer (on voit le trait) ; les autres
-        // restent dans le nuage, qu'ils illuminent de l'intérieur
+        // un éclair sur deux descend jusqu'à la mer (on voit le trait) — sous un grain, deux
+        // sur trois ; les autres restent dans le nuage, qu'ils illuminent de l'intérieur
         const cle = Math.floor(Math.random() * 1e9);
-        const visible = Math.random() < 0.55;
+        const visible = Math.random() < (grain ? 0.65 : 0.55);
         // (le tonnerre arrive d'autant plus tard que l'éclair est loin de nous)
         const loin = Math.hypot(centre.x - this.camera.position.x, centre.z - this.camera.position.z);
         this.surEclair?.(loin, visible);
@@ -305,6 +332,7 @@ export class Monde3D {
       eclaire = Math.max(eclaire, v * (f.eclaire ?? 1));
     }
     e.eclaire = eclaire;
+    e.centre = centre;
     this.ciel.eclair(centre ?? new THREE.Vector3(), e.intensite);
     this.eau.uniforms.uEclair.value = eclaire * 0.25;
     this.post.reglages.uFlash.value = eclaire * 0.006;
@@ -425,8 +453,22 @@ export class Monde3D {
     this.camera.updateMatrixWorld();
     this.mesurer('lumiere', () => this.majLumiere(dt));
     const vent = new THREE.Vector3(Math.cos(angleVers(m.directionVent)), 0, Math.sin(angleVers(m.directionVent))).multiplyScalar(m.vent * NOEUD);
+    // les grains : ce qu'ils font ici (la pluie qui tombe sur nous, leur vent), et ce que les
+    // shaders doivent savoir d'eux (leurs rideaux de pluie, leurs rafales, leur nuage)
+    const grains = this.etatGrains;
+    const ici = this.ici;
+    const cam = this.camera.position;
+    if (grains) grains.mesurer(cam.x, cam.z, ici);
+    else {
+      Object.assign(ici, { pluie: m.pluie, agitation: 0, ombre: 0, approche: 0, grain: null });
+      ici.vent.x = 0;
+      ici.vent.z = 0;
+    }
+    this.ciel.grains.maj(dt, grains, this.camera, { base: this.ciel.uniformsNuages.uBaseNuages.value, temps: this.temps, ecl: this.ecl, eclair: this.eclair });
+    // (la pluie penche avec le vent d'ici : celui du moment, et celui du grain)
+    const ventIci = new THREE.Vector3(vent.x + ici.vent.x, 0, vent.z + ici.vent.z);
     this.pluie.maj(this.temps, this.camera, {
-      intensite: m.pluie, vent, ambiance: new THREE.Vector3().fromArray(this.ecl.ambiance), eclair: this.eclair.eclaire,
+      intensite: ici.pluie, vent: ventIci, ambiance: new THREE.Vector3().fromArray(this.ecl.ambiance), eclair: this.eclair.eclaire,
       lampe: this.lampe,
       versBateau: this.bateau ? this.eau.uniforms.uBateauInverse.value : null,
     });
@@ -454,13 +496,14 @@ export class Monde3D {
       temps: this.temps, directionVent: angleVers(m.directionVent), camera: this.camera, nuit: this.ecl.nuit, noir: this.ecl.noir ?? 0, eclaire: this.eclair.eclaire,
     });
     if (this.eau.brumeDeBase) this.eau.uniforms.uBrume.value = this.eau.brumeDeBase * (1 + 160 * this.trombe.brouillard ** 1.5);
+    this.ciel.grains.uniforms.uRideauxReglages.value.z = this.eau.uniforms.uBrume.value;
     this.post.reglages.uEmbruns.value = this.dansLaCabine ? 0 : this.trombe.brouillard ** 1.5;
     this.lumiereEtrange.maj(dt, this.camera);
     // le faisceau de la lampe frontale se voit dans la pluie, les embruns, la brume
-    const eauDansLAir = Math.min(1, m.pluie * 0.8 + (this.embruns.densiteAutour ?? 0) + this.trombe.brouillard + m.brume * 0.3);
+    const eauDansLAir = Math.min(1, ici.pluie * 0.8 + (this.embruns.densiteAutour ?? 0) + this.trombe.brouillard + m.brume * 0.3);
     this.post.reglages.uLampeVoile.value = this.lampe.intensity > 0 && !this.dansLaCabine ? 0.0045 * eauDansLAir * this.lampe.intensity : 0;
     const face = Math.max(0, -regard.dot(vent.clone().normalize()));
-    this.gouttes.maj(dt, { pluie: m.pluie * Math.min(1, m.vent / 20), face, dehors: !this.dansLaCabine });
+    this.gouttes.maj(dt, { pluie: ici.pluie * Math.min(1, m.vent / 20), face, dehors: !this.dansLaCabine });
     this.post.reglages.uForceGouttes.value = this.dansLaCabine || !this.gouttesActives ? 0 : 1;
     this.mesurer('eau', () => this.eau.preparer(this.camera));
     this.mesurer('ciel', () => this.ciel.preparer(this.camera, { toutLeCube }));

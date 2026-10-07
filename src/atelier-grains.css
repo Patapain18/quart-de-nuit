@@ -1,0 +1,18 @@
+/* Atelier des grains : le panneau de l'atelier de la mer, l'écran du radar et les courbes
+   de la traversée */
+#radar {
+  display: block;
+  width: 100%;
+  max-width: 256px;
+  aspect-ratio: 1;
+  margin: 0 auto;
+  border-radius: 50%;
+  background: #05080b;
+}
+
+#courbes svg { display: block; width: 100%; height: auto; margin-top: var(--espace-2); }
+#courbes .titre { fill: var(--texte-doux); font-size: 11px; }
+#courbes .valeur { fill: var(--texte); font-size: 11px; font-variant-numeric: tabular-nums; }
+#courbes .cadre { fill: none; stroke: var(--bordure); stroke-width: 1; }
+#courbes .zero { stroke: var(--bordure); stroke-width: 1; stroke-dasharray: 3 3; }
+#courbes .trait { fill: none; stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }

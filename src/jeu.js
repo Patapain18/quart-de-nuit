@@ -15,6 +15,7 @@ import * as THREE from 'three';
 import { Monde3D, QUALITES } from './rendu/monde3d.js';
 import { AMBIANCES, etatMeteo } from './monde/meteo.js';
 import { Vent } from './monde/vent.js';
+import { Grains } from './monde/grains.js';
 import { PhysiqueVoilier } from './physique/voilier.js';
 import { reglerAutomatiquement, etatReglage } from './physique/regleur.js';
 import { Commandes, TOUCHES } from './jeu/commandes.js';
@@ -48,6 +49,13 @@ monde.regler(meteo);
 const bateau = monde.ajouterBateau();
 const physique = new PhysiqueVoilier();
 const vent = new Vent(5);
+// les grains (monde/grains.js) : la nuit, ceux de la nuit (jeu/nuit.js) ; le jour et sur
+// l'écran d'accueil, ceux du décor, qui vivent ici
+const grainsDuDecor = new Grains(13);
+const grainsActifs = () => nuit?.grains ?? grainsDuDecor;
+const _grains = new THREE.Vector3();
+// (ce que les grains font là où est le bateau : la pluie, leur vent, l'ombre de leur nuage…)
+let ici = grainsDuDecor.mesurer(0, 0, {});
 const commandes = new Commandes(canvas);
 const audio = new Audio();
 // (les vrais enregistrements se chargent en arrière-plan dès maintenant ; le son ne
@@ -546,7 +554,18 @@ function simuler(dt) {
     if (journee) vivreLaJournee(dt);
     if (nuit) vivreLaNuit(dt);
   }
-  const v = vent.maj(monde.temps, dt, meteo);
+  // les grains : ceux de la nuit vivent avec elle (nuit.maj) ; ceux du décor, ici
+  const p = physique.position;
+  if (!nuit) {
+    // (sur l'écran d'accueil, deux averses de plus à l'horizon : la nuit qui vient)
+    grainsDuDecor.renfort = etat.mode === 'accueil' ? 2 : 0;
+    grainsDuDecor.maj(dt, meteo, p.x, p.z, physique.vitesse.x, physique.vitesse.z);
+    ici = grainsDuDecor.mesurer(p.x, p.z, ici);
+  } else if (nuit.ici) ici = nuit.ici;
+  // le vent : le vent du moment (ses rafales viennent plus souvent sous un grain), et l'air
+  // froid qui tombe des grains (la rafale qui les précède, le vent qui tourne sur leurs côtés)
+  const v = vent.maj(monde.temps, dt, meteo, ici.agitation);
+  v.add(grainsActifs().ventEn(p.x, p.z, _grains));
   // (au crépuscule, le tourbillon de la trombe, quand elle passe près : il souffle sur le
   // bateau, le secoue, et lui jette l'eau qu'il arrache à la mer)
   if (nuit?.trombe) {
@@ -564,6 +583,7 @@ function simuler(dt) {
       if (fort > 18 && !monde.dansLaCabine && Math.random() < dt * 2) monde.gouttes.eclabousser(0.4);
     }
   }
+  etat.ventVrai = v.length() / 0.5144;
   monde.mesurer('physique', () => physique.avancer(dt, monde.houle, v, Math.max(2, Math.ceil(dt * 240))));
   apparitions.maj(nuit?.peur ?? null, {
     temps: monde.temps, eclairage: etat.eclairage, ambiance: monde.ecl.ambiance, eclair: monde.eclair.eclaire, lampe: etat.lampe,
@@ -660,7 +680,7 @@ function simuler(dt) {
   });
   // les essuie-glaces : sous la pluie, ou quand les embruns arrosent le pare-brise ; et
   // l'eau qui ruisselle sur les vitres de la timonerie
-  const eauDansLAir = Math.min(1, meteo.pluie * 1.3 + (monde.embruns.densiteAutour ?? 0) * 2.5 + Math.max(0, meteo.vent - 28) / 30);
+  const eauDansLAir = Math.min(1, ici.pluie * 1.3 + (monde.embruns.densiteAutour ?? 0) * 2.5 + Math.max(0, meteo.vent - 28) / 30);
   bateau.balayage = eauDansLAir > 0.05 ? Math.min(1, eauDansLAir * 1.2) : 0;
   bateau.pluieSurLesVitres = eauDansLAir;
   mouillerLePont(dt);
@@ -707,6 +727,8 @@ function simuler(dt) {
   // (sous le nuage-mur de la trombe, il fait un peu plus sombre — un peu seulement : elle
   // vient à la tombée de la nuit, il faut encore la voir)
   if (nuit?.trombe) reglages.uExposition.value *= 1 - 0.12 * nuit.trombe.force * (1 - THREE.MathUtils.smoothstep(nuit.trombe.distance, 150, 900));
+  // (sous le nuage d'un grain aussi)
+  reglages.uExposition.value *= 1 - 0.15 * ici.ombre;
   // (et les couleurs de la nuit — bleues, délavées — ne valent que dehors)
   const et = monde.etalonnage;
   reglages.uSaturation.value = THREE.MathUtils.lerp(et.saturation, 1.05, etat.adaptation);
@@ -717,12 +739,13 @@ function simuler(dt) {
   reglages.uSaturation.value *= 1 - 0.25 * tension;
   monde.lampeFrontale(etat.lampe || (etat.mode === 'accueil' && monde.ecl.nuit > 0.6));
   // (dans la timonerie, on voit la pluie par les vitres ; dans le carré, plus du tout)
-  monde.pluie.mesh.visible = (!dedans || enTimonerie) && meteo.pluie > 0.01;
+  monde.pluie.mesh.visible = (!dedans || enTimonerie) && (monde.ici?.pluie ?? ici.pluie) > 0.01;
   monde.dansLaCabine = dedans;
   // (des gouttes sur l'écran seulement quand on est à bord, pas sur l'écran d'accueil)
   monde.gouttesActives = options.gouttes && (etat.mode === 'barre' || etat.mode === 'pied');
   monde.etatCargo = nuit?.cargo ?? null;
   monde.etatTrombe = nuit?.trombe ?? null;
+  monde.etatGrains = grainsActifs();
 
   // le son du bord
   // (le bateau secoué : la vitesse de rotation qui change d'un coup, lissée ; le vérin du
@@ -743,7 +766,9 @@ function simuler(dt) {
     ventApparent: m.ventApparent,
     vitesse: m.vitesse,
     faseyement: Math.max(r.faseyement, r.faseyementFoc * physique.deroule),
-    pluie: meteo.pluie,
+    // la pluie qui tombe ici, et l'averse d'un grain qui arrive (on l'entend sur la mer)
+    pluie: ici.pluie,
+    averse: ici.approche,
     bordage: etat.bordage,
     houle: monde.houle.hauteurSignificative,
     // la nuit : l'eau à bord, la trombe et le cargo (0 : loin → 1 : sur nous)
@@ -953,7 +978,7 @@ let enregistrement = null;
 function nouvelEnregistrement() {
   enregistrement = {
     date: Date.now(), difficulte, fin: null, heureFin: null, stats: null, age: 0,
-    serie: { heure: [], vent: [], rafale: [], hs: [], gite: [], twa: [], vitesse: [], cale: [], cockpit: [] },
+    serie: { heure: [], vent: [], rafale: [], pluie: [], hs: [], gite: [], twa: [], vitesse: [], cale: [], cockpit: [] },
     deferlantes: [], avaries: [], journal: [],
   };
 }
@@ -974,7 +999,8 @@ function enregistrer(dt) {
   const s = e.serie;
   s.heure.push(r(nuit.heure, 1000));
   s.vent.push(r(nuit.meteo.vent));
-  s.rafale.push(r(vent.vitesse));
+  s.rafale.push(r(etat.ventVrai ?? vent.vitesse));
+  s.pluie.push(r(ici.pluie, 100));
   s.hs.push(r(monde.houle.hauteurSignificative, 100));
   s.gite.push(r(Math.abs(m.gite)));
   s.twa.push(Math.round(Math.abs(m.angleVentReel)));
@@ -1056,7 +1082,7 @@ function vivreLaNuit(dt) {
 // fonce. (Seulement la rugosité et la teinte des matériaux : aucun shader à refaire.)
 const materiauxSecs = new Map();
 function mouillerLePont(dt) {
-  const vise = Math.min(1, meteo.pluie * 1.3 + Math.max(0, (meteo.vent - 25) / 20) * 0.5);
+  const vise = Math.min(1, ici.pluie * 1.3 + Math.max(0, (meteo.vent - 25) / 20) * 0.5);
   etat.mouille = (etat.mouille ?? 0) + (vise - (etat.mouille ?? 0)) * Math.min(1, dt * (vise > (etat.mouille ?? 0) ? 0.5 : 0.05));
   const w = etat.mouille;
   if (Math.abs(w - (etat.mouilleApplique ?? -1)) < 0.01) return;
@@ -1080,6 +1106,7 @@ function majRadar(dt) {
   const r = radarMonde;
   r.hs = monde.houle.hauteurSignificative;
   r.pluie = meteo.pluie;
+  r.grains = grainsActifs();
   const versOu = THREE.MathUtils.degToRad(meteo.directionVent + 180);
   const vitesseGrains = meteo.vent * 0.5144 * 0.6;
   r.vent.x = Math.sin(versOu) * vitesseGrains;
@@ -1320,6 +1347,10 @@ function commencerNuit({ depuisJournee = false, bateau: bateauGarde = null, repr
         if (!marin.attache) marin.etourdi = Math.max(marin.etourdi, 1.2);
       }
     })
+    .on('grain', (g) => {
+      if (g.grain.faits.annoncer) afficherMessage(`Un grain arrive ${directionRelative(g.relatif)}, à ${(g.distance / 1852).toFixed(1).replace('.', ',')} mille : réduis la toile avant sa rafale`);
+    })
+    .on('grain-rafale', (g) => afficherMessage(g.faits.annoncer ? 'La rafale du grain ! Tiens ta barre, les vagues dans l\'arrière' : 'La rafale d\'un grain qui passe tout près ! Tiens ta barre'))
     .on('cargo', () => afficherMessage('Un cargo en route de collision ! Appelle-le à la radio (canal 16), dans la timonerie'))
     .on('cargo-klaxon', () => audio.corne?.(5))
     .on('trombe', () => afficherMessage('Une trombe marine ! Écarte-toi de sa route : lofe et file de travers au vent'))

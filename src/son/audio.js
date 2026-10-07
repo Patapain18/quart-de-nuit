@@ -324,6 +324,23 @@ export class Audio {
       r.start(0, infos.boucle[0] + Math.random() * (infos.boucle[1] - infos.boucle[0]));
       this.boucles['scelerate-mer-forte'] = { source: r, gain: g2, filtre: f };
     }
+    // l'averse d'un grain qui arrive : la pluie, un peu plus grave, qui gronde au loin sur la
+    // mer (un souffle sourd, qui s'éclaircit en approchant)
+    if (nom === 'pluie-pont') {
+      const a = ctx.createBufferSource();
+      a.buffer = s.buffer;
+      a.loop = true;
+      [a.loopStart, a.loopEnd] = infos.boucle;
+      a.playbackRate.value = 0.82;
+      const f = ctx.createBiquadFilter();
+      f.type = 'lowpass';
+      f.frequency.value = 900;
+      const ga = ctx.createGain();
+      ga.gain.value = 0;
+      a.connect(f).connect(ga).connect(this.bus.dehors);
+      a.start(0, infos.boucle[0] + Math.random() * (infos.boucle[1] - infos.boucle[0]));
+      this.boucles['averse-pluie-pont'] = { source: a, gain: ga, filtre: f };
+    }
     if (nom === 'vent-rafales' || nom === 'mer-forte') {
       const t = ctx.createBufferSource();
       t.buffer = s.buffer;
@@ -359,7 +376,8 @@ export class Audio {
 
   actif() { return this.ctx && (this.horsLigne || this.ctx.state === 'running'); }
 
-  // e : { ventApparent (nds), vitesse (nds), faseyement (0 → 1), pluie (0 → 1),
+  // e : { ventApparent (nds), vitesse (nds), faseyement (0 → 1), pluie (0 → 1), averse (0 → 1 :
+  //       l'averse d'un grain qui arrive, on l'entend sur la mer),
   //       bordage (vitesse de rotation d'un winch, 0 → 1), houle (m, hauteur significative),
   //       eauCale, eauCockpit (litres), roulis (rad/s), mouvement (secousses du bateau, 0 → 1),
   //       trombe, cargo (0 : loin → 1 : sur nous), pilote (le vérin travaille, 0 → 1),
@@ -407,6 +425,15 @@ export class Audio {
     // la pluie, sur le pont et sur les cirés
     this.boucle('pluie-pont', 0.75 * e.pluie, 0.8);
     this.vers(this.pluie.gain.gain, 0.35 * e.pluie * calcul('pluie-pont', 0.3), 0.8);
+    // l'averse d'un grain qui arrive : elle gronde sur la mer avant de tomber sur nous
+    // (quand elle est là, c'est la pluie sur le pont qu'on entend)
+    const averse = Math.max(0, (e.averse ?? 0) - 0.7 * e.pluie);
+    this.niveaux.averse = averse;
+    const b = this.boucles['averse-pluie-pont'];
+    if (b) {
+      this.vers(b.gain.gain, 0.95 * averse ** 1.3, 0.8);
+      this.vers(b.filtre.frequency, 900 + 3200 * averse * averse, 0.8);
+    }
 
     // ----- dedans (la cabine) -----
     const d = this.dedans ? 1 : 0;

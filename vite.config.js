@@ -58,6 +58,7 @@ export default defineConfig({
         atelierTempete: path.resolve('atelier-tempete.html'),
         atelierSon: path.resolve('atelier-son.html'),
         atelierTrombe: path.resolve('atelier-trombe.html'),
+        atelierGrains: path.resolve('atelier-grains.html'),
       },
     },
   },

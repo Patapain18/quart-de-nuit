@@ -19,6 +19,7 @@ import { COQUE } from '../bateau/forme.js';
 import { glslFront } from './glsl/front.js';
 import { LONGUEUR as LONGUEUR_CARGO, GLSL_CARGO } from './forme-cargo.js';
 import { GLSL_SCELERATE, reglerUniformsScelerate } from '../mer/scelerate.js';
+import { glslGrains } from './glsl/grains.js';
 
 const N_SILLAGE = 24; // points du sillage (le premier : la poupe ; puis un toutes les 2,5 s)
 const N_CARGO = 24; // ceux du cargo (un toutes les 7 s : près de trois minutes, plus d'un kilomètre)
@@ -59,10 +60,17 @@ ${utiles.map(({ i }) => `uniform sampler2D uDeplacement${i};`).join('\n')}
 ${cascades.map((_, i) => `uniform vec3 uGrille${i}; // taille, texel, niveau de flou maximal`).join('\n')}
 uniform vec3 uCentre;
 uniform float uPasAngulaire;
+uniform sampler2D uCarteCiel;
+uniform highp sampler3D uBruit;
+uniform float uBrume;
 out vec3 vMonde;
 out vec2 vSource;
 out float vHauteur;
+out vec4 vRideaux;
+const float PI = 3.14159265359;
 ${GLSL_SCELERATE}
+${GLSL_CARTE_CIEL}
+${glslGrains('uBruit')}
 
 // Lit une grille ; au loin (sommets espacés), dans une version floue de la grille
 vec3 lireCascade(sampler2D t, vec2 xz, vec3 grille, float espacement) {
@@ -90,6 +98,17 @@ ${utiles.map(({ i }) => `  d += lireCascade(uDeplacement${i}, xz, uGrille${i}, e
   vMonde = monde;
   vSource = xz;
   vHauteur = d.y;
+  // les rideaux de pluie des grains entre nous et ce point de la mer (et, sous un grain, la
+  // pluie tout autour de nous) : calculés à chaque sommet (le voile change lentement d'un
+  // pixel à l'autre ; dix fois moins de calculs)
+  vRideaux = vec4(0.0, 0.0, 0.0, 1.0);
+  if (uRideauxN > 0) {
+    vec3 versPoint = monde - cameraPosition;
+    float dist = length(versPoint);
+    vec3 dir = versPoint / max(dist, 1e-3);
+    vec3 horizon = textureLod(uCarteCiel, uvCarteCiel(normalize(vec3(dir.x, 0.015, dir.z))), 0.0).rgb;
+    vRideaux = rideaux(cameraPosition, dir, dist, uBrume, horizon);
+  }
   gl_Position = projectionMatrix * viewMatrix * vec4(monde, 1.0);
 }
 `;
@@ -103,6 +122,7 @@ function fragmentEau(cascades) {
 in vec3 vMonde;
 in vec2 vSource;
 in float vHauteur;
+in vec4 vRideaux;
 ${cascades.map((_, i) => `uniform sampler2D uPentes${i};`).join('\n')}
 ${cascades.map((_, i) => `uniform vec3 uGrille${i};`).join('\n')}
 uniform samplerCube uReflets;
@@ -203,6 +223,7 @@ float ecumeScelerate(Scelerate sc, vec2 p) {
   return deferle * crete * max(front, traine * 0.85);
 }
 ${glslFront('uBruit')}
+${glslGrains('uBruit')}
 
 float saturer(float x) { return clamp(x, 0.0, 1.0); }
 
@@ -411,6 +432,10 @@ ${cascades.map((_, i) => `  p = texture(uPentes${i}, vSource / uGrille${i}.x);
   vec4 bateau = max(ecumeDuBateau(vMonde), ecumeDuCargo(vMonde));
   pente *= 1.0 - 0.35 * bateau.z;
   variance *= 1.0 - 0.7 * bateau.z;
+  // la rafale d'un grain : l'air froid qui s'étale ride la mer (elle ne reflète plus le
+  // ciel clair de l'horizon : elle fonce), et son bord avance comme une ligne sombre
+  vec2 rafale = rafaleGrains(vMonde.xz);
+  variance += 0.09 * rafale.x + 0.14 * rafale.y;
 
   vec3 n = normalize(vec3(-pente.x, 1.0, -pente.y));
   vec3 versOeil = cameraPosition - vMonde;
@@ -482,7 +507,9 @@ ${cascades.map((_, i) => `  p = texture(uPentes${i}, vSource / uGrille${i}.x);
                    + texture(uBruit, vec3(q.x * 0.17, q.y * 0.5, 0.63 - uTemps * 0.005)).b * 0.3
                    + texture(uBruit, vec3(vSource * 0.9, 0.4)).a * 0.15;
     // seuil réglé selon le vent : ~1 % de la mer blanchit par 13 nœuds, ~20 % par 48 nœuds
-    float fraiche = smoothstep(uSeuilEcume, uSeuilEcume + 0.35, ecume);
+    // (sous la rafale d'un grain, la mer blanchit davantage)
+    float seuil = uSeuilEcume - 0.16 * rafale.x;
+    float fraiche = smoothstep(seuil, seuil + 0.35, ecume);
     // la trombe arrache la mer. Sa vie, sur l'eau (Golden, 1974) : d'abord une tache
     // sombre ; puis des bandes d'écume qui s'enroulent en spirales vers son pied ; puis
     // l'anneau d'embruns, une couronne d'eau blanche et chaotique qui tourbillonne autour
@@ -599,6 +626,8 @@ ${cascades.map((_, i) => `  p = texture(uPentes${i}, vSource / uGrille${i}.x);
   horizon = mix(horizon, front.rgb, front.a);
   float brume = 1.0 - exp(-distance * uBrume);
   couleur = mix(couleur, horizon, brume);
+  // les rideaux de pluie des grains, entre nous et ce point de la mer (calculés aux sommets)
+  couleur = couleur * vRideaux.a + vRideaux.rgb;
   gl_FragColor = vec4(couleur, 1.0);
 }
 `;
@@ -726,6 +755,7 @@ export class Eau {
       uScelerate2: { value: new THREE.Vector4() },
       uScelerate3: { value: new THREE.Vector4() },
       ...ciel.uniformsFront,
+      ...ciel.grains.uniforms,
     };
     // une texture de déplacement, une de pentes et une fiche (taille, texel, flou max) par grille
     this.grilles.forEach(({ cascade: c, sortie }, i) => {
@@ -864,8 +894,9 @@ export class Eau {
     }
   }
 
-  // Lumières et ambiance (voir monde/meteo.js)
-  regler(meteo, ecl) {
+  // Lumières et ambiance (voir monde/meteo.js) ; pluie : celle qui voile l'air partout (sans
+  // celle des grains : leurs rideaux sont dessinés à part)
+  regler(meteo, ecl, { pluie = meteo.pluie } = {}) {
     const u = this.uniforms;
     u.uSoleil.value.fromArray(ecl.soleil);
     u.uLune.value.fromArray(ecl.lune);
@@ -879,7 +910,7 @@ export class Eau {
     const a = this.houle.mer?.directionVent ?? 0;
     u.uDirVent.value.set(Math.cos(a), Math.sin(a));
     // visibilité : 60 km par beau temps, 1,5 km sous la pluie battante
-    const visibilite = THREE.MathUtils.lerp(60000, 6000, meteo.brume) * THREE.MathUtils.lerp(1, 0.25, meteo.pluie);
+    const visibilite = THREE.MathUtils.lerp(60000, 6000, meteo.brume) * THREE.MathUtils.lerp(1, 0.25, pluie);
     this.brumeDeBase = 3 / visibilite;
     u.uBrume.value = this.brumeDeBase;
   }

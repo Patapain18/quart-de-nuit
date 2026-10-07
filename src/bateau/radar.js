@@ -7,8 +7,9 @@
 // « écho », dessiné à sa distance et dans sa direction. L'écran est centré sur le bateau,
 // l'avant en haut ; les échos s'allument quand la ligne de balayage passe, puis
 // s'estompent jusqu'au tour suivant.
-// Ce qu'on y voit : la côte de Kervalen, les bouées, le cargo, les grains de pluie (des
-// taches qui dérivent avec le vent), la trombe (une masse dense) et, tout autour du
+// Ce qu'on y voit : la côte de Kervalen, les bouées, le cargo, les grains (les vrais, ceux
+// qui passent sur la mer : monde/grains.js — leur cœur de pluie renvoie l'onde, et la pluie
+// tout autour fait un léger semis), la trombe (une masse dense) et, tout autour du
 // bateau, le « fouillis de mer » : les crêtes des vagues proches, d'autant plus qu'elles
 // sont hautes (le filtre de mer l'atténue, mais il peut cacher un petit écho).
 // Les réglages : la portée (0,75 ; 1,5 ; 3 ; 6 milles), le filtre de mer. (Le gain est
@@ -97,6 +98,7 @@ export class Radar {
 
   // dt ; m : { x, z (la position du bateau), cap (degrés) } ; monde : {
   //   hs (hauteur des vagues), pluie (0 → 1), vent : { x, z } (m/s, vers où il va),
+  //   grains (monde/grains.js : la pluie en chaque point ; sans eux, des taches au hasard),
   //   temps (s), terre(x, z) → distance à la côte (négative : à terre),
   //   cibles : [{ x, z, rayon, force }] (les navires, les bouées, la trombe, l'écho fantôme ;
   //     avec ligne, lx, lz, largeurLigne : un segment de ±ligne m le long de (lx, lz), dont
@@ -141,6 +143,7 @@ export class Radar {
     const pas = R / CASES;
     // le fouillis de mer : jusqu'à quelques centaines de mètres, selon la hauteur des vagues
     const porteeMer = 250 + 260 * monde.hs;
+    const fondPluie = monde.grains?.pluieFond() ?? 0;
     let rivage = -1; // (la distance du rivage sur ce rayon, quand on l'a trouvé)
     for (let i = 1; i < CASES; i++) {
       const r = i * pas;
@@ -167,9 +170,15 @@ export class Radar {
         } else d = Math.hypot(x - t.x, z - t.z);
         if (d < t.rayon + pas) e += k * t.force * (1 - 0.4 * (d / (t.rayon + pas)));
       }
-      // les grains : des taches de pluie qui dérivent avec le vent (seuls les plus
-      // denses renvoient l'onde)
-      if (monde.pluie > 0.05) {
+      // les grains : la pluie renvoie l'onde, d'autant plus qu'elle est dense — la pluie de
+      // partout, à peine (un léger semis) ; le cœur d'un grain, presque comme une côte : un
+      // écho granuleux, qui change à chaque tour
+      if (monde.grains) {
+        const p = monde.grains.pluieDesGrains(x, z);
+        const semis = hachage(i, this.tour, dirMonde);
+        if (p > 0.12) e += 0.95 * (p - 0.12) ** 1.1 * (0.5 + 0.5 * semis);
+        e += 0.11 * fondPluie * semis ** 6;
+      } else if (monde.pluie > 0.05) {
         const n = bruit2((x - monde.vent.x * monde.temps) / 1100, (z - monde.vent.z * monde.temps) / 1100);
         e += monde.pluie * 0.5 * Math.max(0, n - 0.6) * 2.5 * (0.5 + 0.5 * hachage(i, this.tour, dirMonde));
       }

@@ -281,6 +281,14 @@ function afficher() {
     ],
     yMax: 70, yPas: 10, unite: 'nœuds',
   });
+  // la pluie : chaque bateau a ses grains (les nuits gardées avant eux n'ont pas cette courbe)
+  const pluie = seriesDe('pluie').filter((s) => s.valeurs?.length).map((s) => ({ ...s, valeurs: s.valeurs.map((v) => v * 100) }));
+  const sectionPluie = document.getElementById('graphe-pluie').closest('section');
+  sectionPluie.hidden = !pluie.length;
+  if (pluie.length) {
+    graphe('graphe-pluie', { series: pluie, yMax: 100, yPas: 25, unite: '%', format: (v) => Math.round(v) });
+    legende(sectionPluie, pluie);
+  }
   graphe('graphe-mer', {
     series: [{ nom: 'vagues', couleur: couleur('--vent'), heure: r.heure, valeurs: r.hs }],
     yMax: 8, yPas: 2, unite: 'm', format: (v) => v.toFixed(1),
@@ -312,7 +320,7 @@ function afficherTableau() {
   const lignes = [...(etat.resultats ?? [])];
   if (etat.toi) lignes.push({ ...etat.toi, cle: 'toi', nom: 'toi' });
   const t = document.getElementById('tableau');
-  t.innerHTML = `<thead><tr><th>Marin</th><th>Issue</th><th class="nombre">Déferlantes</th><th class="nombre">Scélérates</th><th class="nombre">Gîte max</th><th class="nombre">Eau max</th><th class="nombre">Pompé</th><th>Avaries</th><th class="nombre">Trombe</th><th class="nombre">Cargo</th><th class="nombre">Parcouru</th></tr></thead>`
+  t.innerHTML = `<thead><tr><th>Marin</th><th>Issue</th><th class="nombre">Déferlantes</th><th class="nombre">Scélérates</th><th class="nombre">Gîte max</th><th class="nombre">Eau max</th><th class="nombre">Pompé</th><th>Avaries</th><th class="nombre">Grains</th><th class="nombre">Trombe</th><th class="nombre">Cargo</th><th class="nombre">Parcouru</th></tr></thead>`
     + `<tbody>${lignes.map((r) => {
       const s = r.stats;
       const issue = r.fin === 'aube' ? 'aube' : 'perdue';
@@ -323,7 +331,7 @@ function afficherTableau() {
         + `<td class="nombre">${s.deferlantes}${s.coups ? ` (${s.coups} couché${s.coups > 1 ? 's' : ''})` : ''}</td>`
         + `<td class="nombre">${s.scelerates ?? 0}${s.sceleratesCouche ? ` (${s.sceleratesCouche} couché${s.sceleratesCouche > 1 ? 's' : ''})` : ''}</td>`
         + `<td class="nombre">${Math.round(s.giteMax)}°</td><td class="nombre">${Math.round(s.caleMax)} L</td><td class="nombre">${Math.round(s.pompee)} L</td>`
-        + `<td>${avaries.join(', ') || '—'}</td><td class="nombre">${metres(s.trombeDistance)}</td><td class="nombre">${metres(s.cargoDistance)}${s.cargoAppele ? ' ☎' : ''}</td>`
+        + `<td>${avaries.join(', ') || '—'}</td><td class="nombre">${s.grains ? `${s.grains} (${Math.round(s.rafaleMax)} nds)` : '—'}</td><td class="nombre">${metres(s.trombeDistance)}</td><td class="nombre">${metres(s.cargoDistance)}${s.cargoAppele ? ' ☎' : ''}</td>`
         + `<td class="nombre">${(s.distance / 1852).toFixed(1)} mille${s.distance >= 3704 ? 's' : ''}</td></tr>`;
     }).join('')}</tbody>`;
 }

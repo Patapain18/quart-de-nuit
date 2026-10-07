@@ -17,6 +17,7 @@
     "test-barre": "node scripts/test-barre.js",
     "test-scelerate": "node scripts/test-scelerate.js",
     "test-peur": "node scripts/test-peur.js",
+    "test-grains": "node scripts/test-grains.js",
     "sons": "node scripts/preparer-sons.mjs"
   },
   "dependencies": {

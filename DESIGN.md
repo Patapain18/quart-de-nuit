@@ -837,6 +837,112 @@ dise celui que je préfère ».
     elle est un peu moins noire, pour qu'on voie encore sa texture à la tombée de la nuit.
     L'atelier de la trombe s'ouvre sur elle, au « Début de nuit (le jeu) ».
 
+### Le monde connecté (octobre 2026) : « que tout l'environnement soit connecté »
+
+Ce que Mathis a demandé, le 2026-10-07 au soir : « j'aimerais bien que tout l'environnement
+soit connecté ». Ce que ça veut dire, en jeu vidéo : un monde **systémique** (le contraire
+d'un monde *scripté*) — des choses qui existent à un endroit, et qui agissent sur tout ce
+qui les entoure. La bête marchait déjà comme ça (son tourbillon pousse le bateau, la mer a
+sa tache et ses spirales, le ciel est bouché au-dessus d'elle, les éclairs tombent autour
+d'elle, le radar la voit, on l'entend gronder) ; le reste, non : la météo de la nuit
+suivait l'horloge et était la même partout ; les grains n'existaient que sur l'écran du
+radar (des taches de bruit) ; les rafales tombaient au hasard, sans rien pour les
+annoncer ; les éclairs, n'importe où ; le baromètre suivait le temps au lieu de
+l'annoncer. Son choix, dans cet ordre :
+
+27. ✅ **Les grains**, qui existent vraiment, et dont tout dépend.
+28. ⬜ **Les rafales qu'on voit venir** : une tache sombre qui court sur l'eau, la risée.
+29. ⬜ **Les éclairs qui partent des nuages d'orage**, et plus de n'importe où.
+30. ⬜ **Le baromètre qui annonce le temps**, au lieu de le suivre.
+31. ⬜ **La bête, née d'un des grains** qu'on a vus arriver au radar.
+
+27. ✅ **Les grains** (`src/monde/grains.js`, `src/rendu/glsl/grains.js`, `src/rendu/grains.js`,
+    `atelier-grains.html`) — Un grain, comme les vrais vus d'un bateau : un **cœur de
+    pluie** de 1,5 à 3 km de large, en deux ou trois morceaux, plus dense à l'avant (là où
+    l'air froid descend), qui s'étire en une traîne de pluie plus fine ; **l'air froid**
+    qui tombe sous lui et s'étale sur la mer dans tous les sens : devant le grain, il
+    s'ajoute au vent, d'un coup — **la rafale arrive avant la pluie** (une minute et demie
+    pour un bateau immobile, deux minutes quand on fuit devant lui) ; sur ses côtés, il
+    fait **tourner le vent** (dans un sens ou dans l'autre selon le côté où il passe) ;
+    derrière lui, il s'oppose au vent : **le vent mollit** après son passage ; au-dessus,
+    **son nuage d'orage**, plus large que la pluie, qui déborde loin devant (l'enclume) :
+    le ciel s'assombrit avant la rafale ; les plus forts sont **pleins d'éclairs**. Ils
+    avancent à 80 % du vent et 10° à sa droite (le vent d'altitude), naissent en une
+    minute et demie, vivent, et se dissipent.
+    **Ce qui en dépend** — tout ce qui a un rapport avec eux le lit au même endroit :
+    - *la pluie* : celle qui tombe ici (sur le pont, sur les vitres, dans le faisceau de la
+      frontale, sur l'objectif) est celle de partout (la moitié de la pluie du moment) et
+      celle des grains ; le pont mouillé, les essuie-glaces aussi ;
+    - *le vent du bateau* : l'air froid des grains s'ajoute au vent, dans la physique ;
+      sous un grain, les rafales ordinaires viennent trois fois plus souvent ;
+    - *le ciel* : au-dessus de chaque grain, son nuage d'orage (une petite carte, vue d'en
+      haut, que lisent les nuages : le ciel y est bouché, en tours) ;
+    - *les rideaux de pluie* : sous chaque grain, de la base des nuages jusqu'à la mer,
+      chaque morceau de son cœur est une colonne de pluie en cloche (une gaussienne), qui
+      penche (le vent pousse la pluie en tombant). Pour un pixel, la pluie que traverse
+      le regard se calcule d'un coup (avec la « fonction d'erreur », erf : une cloche
+      s'intègre exactement), sans avancer pas à pas ; puis des pans plus ou moins denses
+      et de légères traînées verticales. Ils renvoient la lumière du ciel (à l'ombre de
+      leur nuage : sombres en haut, plus clairs en bas, où la pluie rejaillit), le soleil
+      bas derrière eux (à contre-jour, la pluie s'allume), et l'éclair qui tombe dedans
+      (la nuit, c'est ainsi qu'on les voit : tout le rideau s'allume). Sous un grain, on ne
+      voit pas à plus de 500 m ;
+    - *la mer* : sous la rafale, elle se froisse (elle ne reflète plus le ciel clair de
+      l'horizon) et blanchit ; la côte et le cargo disparaissent derrière un rideau ;
+    - *les éclairs* tombent dans les grains, tirés au sort selon leur force et leurs
+      éclairs (deux sur trois jusqu'à la mer) ; la trombe et l'orage lointain gardent les
+      leurs ;
+    - *le son* : on **entend l'averse arriver** sur la mer (un grondement sourd qui
+      s'éclaircit en approchant), une cinquantaine de secondes avant qu'elle tombe sur le
+      pont ;
+    - *le radar* voit les vrais grains : leur cœur de pluie, un écho granuleux qui avance
+      avec le vent ; la pluie de partout ne fait qu'un léger semis ;
+    - *Jos* les voit sur son radar et les annonce, quand ils sont à moins de deux milles :
+      d'où ils viennent, à quelle distance, le vent qu'il fera dessous, et ce qu'il faut
+      faire (« Réduis maintenant, pas quand il sera sur toi : la grand-voile affalée, un
+      mouchoir de foc ») — ou que la toile est bonne ; il rappelle à l'ordre si le grain
+      est presque là et la toile toujours haute ; il dit quand il est passé ;
+    - *l'écran* : « Un grain arrive derrière, sur bâbord, à 1,6 mille : réduis la toile
+      avant sa rafale », « La rafale du grain ! », le panneau (« Grain à 1,2 mille »,
+      « Sous le grain »), le journal et le bilan (« rafales à 52 nœuds ») ;
+    - *les avaries* : si la rafale d'un grain arrive un peu avant l'heure où l'écoute de foc
+      ou le pilote devaient lâcher, c'est elle qui les achève (« Le pilote automatique a
+      lâché, dans la rafale d'un grain ») ;
+    - *la lumière* : sous son nuage, il fait un peu plus sombre (15 %).
+    **La nuit** : des grains alentour, d'autant plus que le temps tourne à l'orage
+    (épars au coucher du soleil, une demi-douzaine au plus fort), qui ne viennent jamais
+    sur nous ; et quatre lancés exprès, quatre minutes avant d'arriver (au vent, à la
+    bonne distance), chacun quand rien d'autre n'arrive, pour qu'on le vive pour
+    lui-même : le premier passe de côté vers 22 h 40, juste après la trombe (on n'en prend
+    que le bord de la rafale, on le voit à ses éclairs), puis vers 1 h 30, le plus fort
+    vers 3 h, au cœur de la tempête, le dernier, plus faible, vers 4 h 30, dans
+    l'accalmie. On peut s'écarter de leur route
+    (ils passent là où le bateau serait s'il ne changeait rien) ; on ne peut pas les
+    distancer. Plus faibles pour le matelot (× 0,8), plus forts pour le cap-hornier
+    (× 1,15). Le jour, des grains du décor, selon le temps ; sur l'écran d'accueil, deux
+    averses de plus à l'horizon du coucher de soleil (la nuit qui vient).
+    **Mesuré** (`npm run test-grains`) : un grain lancé arrive à l'heure dite ; la rafale
+    (+13 nœuds pour un grain de force 0,9) 99 s avant la pluie la plus forte ; l'averse entendue 50 s avant ; le ciel
+    sombre avant la rafale ; derrière, le vent mollit de 5 nœuds ; sur le côté, il tourne
+    pendant trois minutes. `npm run test-nuit` : le prudent prend cinq grains (rafales à
+    55 nœuds), réduit avant chacun, comme le dit Jos, et n'est jamais couché.
+    **Ce que ça coûte** : la première version calculait les rideaux pour chaque pixel du
+    ciel et de la mer : 2,6 ms de plus par image (60 images par seconde au lieu de 71
+    dans l'atelier). Maintenant : la mer les calcule à chaque sommet de son maillage (le
+    voile change lentement d'un pixel à l'autre : dix fois moins de calculs), le ciel dans
+    une petite image (un quart de la largeur de l'écran, agrandie), une seule colonne par
+    grain lointain, une seule lecture du bruit par colonne : 0,25 ms.
+    **Les outils** : l'atelier des grains (`atelier-grains.html` : faire passer un grain
+    sur le bateau, ou à côté, ou le poser à la distance voulue ; sa force, ses éclairs,
+    les grains d'alentour ; cinq moments, de l'après-midi d'orage à la nuit au plus fort ;
+    cinq points de vue (du cockpit, immobile pour filmer, de loin, d'en haut, sous la
+    pluie) ; ce qu'il fait au bateau, en chiffres et en courbes (la pluie, le vent, le vent
+    qui tourne, l'averse qu'on entend), et l'écran du radar ; `__grains.planche()`,
+    `film()`, `couts()`, `coutsDetailles()` (ce que coûte chaque morceau : on le coupe, on
+    compare), `fluidite()` (les vraies images par seconde, avec et sans) ; dans l'atelier
+    de la tempête, la courbe de la pluie de chaque marin et une colonne « Grains ».
+    Images : `docs/etape27-*.jpg`.
+
 ## 4. Pistes graphiques notées pour plus tard
 
 Toutes celles du grand chantier sont faites (étapes 13 à 17).

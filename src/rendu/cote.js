@@ -12,6 +12,7 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { GLSL_CARTE_CIEL } from './ciel.js';
+import { glslGrains, UNIFORMS_GRAINS } from './glsl/grains.js';
 
 // ---------- Un bruit répétable (pour les reliefs) ----------
 function hasard(n) {
@@ -295,11 +296,14 @@ function batiments() {
 }
 
 // ---------- La brume, comme sur la mer ----------
-// (sert aussi aux autres choses lointaines : le cargo, la trombe, les déferlantes)
+// (sert aussi aux autres choses lointaines : le cargo, la trombe, les déferlantes) ; et
+// les rideaux de pluie des grains qui passent devant (rendu/glsl/grains.js)
 export function brumeCommeLaMer(materiau, eau, cle = 'cote-brume') {
   materiau.onBeforeCompile = (shader) => {
     shader.uniforms.uCarteCiel = eau.uniforms.uCarteCiel;
     shader.uniforms.uBrume = eau.uniforms.uBrume;
+    shader.uniforms.uBruitRideaux = eau.uniforms.uBruit;
+    for (const k of Object.keys(UNIFORMS_GRAINS)) shader.uniforms[k] = eau.uniforms[k];
     shader.vertexShader = shader.vertexShader
       .replace('#include <common>', '#include <common>\nvarying vec3 vPosMonde;')
       .replace('#include <project_vertex>', '#include <project_vertex>\nvPosMonde = (modelMatrix * vec4(transformed, 1.0)).xyz;');
@@ -308,7 +312,9 @@ export function brumeCommeLaMer(materiau, eau, cle = 'cote-brume') {
 varying vec3 vPosMonde;
 uniform sampler2D uCarteCiel;
 uniform float uBrume;
-${GLSL_CARTE_CIEL}`)
+uniform highp sampler3D uBruitRideaux;
+${GLSL_CARTE_CIEL}
+${glslGrains('uBruitRideaux')}`)
       .replace('#include <opaque_fragment>', `#include <opaque_fragment>
 {
   vec3 versPoint = vPosMonde - cameraPosition;
@@ -316,6 +322,10 @@ ${GLSL_CARTE_CIEL}`)
   vec3 d = versPoint / distance;
   vec3 horizon = texture(uCarteCiel, uvCarteCiel(normalize(vec3(d.x, max(d.y, 0.012), d.z)))).rgb;
   gl_FragColor.rgb = mix(gl_FragColor.rgb, horizon, 1.0 - exp(-distance * uBrume));
+  if (uRideauxN > 0) {
+    vec4 r = rideaux(cameraPosition, d, distance, uBrume, horizon);
+    gl_FragColor.rgb = gl_FragColor.rgb * r.a + r.rgb;
+  }
 }`);
   };
   materiau.customProgramCacheKey = () => cle;
