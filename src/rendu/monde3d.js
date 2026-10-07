@@ -83,6 +83,7 @@ export class Monde3D {
     this.gouttes = new Gouttes();
     this.post.reglages.uGouttes.value = this.gouttes.texture;
     this.dansLaCabine = false; // (le jeu le dit : dedans, pas de gouttes sur l'objectif)
+    this.noirMax = 1; // (le noir d'encre de la nuit d'orage : 1 ; moins, pour un écran peu lumineux)
     this.gouttesActives = true; // (les options : on peut ne pas en vouloir)
     // le cargo et la trombe de la nuit (le jeu donne leur état : jeu/nuit.js)
     this.cargo = new Cargo3D(this.scene, this.houle, this.eau);
@@ -99,7 +100,7 @@ export class Monde3D {
     // calcul, image par image ; gpu : on attend la carte graphique après chaque morceau
     // (plus lent, mais on voit son vrai travail)
     this.chrono = { actif: false, gpu: false, image: null, images: [] };
-    this.eclair = { intensite: 0, prochain: 4, flashs: [] };
+    this.eclair = { intensite: 0, eclaire: 0, prochain: 4, flashs: [] };
     this.mesures = { houleMs: 0, imageMs: 0, ips: 0 };
     this._compteur = { images: 0, depuis: performance.now() };
     this.redimensionner();
@@ -221,7 +222,8 @@ export class Monde3D {
     this.meteo = meteo;
     if (recalculerMer) this.houle.regler(etatMer(meteo), { progressif: !brusque });
     if (brusque && recalculerMer) this.houle.effacerEcume();
-    this.ecl = eclairage(meteo);
+    // (noirMax : les options peuvent adoucir le noir d'encre de la nuit d'orage)
+    this.ecl = eclairage(this.noirMax < 1 ? { ...meteo, noirMax: this.noirMax } : meteo);
     this.ciel.regler(meteo, this.ecl, this.temps, { brusque });
     this.eau.regler(meteo, this.ecl);
     const r = this.post.reglages;
@@ -246,7 +248,9 @@ export class Monde3D {
       if (e.prochain <= 0) {
         const angle = Math.random() * Math.PI * 2;
         const autourTrombe = trombe && Math.random() < 0.6;
-        const distance = autourTrombe ? Math.random() * 700 : 2000 + Math.random() * 9000;
+        // (plus souvent loin que près : la plupart illuminent les nuages et l'horizon, un sur
+        // trois tombe à moins de 4 km et montre toute la mer autour de nous)
+        const distance = autourTrombe ? Math.random() * 700 : 1200 + Math.random() ** 1.6 * 9800;
         const origine = autourTrombe ? new THREE.Vector3(trombe.x, 0, trombe.z) : this.camera.position;
         const centre = new THREE.Vector3(
           origine.x + Math.cos(angle) * distance,
@@ -262,14 +266,22 @@ export class Monde3D {
         // (le tonnerre arrive d'autant plus tard que l'éclair est loin de nous)
         const loin = Math.hypot(centre.x - this.camera.position.x, centre.z - this.camera.position.z);
         this.surEclair?.(loin, visible);
+        // (ce qu'il éclaire autour du bateau : tout, s'il est proche ; loin, la lumière qui
+        // nous arrive vient surtout des nuages, faible et diffuse)
+        const eclaire = 0.22 + 0.78 * (1 - THREE.MathUtils.smoothstep(loin, 2500, 9000));
+        // (les éclats d'un même éclair, à plus d'un tiers de seconde l'un de l'autre : dans
+        // le noir, des éclats plus serrés, sur tout l'écran, peuvent être dangereux pour les
+        // personnes photosensibles — jamais plus de trois par seconde)
         for (let i = 0; i < nb; i++) {
-          e.flashs.push({ centre, cle, visible, debut: debut + i * (0.06 + Math.random() * 0.12), force: 0.6 + Math.random() * 0.9, proche: loin < 5000 });
+          e.flashs.push({ centre, cle, visible, debut: debut + i * (0.36 + Math.random() * 0.25), force: 0.6 + Math.random() * 0.9, proche: loin < 5000, eclaire });
         }
-        e.prochain = 1.5 + Math.random() * 7;
+        // (des salves rapprochées, puis de longues attentes dans le noir)
+        e.prochain = Math.random() < 0.3 ? 0.4 + Math.random() * 2 : 3 + Math.random() * 10;
       }
     }
     let centre = null;
     let actif = null;
+    let eclaire = 0; // (la lumière de l'éclair autour du bateau : moins que dans les nuages, s'il est loin)
     // (les éclairs doux, pour les yeux sensibles : moins forts, et ils s'éteignent lentement
     // au lieu de claquer — plus d'éclats successifs)
     const doux = this.eclairsDoux;
@@ -281,10 +293,12 @@ export class Monde3D {
         ? 0.4 * f.force * Math.exp(-age * 3.5) * Math.min(1, age / 0.25)
         : f.force * Math.exp(-age * 18) * (age < 0.02 ? age / 0.02 : 1);
       if (v > e.intensite) { e.intensite = v; centre = f.centre; actif = f; }
+      eclaire = Math.max(eclaire, v * (f.eclaire ?? 1));
     }
+    e.eclaire = eclaire;
     this.ciel.eclair(centre ?? new THREE.Vector3(), e.intensite);
-    this.eau.uniforms.uEclair.value = e.intensite * 0.25;
-    this.post.reglages.uFlash.value = e.intensite * 0.006;
+    this.eau.uniforms.uEclair.value = eclaire * 0.25;
+    this.post.reglages.uFlash.value = eclaire * 0.006;
     this.eclairs.maj(actif, e.intensite, this.renderer.getDrawingBufferSize(new THREE.Vector2()));
     if (centre) {
       this.eau.uniforms.uDirEclair.value.copy(centre).sub(this.camera.position).normalize();
@@ -292,7 +306,7 @@ export class Monde3D {
       this.lumiereEclair.target.position.copy(this.camera.position);
       this.lumiereEclair.target.updateMatrixWorld();
     }
-    this.lumiereEclair.intensity = e.intensite * 1.3;
+    this.lumiereEclair.intensity = eclaire * 1.3;
     this.majEclairsDuFront(dt);
   }
 
@@ -305,7 +319,7 @@ export class Monde3D {
     this.surEclair?.(loin, true);
     const cle = Math.floor(Math.random() * 1e9);
     for (let i = 0; i < 3; i++) {
-      e.flashs.push({ centre, cle, visible: true, debut: this.temps + i * (0.09 + Math.random() * 0.1), force: 1.1 + Math.random() * 0.5, proche: true });
+      e.flashs.push({ centre, cle, visible: true, debut: this.temps + i * (0.36 + Math.random() * 0.15), force: 1.1 + Math.random() * 0.5, proche: true, eclaire: 1 });
     }
     e.prochain = Math.max(e.prochain, 2.5);
   }
@@ -401,7 +415,7 @@ export class Monde3D {
     this.mesurer('lumiere', () => this.majLumiere(dt));
     const vent = new THREE.Vector3(Math.cos(angleVers(m.directionVent)), 0, Math.sin(angleVers(m.directionVent))).multiplyScalar(m.vent * NOEUD);
     this.pluie.maj(this.temps, this.camera, {
-      intensite: m.pluie, vent, ambiance: new THREE.Vector3().fromArray(this.ecl.ambiance), eclair: this.eclair.intensite,
+      intensite: m.pluie, vent, ambiance: new THREE.Vector3().fromArray(this.ecl.ambiance), eclair: this.eclair.eclaire,
       lampe: this.lampe,
       versBateau: this.bateau ? this.eau.uniforms.uBateauInverse.value : null,
     });
@@ -410,13 +424,15 @@ export class Monde3D {
     this.lampe.position.copy(this.camera.position);
     this.lampe.target.position.copy(this.camera.position).addScaledVector(regard, 10);
     this.lampe.target.updateMatrixWorld();
+    // (la mer reçoit la lumière du bord : la frontale, les feux de navigation)
+    this.eau.eclairerParLeBord(this.lampe, this.bateau?.feux ?? []);
     // la tempête : les déferlantes qui arrivent, les embruns, les gouttes sur l'objectif
     const ambiance = new THREE.Vector3().fromArray(this.ecl.ambiance);
     const centre = this.bateau ? this.bateau.groupe.position : this.camera.position;
     this.deferlantes.maj(dt, this.temps, centre, { nuit: this.ecl.nuit, vent });
     this.scelerate.maj(dt, this.temps, { centre: this.bateau ? centre : null, nuit: this.ecl.nuit, vent });
     this.embruns.maj(dt, {
-      vent, camera: this.camera, lampe: this.lampe, ambiance, eclair: this.eclair.intensite, nuit: this.ecl.nuit,
+      vent, camera: this.camera, lampe: this.lampe, ambiance, eclair: this.eclair.eclaire, nuit: this.ecl.nuit,
       niveauEau: centre.y - 3,
     });
     this.cargo.maj(this.etatCargo, this.camera);

@@ -16,6 +16,7 @@ export const OPTIONS_DE_BASE = {
   secousses: true, // la vue tremble quand une vague frappe
   gouttes: true, // les gouttes d'eau sur l'écran
   clignotements: true, // les éclairs vifs, les lumières qui vacillent (sinon : adoucis, pour les yeux sensibles)
+  nuit: 'encre', // la nuit d'orage : 'encre' (noir d'encre), 'tres-sombre' ou 'sombre' (pour un écran peu lumineux)
   volume: 0.8, // le son : 0 → 1
   voix: true, // Jos parle (sinon : seulement les sous-titres)
   sousTitres: true, // les sous-titres de la radio
@@ -29,6 +30,7 @@ export const OPTIONS_DE_BASE = {
 const LISTES = {
   qualite: ['economique', 'moyenne', 'haute', 'superbe'],
   difficulte: ['matelot', 'marin', 'caphornier'],
+  nuit: ['encre', 'tres-sombre', 'sombre'],
 };
 const BORNES = { sensibilite: [0.3, 2.5], champ: [60, 90], stabilisation: [0, 1], volume: [0, 1] };
 function valide(cle, valeur) {

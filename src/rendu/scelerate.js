@@ -9,6 +9,7 @@ import { Crete, materiauEcume, PROFIL, RANG_LEVRE } from './deferlantes.js';
 import { positionCrete, repereScelerate } from '../mer/scelerate.js';
 
 const NU = 84; // sommets le long de la crête
+// (pour une vague de 11 m : la lèvre grandit avec la vague)
 const ECHELLE = 2.2; // le profil en travers des déferlantes, agrandi
 const HAUTEUR_LEVRE = 3.4; // m : la hauteur de la lèvre au-dessus de la crête (au plus fort)
 const NV = PROFIL.length - 1;
@@ -53,7 +54,9 @@ export class Scelerate3D {
     }
     c.mesh.visible = true;
     const longueur = 2.6 * v.largeur;
+    const taille = Math.min(2.2, Math.max(0.8, v.hauteur / 11));
     const u = c.materiau.userData.uniforms;
+    u.uEchelle.value = ECHELLE * taille;
     u.uTemps.value = temps;
     u.uVie.value = Math.min(1, this.vie * 1.2);
     u.uPhospho.value = nuit * 2.8;
@@ -73,10 +76,10 @@ export class Scelerate3D {
         const el = Math.exp(-((l / v.largeur) ** 2));
         // (la lèvre n'est pas droite : elle ondule, déchiquetée, et ses bouts traînent)
         const courbe = Math.sin(l * 0.031 + 1.3) * 2.2 + Math.sin(l * 0.087 + temps * 0.4) * 0.9 + (1 - el) * 6;
-        const r = recul * ECHELLE * (0.55 + 0.45 * el) + courbe;
+        const r = recul * ECHELLE * taille * (0.55 + 0.45 * el) + courbe;
         const x = cx + px * l - dx * r;
         const z = cz + pz * l - dz * r;
-        const bosse = HAUTEUR_LEVRE * this.vie * haut * el * (0.85 + 0.15 * Math.sin(l * 0.21 + temps * 1.7));
+        const bosse = HAUTEUR_LEVRE * taille * this.vie * haut * el * (0.85 + 0.15 * Math.sin(l * 0.21 + temps * 1.7));
         // (le sommet est un point d'eau « au repos » : il suit l'eau, poussé par les vagues
         // — une seule lecture de la houle, au lieu de chercher l'eau qui arrive en (x, z))
         const d = this.houle.lire(x, z);
@@ -90,7 +93,7 @@ export class Scelerate3D {
     // le vent arrache des embruns au sommet de la lèvre : une poussière d'eau, et une brume
     // qui fume derrière la crête (plus près du bateau : on les voit passer)
     if (this.embruns && this.vie > 0.25) {
-      const n = Math.floor(70 * dt * 30 * this.vie);
+      const n = Math.floor(70 * dt * 30 * this.vie * taille);
       for (let q = 0; q < n; q++) {
         const s = (Math.random() - 0.5) * 0.7;
         const i = Math.round((s + 0.5) * NU);

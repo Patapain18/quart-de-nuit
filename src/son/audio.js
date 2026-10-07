@@ -1094,6 +1094,28 @@ export class Audio {
     }
   }
 
+  // L'alarme de la zone de garde du radar : deux notes qui alternent, vite (bip-bip,
+  // bip-bip), une salve par appel
+  alarmeRadar() {
+    if (!this.actif()) return;
+    const ctx = this.ctx;
+    const t0 = ctx.currentTime;
+    for (let k = 0; k < 4; k++) {
+      const t = t0 + k * 0.16;
+      const o = ctx.createOscillator();
+      o.type = 'square';
+      o.frequency.value = k % 2 ? 1760 : 2350;
+      const g = ctx.createGain();
+      g.gain.setValueAtTime(0, t);
+      g.gain.linearRampToValueAtTime(0.05, t + 0.004);
+      g.gain.setValueAtTime(0.05, t + 0.1);
+      g.gain.linearRampToValueAtTime(0, t + 0.11);
+      o.connect(g).connect(this.sortie);
+      o.start(t);
+      o.stop(t + 0.12);
+    }
+  }
+
   // Une voile qui se déchire (un long craquement qui monte), ou une écoute qui casse (un
   // claquement sec, puis le fouet du bout libre)
   dechirure(sorte = 'dechire') {

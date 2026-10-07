@@ -114,12 +114,16 @@ export class Bateau {
   }
 
   // Les feux de navigation : rouge à bâbord, vert à tribord (à l'avant), blanc à
-  // l'arrière et en tête de mât. Obligatoires la nuit ; ils éclairent un peu le pont.
+  // l'arrière et en tête de mât. Obligatoires la nuit ; ils éclairent un peu le pont, et
+  // la mer tout près — chacun seulement dans son secteur, comme les vrais (ils ont un
+  // écran) : le rouge et le vert de l'avant jusqu'un peu en arrière du travers, chacun de
+  // son côté ; le blanc de poupe vers l'arrière (il éclaire le sillage, pas le cockpit).
   creerFeux() {
     const m = this.mesures;
     // chaque feu : un verre teinté (éteint, il reflète le ciel ; allumé, il brille) posé
     // sur un petit boîtier noir ; le feu de poupe est au bout d'un mât de pavillon
-    const feu = (couleur, position, portee, pied = null) => {
+    // (direction : le milieu de son secteur ; angle : le demi-angle de son cône)
+    const feu = (couleur, position, portee, direction, angle, pied = null) => {
       const teinte = new THREE.Color(couleur);
       const materiau = new THREE.MeshStandardMaterial({
         color: teinte.clone().lerp(new THREE.Color(1, 1, 1), 0.5), roughness: 0.12, metalness: 0,
@@ -129,9 +133,10 @@ export class Bateau {
       verre.position.set(...position);
       const boitier = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.03, 0.06), this.materiaux.noir);
       boitier.position.set(position[0], position[1] - 0.035, position[2]);
-      const lumiere = new THREE.PointLight(couleur, 0, portee, 2);
+      const lumiere = new THREE.SpotLight(couleur, 0, portee, angle, 0.35, 2);
       lumiere.position.set(...position);
-      this.groupe.add(verre, boitier, lumiere);
+      lumiere.target.position.set(...position).add(new THREE.Vector3(...direction).normalize());
+      this.groupe.add(verre, boitier, lumiere, lumiere.target);
       if (pied) {
         const hauteur = position[1] - 0.05 - pied[1];
         const tube = new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.014, hauteur, 8), this.materiaux.inox);
@@ -142,11 +147,12 @@ export class Bateau {
     };
     const yBalcon = hauteurLivet(0.965) + 0.5;
     const zPoupe = zDe(0.006);
+    const cote = (s) => [s * Math.sin(1.0), -0.25, -Math.cos(1.0)];
     this.feux = [
-      feu(0xff2a1a, [-0.22, yBalcon, zDe(0.962)], 2.8),
-      feu(0x22ff66, [0.22, yBalcon, zDe(0.962)], 2.8),
-      feu(0xfff4e0, [0, hauteurPont(0.01, 0) + 0.72, zPoupe], 4, [0, hauteurPont(0.01, 0), zPoupe]),
-      feu(0xfff4e0, [0, m.tete + 0.12, m.zMat], 6),
+      feu(0xff2a1a, [-0.22, yBalcon, zDe(0.962)], 3.5, cote(-1), 1.05),
+      feu(0x22ff66, [0.22, yBalcon, zDe(0.962)], 3.5, cote(1), 1.05),
+      feu(0xfff4e0, [0, hauteurPont(0.01, 0) + 0.72, zPoupe], 7, [0, -0.3, 1], 1.15, [0, hauteurPont(0.01, 0), zPoupe]),
+      feu(0xfff4e0, [0, m.tete + 0.12, m.zMat], 6, [0, -0.35, -1], 1.35),
     ];
     this.allumerFeux(0);
   }
@@ -154,7 +160,7 @@ export class Bateau {
   allumerFeux(niveau) {
     for (const f of this.feux) {
       f.materiau.emissiveIntensity = niveau * 40;
-      f.lumiere.intensity = niveau * 0.7;
+      f.lumiere.intensity = niveau * 0.5;
     }
   }
 

@@ -276,6 +276,25 @@ export class Radar {
     g.fillText(`cercles ${String(this.milles / 4).replace('.', ',')} mn`, 14, TAILLE - 16);
     g.textAlign = 'right';
     g.fillText(this.filtreMer ? 'FILTRE MER' : 'filtre coupé', TAILLE - 14, TAILLE - 16);
+    // l'alarme de la zone de garde : son anneau (un quart de mille), qui clignote une fois
+    // par seconde, et l'alerte
+    if (this.alarme) {
+      const r = (0.25 / this.milles) * rayonEcran;
+      const allume = (performance.now() / 500) % 2 < 1;
+      g.strokeStyle = `rgba(255, 90, 60, ${allume ? 0.9 : 0.35})`;
+      g.lineWidth = 2;
+      g.setLineDash([6, 6]);
+      g.beginPath();
+      g.arc(c, c, Math.min(r, rayonEcran), 0, Math.PI * 2);
+      g.stroke();
+      g.setLineDash([]);
+      g.fillStyle = '#ff5a3c';
+      g.font = '700 26px ui-monospace, Menlo, monospace';
+      g.textAlign = 'center';
+      g.fillText('ALARME', c, 64);
+      g.font = '600 18px ui-monospace, Menlo, monospace';
+      g.fillText('ZONE DE GARDE', c, 86);
+    }
     this.texture.needsUpdate = true;
   }
 }

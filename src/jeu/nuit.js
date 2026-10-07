@@ -7,7 +7,7 @@
 //  - des avaries : l'écoute de foc qui casse (usée contre le hauban), une voile qui se
 //    déchire quand on en garde trop, le pilote automatique qui lâche ;
 //  - une trombe marine au crépuscule, un cargo qui croise la route vers 22 h 30 ;
-//  - deux ou trois vagues scélérates de 10 à 12 m (annoncées : le grondement, Jos, le
+//  - deux ou trois vagues scélérates de 18 à 22 m (annoncées : le grondement, Jos, le
 //    radar) : à prendre droit dans l'arrière, sinon elles couchent le bateau ;
 //  - Jos veille à la radio, depuis son sémaphore, et conseille quand ça va mal.
 // On a gagné si le bateau est encore à flot, et le marin à bord, quand le jour se lève.
@@ -76,9 +76,9 @@ const MOMENTS = [
 
 // La difficulté (l'atelier de la tempête sert à la régler)
 export const DIFFICULTES = {
-  matelot: { nom: 'Matelot', deferlantes: 0.6, force: 0.85, fuite: 0.6, avaries: 0.7, vent: -3, scelerates: 2, hauteurScelerate: 10 },
-  marin: { nom: 'Marin', deferlantes: 1, force: 1, fuite: 1, avaries: 1, vent: 0, scelerates: 3, hauteurScelerate: 11 },
-  caphornier: { nom: 'Cap-hornier', deferlantes: 1.5, force: 1.12, fuite: 1.4, avaries: 1.3, vent: 4, scelerates: 3, hauteurScelerate: 12 },
+  matelot: { nom: 'Matelot', deferlantes: 0.6, force: 0.85, fuite: 0.6, avaries: 0.7, vent: -3, scelerates: 2, hauteurScelerate: 18 },
+  marin: { nom: 'Marin', deferlantes: 1, force: 1, fuite: 1, avaries: 1, vent: 0, scelerates: 3, hauteurScelerate: 20 },
+  caphornier: { nom: 'Cap-hornier', deferlantes: 1.5, force: 1.12, fuite: 1.4, avaries: 1.3, vent: 4, scelerates: 3, hauteurScelerate: 22 },
 };
 
 // ---------- Le temps qu'il fait pendant la nuit ----------
@@ -192,8 +192,8 @@ export class Nuit {
       voix16: 24.55 + etrange() * 0.45,
       silence: 25.6 + etrange() * 0.4,
       coups: 26.9 + etrange() * 0.5,
-      echo: 25.05 + etrange() * 0.4,
     });
+    // (l'écho qui nous suit sur le radar est maintenant dans la peur : jeu/peur.js)
     // les vagues scélérates (un hasard à part, lui aussi) : la première quand le vent monte,
     // la deuxième au plus fort — pendant que Jos ne répond plus —, la dernière quand le
     // vent tourne (une vague croisée, d'une autre direction que les autres)
@@ -203,8 +203,6 @@ export class Nuit {
     heuresScelerates.slice(0, this.niveau.scelerates ?? 3).forEach((h, k) => { this.prevu[`scelerate${k}`] = h; });
     this.scelerates = null; // (le chef d'orchestre : monde/scelerates.js ; il lui faut la houle)
     this.aLancer = null; // (une vague à lancer tout de suite : pour vérifier)
-    this.echoFantome = null; // { distance, releve (rad, dans le monde), age, duree } : sur le radar
-    this.hasardEtrange = etrange;
     // la peur (jeu/peur.js) : la tension, et ce qu'on voit du coin de l'œil
     this.peur = new Peur({ graine });
     this.silence = false; // (Jos ne répond plus)
@@ -525,7 +523,7 @@ export class Nuit {
     const ecart = (k === 2 ? 34 + 14 * h() : 10 + 18 * h()) * (h() < 0.5 ? -1 : 1);
     const de = depuis ?? (this.meteo.directionVent + ecart + 360) % 360; // d'où elle vient (cap)
     const vers = ((de + 180) * Math.PI) / 180;
-    const haut = hauteur ?? (this.niveau.hauteurScelerate ?? 11) + (h() - 0.5) * 0.8;
+    const haut = hauteur ?? (this.niveau.hauteurScelerate ?? 20) + (h() - 0.5) * 1.4;
     const p = ctx.physique.position;
     const w = this.scelerates.lancer({ x: p.x, z: p.z, dx: Math.sin(vers), dz: -Math.cos(vers), hauteur: haut });
     w.depuis = de;
@@ -813,19 +811,6 @@ export class Nuit {
         'Il s\'est passé… enfin, peu importe. Tout va bien, à bord ?',
       ]);
     }
-    // un écho sur le radar, par le travers, qui garde la même distance (il nous suit), puis
-    // disparaît. (On ne le voit que si l'on regarde le radar : on ne le dira pas.)
-    if (pret('echo')) {
-      this.faits.add('echo');
-      const cap = (ctx.m.cap * Math.PI) / 180;
-      const hasard = this.hasardEtrange ?? Math.random;
-      this.echoFantome = { distance: 2200 + hasard() * 700, releve: cap + (hasard() < 0.5 ? -1 : 1) * (1.2 + hasard() * 0.6), age: 0, duree: 24 };
-      this.dernierEtrange = { nom: 'echo', heure: h };
-    }
-    if (this.echoFantome) {
-      this.echoFantome.age += dt;
-      if (this.echoFantome.age > this.echoFantome.duree) this.echoFantome = null;
-    }
     // des coups contre la coque : on ne les entend que dans la cabine
     if (pret('coups')) {
       if (!ctx.aBord.dehors) arrive('coups', 'Des coups contre la coque, à l\'avant. Trois.');
@@ -843,7 +828,7 @@ export class Nuit {
       || (this.cargo && this.cargo.distance < 1500) || (ctx.danger ?? 0) > 0.4;
     const evts = this.peur.maj(dt, {
       heure: this.heure, lieu: ctx.lieu, yeux: ctx.yeux, regard: ctx.regard, haut: ctx.haut, tanX: ctx.tanX, tanY: ctx.tanY,
-      lampe: ctx.lampe, eclairage: ctx.eclairage,
+      lampe: ctx.lampe, eclairage: ctx.eclairage, noir: ctx.noir ?? 0,
       eclair: ctx.eclair ?? 0, danger: ctx.danger ?? 0, calme: ctx.calme ?? 0, occupe, silence: this.silence,
       porteOuverte: ctx.aBord.descenteOuverte,
     });
@@ -859,6 +844,14 @@ export class Nuit {
       else if (e === 'nom') noter('nom', `Une voix a dit « ${NOM_BATEAU} », sur le 16.`);
       else if (e === 'coupCoque') noter('coupCoque', 'Un choc énorme contre la coque.');
       else if (e === 'eclairSilhouette') noter('eclairSilhouette', 'Dans l\'éclair, quelqu\'un à l\'avant. À l\'éclair suivant, plus personne.');
+      else if (e === 'echoSuiveur-fin') noter('echoSuiveur', 'Un écho sur le radar nous a suivis, toujours au même relèvement, de plus en plus près. Puis plus rien.');
+      else if (e === 'echoProche') noter('echoProche', null);
+      else if (e === 'echoProche-fin') {
+        const j = this.peur.journal.at(-1);
+        noter('echoProche', j?.nom === 'echoProche' && j.regardee
+          ? 'L\'alarme du radar : un écho à cent mètres, dans notre sillage. Dans l\'éclair, je l\'ai vu : la mer, vide.'
+          : 'L\'alarme du radar a sonné : un écho à cent mètres, dans notre sillage. Puis plus rien.');
+      }
       else if (e === 'silhouette-fin' || e === 'reflet-fin' || e === 'forme-fin') {
         // (ce qu'on a vu du coin de l'œil ne compte que si on l'a regardé : il n'y avait rien)
         const j = this.peur.journal.at(-1);
@@ -891,7 +884,8 @@ export class Nuit {
         lumiere: ['Une lumière ? Le cargo est loin dans le nord, maintenant. Sur mon radar, il n\'y a que toi.', 'Un reflet, sans doute. Ou la fatigue. Garde les yeux sur tes vagues.'],
         voix16: ['Un appel sur le seize ? Non… Je n\'ai rien reçu, moi. Et il n\'y a aucun bateau signalé dans le secteur, à part toi.', 'La fatigue joue des tours, la nuit. Reste concentré, matelot.'],
         coups: ['Des coups contre la coque ? Un tronc, une épave… ça arrive, par gros temps.', 'Regarde si tu ne prends pas l\'eau à l\'avant. Et écoute si ça recommence.'],
-        echo: ['Un écho sur ton radar ? Sur le mien, il n\'y a que toi.', 'Du fouillis de mer, sans doute. Ou un grain. Ne te laisse pas impressionner, matelot.'],
+        echoSuiveur: ['Un écho qui te suit, sur ton radar ? Sur le mien, il n\'y a que toi.', 'Un grain qui file avec le vent, sans doute. Ne te laisse pas impressionner, matelot.'],
+        echoProche: ['Ton alarme radar ? Dans cette mer, une crête qui brise juste derrière toi renvoie l\'onde.', 'Remets le filtre de mer. Et ne te retourne pas toutes les deux secondes.'],
         gemissement: ['La mer qui gémit ? C\'est le vent dans ta mâture, matelot. Ou une bouée sifflante, loin d\'ici.', 'Il n\'y en a pas dans le secteur… mais par ce temps, le son porte loin.'],
         silhouette: ['Quelqu\'un à l\'avant ? Tu es seul à bord, matelot.', 'Ton ciré de rechange qui bat, peut-être. Ou la fatigue. Bois un peu d\'eau, mange quelque chose.'],
         eclairSilhouette: ['Dans l\'éclair ? … Tu es seul à bord. Tu le sais.', 'Ne va pas à l\'avant. Pas cette nuit. Reste attaché au cockpit.'],
@@ -1092,7 +1086,7 @@ export class Nuit {
     this.commence = true;
     this.tReprise = this.t;
     MOMENTS.forEach((mo, k) => { if (mo.heure <= this.heure) this.faits.add(`moment-${k}`); });
-    for (const nom of ['trombe', 'cargo', 'lumiere', 'voix16', 'silence', 'coups', 'echo', 'scelerate0', 'scelerate1', 'scelerate2']) if (this.prevu[nom] < this.heure) this.faits.add(nom);
+    for (const nom of ['trombe', 'cargo', 'lumiere', 'voix16', 'silence', 'coups', 'scelerate0', 'scelerate1', 'scelerate2']) if (this.prevu[nom] < this.heure) this.faits.add(nom);
     for (const nom of ['ecouteFoc', 'pilote']) if (this.prevu[nom] < this.heure) this.prevu[nom] = Infinity;
     this.silence = this.faits.has('silence') && this.heure < this.prevu.silence + 0.55;
     this.meteo = meteoDeLaNuit(this.heure, this.niveau);
@@ -1145,7 +1139,7 @@ export class Nuit {
       etat: 'nuit', raison: null, cargo: null, trombe: null, suiviCoup: null, renverse: 0, annonceVue: null, commence: true,
     });
     this.sauvegarde = { ...s, faits: new Set(s.faits) };
-    for (const nom of ['trombe', 'cargo', 'ecouteFoc', 'pilote', 'lumiere', 'voix16', 'silence', 'coups', 'echo', 'scelerate0', 'scelerate1', 'scelerate2']) this.prevu[nom] ??= Infinity; // (JSON : Infinity devient null)
+    for (const nom of ['trombe', 'cargo', 'ecouteFoc', 'pilote', 'lumiere', 'voix16', 'silence', 'coups', 'scelerate0', 'scelerate1', 'scelerate2']) this.prevu[nom] ??= Infinity; // (JSON : Infinity devient null)
     this.scelerates?.finir();
     this.aLancer = null;
     this.peur.restaurer(s.peur);

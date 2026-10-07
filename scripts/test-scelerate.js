@@ -1,8 +1,9 @@
 // Les vagues scélérates, sans navigateur : node scripts/test-scelerate.js
-// Au plus fort de la nuit (40 nœuds, une mer de 5 m), une vague de 11 m arrive sur le
+// Au plus fort de la nuit (40 nœuds, une mer de 5 m), une vague de 20 m arrive sur le
 // bateau. On vérifie que la physique tient, que la vague est bien là (le bateau monte et
-// descend de 9 à 12 m), qu'on la passe en la prenant par l'arrière ou de trois quarts — un
-// grand coup, pas plus —, et qu'elle couche le bateau de travers.
+// descend de 13 à 32 m, avec les vagues de la mer), qu'on la passe en la prenant par
+// l'arrière — un grand coup, pas plus —, le plus souvent de trois quarts, et qu'elle couche
+// le bateau par la hanche ou de travers.
 import { PhysiqueVoilier } from '../src/physique/voilier.js';
 import { reglerAutomatiquement } from '../src/physique/regleur.js';
 import { Houle } from '../src/mer/houle.js';
@@ -30,6 +31,7 @@ const SCENARIOS = [
   { cle: 'face', nom: 'au près (55°), la vague presque de face (35°)', allure: 55, vague: 35, ris: 2, deroule: 0.5 },
 ];
 const MERS = [5, 17, 29];
+const HAUTEUR = Number(process.env.HAUTEUR) || 20; // m (HAUTEUR=22 npm run test-scelerate : une autre)
 const LANCER = 15; // s : le temps que les bateaux se posent
 const APRES = 12; // s : on regarde ce que fait le bateau après le choc
 
@@ -66,7 +68,7 @@ function naviguer(graine) {
         const cote = Math.sign(m.angleVentReel || 1);
         const depuis = ((m.cap + cote * sc.vague) * Math.PI) / 180; // d'où elle vient (cap compas)
         // (cap compas → monde : nord = −z, est = +x ; elle va à l'opposé)
-        e.scelerates.lancer({ x: b.position.x, z: b.position.z, dx: -Math.sin(depuis), dz: Math.cos(depuis), hauteur: 11 });
+        e.scelerates.lancer({ x: b.position.x, z: b.position.z, dx: -Math.sin(depuis), dz: Math.cos(depuis), hauteur: HAUTEUR });
       }
       for (const etape of e.scelerates.maj(1 / 60, b.position.x, b.position.z)) {
         if (etape === 'choc') {
@@ -102,7 +104,7 @@ function naviguer(graine) {
   return bateaux;
 }
 
-console.log('Les vagues scélérates (11 m) dans la tempête (40 nœuds)\n');
+console.log(`Les vagues scélérates (${HAUTEUR} m) dans la tempête (40 nœuds)\n`);
 const debut = Date.now();
 const resultats = {};
 for (const graine of MERS) {
@@ -122,11 +124,12 @@ console.log('');
 const tous = Object.values(resultats).flatMap((r) => r.mers);
 verifier(tous.every((e) => e.valide), 'la physique reste stable (aucune reprise, aucun nombre perdu)');
 verifier(tous.every((e) => e.choc), 'chaque vague arrive jusqu\'au bateau (le choc a lieu)');
-verifier(tous.every((e) => e.hMax - e.hMin > 8 && e.hMax - e.hMin < 17), 'le bateau monte et descend de 8 à 17 m en la passant (la vague, plus celles de la mer)');
+// (de travers, le bateau glisse parfois le long de la crête au lieu de la franchir)
+verifier(tous.every((e) => e.hMax - e.hMin > 0.65 * HAUTEUR && e.hMax - e.hMin < 1.6 * HAUTEUR), `le bateau monte et descend de ${Math.round(0.65 * HAUTEUR)} à ${Math.round(1.6 * HAUTEUR)} m en la passant (la vague, plus celles de la mer)`);
 const couche = (e) => e.giteMax > 70 || e.chavire;
 const r = (cle) => resultats[cle].mers;
 verifier(r('arriere').every((e) => e.giteMax < 50 && !e.chavire), 'droit derrière : un grand coup, mais pas plus (gîte < 50°)');
-verifier(r('troisQuarts').every((e) => e.giteMax < 65 && !e.chavire), 'de trois quarts arrière : ça passe (gîte < 65°)');
+verifier(r('troisQuarts').filter((e) => e.giteMax < 70 && !e.chavire).length >= 2, 'de trois quarts arrière : ça passe le plus souvent (au moins 2 fois sur 3, gîte < 70°)');
 verifier(r('hanche').filter(couche).length >= 2, 'par la hanche (115°) : couché (au moins 2 fois sur 3)');
 verifier(r('travers').filter(couche).length >= 2, 'de travers : elle couche le bateau (au moins 2 fois sur 3)');
 verifier(r('croisee').filter(couche).length >= 2, 'une vague croisée de travers, même en fuite : couché (au moins 2 fois sur 3)');

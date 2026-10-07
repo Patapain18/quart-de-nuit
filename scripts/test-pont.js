@@ -34,6 +34,24 @@ verifier(nom(1.0, 0.9, 0.55) === 'rien', 'de la timonerie, on ne passe pas sur l
 verifier(nom(0.5, 0.9, 0.97) === 'rien', 'du passavant, on n\'entre pas dans la timonerie (la paroi)');
 ouvrirDescente(false);
 verifier(nom(0, TIMONERIE.zArriere, 0.45) === 'rien', 'porte fermée : on ne passe pas');
+// (le marin enjambe les petits vides : il ne doit pas enjamber la porte fermée)
+{
+  const m = new Marin();
+  const pousser = (x, z, y, lacet) => {
+    m.placer(x, y, z);
+    m.lacet = lacet;
+    for (let i = 0; i < 120; i++) m.maj(1 / 60, { avance: 1, lateral: 0 }, new Vector3(0, -9.81, 0));
+    return m.position.z;
+  };
+  const dehors = pousser(0.05, TIMONERIE.zArriere + 0.4, 0.45, 0);
+  const dedans = pousser(0, TIMONERIE.zArriere - 0.5, 0.55, Math.PI);
+  const biais = pousser(0.22, TIMONERIE.zArriere + 0.4, 0.45, 0.4);
+  verifier(dehors > TIMONERIE.zArriere && dedans < TIMONERIE.zArriere - 0.2 && biais > TIMONERIE.zArriere,
+    `porte fermée : le marin ne la traverse ni de face ni en biais, ni du dedans (arrêté à ${((dehors - TIMONERIE.zArriere) * 100).toFixed(0)} cm dehors, ${((TIMONERIE.zArriere - dedans) * 100).toFixed(0)} cm dedans)`);
+  ouvrirDescente(true);
+  const ouverte = pousser(0.05, TIMONERIE.zArriere + 0.4, 0.45, 0);
+  verifier(ouverte < TIMONERIE.zArriere - 0.3, 'porte ouverte : il entre tout droit');
+}
 ouvrirDescente(true);
 
 console.log('Un tour du pont, du cockpit à l\'étrave par tribord, sans jamais être bloqué');

@@ -501,13 +501,13 @@ export const LISTE_NUIT = [
     id: 'gilet',
     texte: 'Ton gilet et ton ciré (dans la cabine)',
     fait: (ctx) => ctx.aBord.gilet,
-    rappel: 'Enfile ton gilet et ton ciré : ils sont pendus dans la timonerie, à côté de la porte.',
+    rappel: 'Enfile ton gilet et ton ciré : ils sont pendus au pied de l\'escalier de la timonerie, dans le carré.',
   },
   {
     id: 'feux',
     texte: 'Les feux de navigation (tableau électrique)',
     fait: (ctx) => ctx.aBord.feux,
-    rappel: 'Allume tes feux de navigation : le tableau électrique est dans la timonerie, sur la paroi tribord, derrière le siège.',
+    rappel: 'Allume tes feux de navigation : le tableau électrique est dans la timonerie, sur la console, à côté de la commande du pilote.',
   },
   {
     id: 'lampe',

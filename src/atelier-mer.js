@@ -8,7 +8,7 @@ import { Monde3D } from './rendu/monde3d.js';
 import { AMBIANCES, etatMeteo } from './monde/meteo.js';
 import { Bateau } from './bateau/bateau.js';
 import { Scelerates } from './monde/scelerates.js';
-import { positionCrete } from './mer/scelerate.js';
+import { positionCrete, LONGUEUR_PAR_METRE } from './mer/scelerate.js';
 
 const parametres = new URLSearchParams(location.search);
 const canvas = document.getElementById('scene');
@@ -65,7 +65,7 @@ function reglerVoiles() {
   // la cabine : le jour par les hublots, les plafonniers allumés la nuit
   bateau.interieur.regler({
     eclairage: nuit > 0.6 ? 'blanc' : 'eteint', feux: nuit > 0.5, ciel: monde.ecl.ambiance, eclair: monde.eclair.intensite,
-    pression: 1024 - 6 * meteo.nuages - 34 * meteo.orage, heure: meteo.heure,
+    pression: 1024 - 6 * meteo.nuages - 34 * meteo.orage, heure: meteo.heure, nuit,
   });
 }
 
@@ -377,10 +377,12 @@ window.__vue = (v) => { vue = v; marquerVue(); };
 // Elle naît dans la direction du regard (l'angle la décale) et vient droit sur le bateau ;
 // la même que dans le jeu (monde/scelerates.js : sa force qui monte, sa crête qui s'écroule).
 const sceleratesAtelier = new Scelerates(monde.houle);
-const reglageScelerate = { hauteur: Number(parametres.get('scelerate')) || 11, longueur: 110, angle: 0 };
+// (la longueur d'onde suit la hauteur, comme dans le jeu, tant qu'on ne la règle pas)
+const hauteurDemandee = Number(parametres.get('scelerate')) || 20;
+const reglageScelerate = { hauteur: hauteurDemandee, longueur: Math.round(hauteurDemandee * LONGUEUR_PAR_METRE), angle: 0 };
 const CURSEURS_SCELERATE = [
-  { cle: 'hauteur', nom: 'Hauteur (creux-crête)', min: 6, max: 15, pas: 0.5, format: (v) => `${v.toFixed(1).replace('.', ',')} m` },
-  { cle: 'longueur', nom: 'Longueur d\'onde', min: 70, max: 180, pas: 5, format: (v) => `${v} m` },
+  { cle: 'hauteur', nom: 'Hauteur (creux-crête)', min: 8, max: 28, pas: 0.5, format: (v) => `${v.toFixed(1).replace('.', ',')} m` },
+  { cle: 'longueur', nom: 'Longueur d\'onde', min: 70, max: 240, pas: 5, format: (v) => `${v} m` },
   { cle: 'angle', nom: 'D\'où elle vient (par rapport au regard)', min: -90, max: 90, pas: 5, format: (v) => `${v > 0 ? '+' : ''}${v}°` },
 ];
 for (const c of CURSEURS_SCELERATE) {

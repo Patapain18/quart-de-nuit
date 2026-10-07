@@ -2,7 +2,8 @@
 // Une nuit entière avec un marin simulé qui va et vient (la barre, la timonerie, le carré)
 // et regarde partout ; on vérifie que la tension suit la nuit, que chaque chose arrive au
 // plus le nombre de fois prévu, jamais deux à la fois, jamais pendant qu'autre chose occupe
-// le marin — et surtout que rien n'est jamais confirmé : ce qu'on regarde en face disparaît.
+// le marin — et surtout que rien n'est jamais confirmé : ce qu'on regarde en face disparaît,
+// et l'écho du radar s'efface quand un éclair montre la mer.
 import { Peur, EVENEMENTS, SILHOUETTE, angleVu, EN_FACE } from '../src/jeu/peur.js';
 
 let echecs = 0;
@@ -175,6 +176,31 @@ const base = { heure: 25, lieu: 'barre', yeux: LIEUX.barre, lampe: false, eclair
   const pendant = !!peur.silhouette;
   for (let i = 0; i < 30; i++) peur.maj(0.016, ctx);
   verifier(sansEclair && pendant && !peur.silhouette, 'la silhouette de l\'éclair n\'existe que le temps de l\'éclair');
+}
+
+// les échos du radar : celui qui nous suit garde son relèvement et se rapproche ; celui
+// d'à côté fait sonner l'alarme ; un éclair montre la mer, et il n'y a plus rien
+{
+  const peur = new Peur({ graine: 10 });
+  const ctx = { ...base, regard: regardDe(0, 0) };
+  peur.provoquer('echoSuiveur');
+  peur.maj(0.1, ctx);
+  const releve = peur.echo?.releve;
+  const d0 = peur.echo?.distance;
+  for (let i = 0; i < 200; i++) peur.maj(0.1, ctx);
+  const suit = !!peur.echo && peur.echo.releve === releve && peur.echo.distance < d0 - 500 && !peur.echo.alarme;
+  for (let i = 0; i < 400 && peur.echo; i++) peur.maj(0.1, ctx);
+  verifier(suit && !peur.echo, 'l\'écho qui nous suit : toujours au même relèvement, de plus en plus près, sans alarme, puis plus rien');
+}
+{
+  const peur = new Peur({ graine: 11 });
+  const ctx = { ...base, lieu: 'timonerie', yeux: LIEUX.timonerie, regard: regardDe(0, -0.3) };
+  peur.provoquer('echoProche');
+  for (let i = 0; i < 50; i++) peur.maj(0.1, ctx);
+  const alarme = !!peur.echo?.alarme && peur.echo.distance < 463;
+  peur.maj(0.016, { ...ctx, eclair: 0.9 });
+  for (let i = 0; i < 15; i++) peur.maj(0.1, ctx);
+  verifier(alarme && !peur.echo, 'l\'écho tout près : l\'alarme sonne (dans le quart de mille) ; un éclair, et il n\'est plus là en moins de 1,5 s');
 }
 
 console.log(echecs ? `\n${echecs} vérification(s) en échec.` : '\nTout est bon.');

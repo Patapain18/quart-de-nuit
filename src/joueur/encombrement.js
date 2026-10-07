@@ -64,6 +64,25 @@ function distance2(px, py, pz, t, i) {
   return dx * dx + dy * dy + dz * dz;
 }
 
+// Distance le long du rayon (o, d) à laquelle il coupe un triangle (Möller et Trumbore) ;
+// Infinity s'il le manque
+function intersecter(ox, oy, oz, dx, dy, dz, t, i) {
+  const e1x = t[i + 3] - t[i], e1y = t[i + 4] - t[i + 1], e1z = t[i + 5] - t[i + 2];
+  const e2x = t[i + 6] - t[i], e2y = t[i + 7] - t[i + 1], e2z = t[i + 8] - t[i + 2];
+  const px = dy * e2z - dz * e2y, py = dz * e2x - dx * e2z, pz = dx * e2y - dy * e2x;
+  const det = e1x * px + e1y * py + e1z * pz;
+  if (Math.abs(det) < 1e-12) return Infinity;
+  const inv = 1 / det;
+  const sx = ox - t[i], sy = oy - t[i + 1], sz = oz - t[i + 2];
+  const u = (sx * px + sy * py + sz * pz) * inv;
+  if (u < 0 || u > 1) return Infinity;
+  const qx = sy * e1z - sz * e1y, qy = sz * e1x - sx * e1z, qz = sx * e1y - sy * e1x;
+  const v = (dx * qx + dy * qy + dz * qz) * inv;
+  if (v < 0 || u + v > 1) return Infinity;
+  const d = (e2x * qx + e2y * qy + e2z * qz) * inv;
+  return d > 1e-5 ? d : Infinity;
+}
+
 export class GrilleTriangles {
   constructor(cellule = 0.12) {
     this.cellule = cellule;
@@ -177,6 +196,46 @@ export class GrilleTriangles {
     let oui = false;
     this.parcourir(x - r, y - r, z - r, x + r, y + r, z + r, (n) => (oui = distance2(x, y, z, t, n * 9) < r2));
     return oui;
+  }
+
+  // La distance à la première chose dure que touche le rayon parti de o dans la direction
+  // d (unitaire), jusqu'à tMax ; Infinity si rien. On suit le rayon de boîte en boîte
+  // (Amanatides et Woo) : seules les boîtes qu'il traverse sont regardées. ignorer : un
+  // ensemble de noms de pièces qui ne comptent pas (la chose que l'on vise elle-même)
+  rayon(o, d, tMax, ignorer = null) {
+    const c = this.cellule;
+    const t = this.triangles;
+    let i = Math.floor(o.x / c), j = Math.floor(o.y / c), k = Math.floor(o.z / c);
+    const pasI = d.x > 0 ? 1 : -1, pasJ = d.y > 0 ? 1 : -1, pasK = d.z > 0 ? 1 : -1;
+    const deltaI = d.x !== 0 ? c / Math.abs(d.x) : Infinity;
+    const deltaJ = d.y !== 0 ? c / Math.abs(d.y) : Infinity;
+    const deltaK = d.z !== 0 ? c / Math.abs(d.z) : Infinity;
+    let prochainI = d.x !== 0 ? ((d.x > 0 ? (i + 1) * c - o.x : o.x - i * c) / Math.abs(d.x)) : Infinity;
+    let prochainJ = d.y !== 0 ? ((d.y > 0 ? (j + 1) * c - o.y : o.y - j * c) / Math.abs(d.y)) : Infinity;
+    let prochainK = d.z !== 0 ? ((d.z > 0 ? (k + 1) * c - o.z : o.z - k * c) / Math.abs(d.z)) : Infinity;
+    const marque = ++this.tampon;
+    let meilleur = Infinity;
+    let entree = 0; // (où le rayon entre dans la boîte en cours)
+    for (let n = 0; n < 400 && entree <= Math.min(tMax, meilleur); n++) {
+      const l = this.cases.get(this.cle(i, j, k));
+      if (l) {
+        for (let m = 0; m < l.length; m++) {
+          const tri = l[m];
+          if (this.marques[tri] === marque) continue;
+          this.marques[tri] = marque;
+          if (ignorer && ignorer.has(this.noms[this.nomDe[tri]])) continue;
+          const dist = intersecter(o.x, o.y, o.z, d.x, d.y, d.z, t, tri * 9);
+          if (dist < meilleur) {
+            meilleur = dist;
+            this.dernierePiece = this.noms[this.nomDe[tri]];
+          }
+        }
+      }
+      if (prochainI < prochainJ && prochainI < prochainK) { i += pasI; entree = prochainI; prochainI += deltaI; }
+      else if (prochainJ < prochainK) { j += pasJ; entree = prochainJ; prochainJ += deltaJ; }
+      else { k += pasK; entree = prochainK; prochainK += deltaK; }
+    }
+    return meilleur <= tMax ? meilleur : Infinity;
   }
 
   // les hauteurs où la verticale (x, z) traverse le modèle entre yBas et yHaut

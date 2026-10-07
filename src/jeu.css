@@ -327,6 +327,9 @@ dialog a { color: var(--ambre); }
 dialog a:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
 dialog fieldset { margin-bottom: var(--e4); display: grid; gap: var(--e2); }
 .choix-qualite { display: grid; grid-template-columns: repeat(4, 1fr); gap: var(--e2); }
+.choix-nuit { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--e2); }
+.choix-nuit button { text-align: center; padding-inline: var(--e2); }
+.etiquette { margin: var(--e3) 0 var(--e1); font-size: 14px; color: var(--encre-douce); }
 .choix-qualite button { text-align: center; padding-inline: var(--e2); }
 .curseur { display: grid; grid-template-columns: 1fr auto; gap: 2px var(--e2); font-size: 14px; color: var(--encre-douce); }
 .curseur output { color: var(--encre); font-variant-numeric: tabular-nums; }

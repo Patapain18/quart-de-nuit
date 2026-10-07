@@ -281,6 +281,9 @@ function appliquerOptions(o, changements = o) {
   document.getElementById('aide-touches').classList.toggle('cache', !o.aide);
   monde.gouttesActives = o.gouttes;
   monde.eclairsDoux = !o.clignotements;
+  // (la nuit d'orage : noir d'encre, ou un peu moins pour un écran peu lumineux)
+  monde.noirMax = { encre: 1, 'tres-sombre': 0.8, sombre: 0.6 }[o.nuit] ?? 1;
+  if ('nuit' in changements && monde.meteo) monde.regler(monde.meteo, { recalculerMer: false, brusque: false });
   difficulte = o.difficulte;
   majDifficultes();
   majFenetreOptions();
@@ -358,7 +361,7 @@ function touchesAppuyees() {
       afficherMessage(etat.regleurAuto ? 'Réglage automatique des voiles : activé' : 'Réglage automatique : désactivé, à toi les écoutes');
     } else if (code === TOUCHES.pilote.code) {
       if (etat.pilote === null && nuit?.avaries.pilote === 'panne') {
-        afficherMessage('Le pilote est en panne : réarme son disjoncteur au tableau électrique (dans la timonerie)');
+        afficherMessage('Le pilote est en panne : réarme son disjoncteur au tableau électrique (sur la console de la timonerie)');
         continue;
       }
       etat.pilote = etat.pilote === null ? Math.round(physique.mesures.cap) : null;
@@ -394,8 +397,8 @@ function reglerPilote(ecart) {
 }
 function quitterLePoste() {
   etat.mode = 'pied';
-  // debout, juste derrière le siège
-  marin.placer(SIEGE.x - 0.08, TIMONERIE.plancher, SIEGE.z + 0.32);
+  // debout, à côté du siège (à bâbord : dans le passage entre la porte et l'escalier)
+  marin.placer(SIEGE.x - SIEGE.demiLargeur - 0.2, TIMONERIE.plancher, SIEGE.z + 0.05);
   majAide();
 }
 
@@ -417,6 +420,15 @@ function basculerHarnais() {
 }
 
 // ---------- Les gestes (E et Maj + E sur ce que l'on regarde) ----------
+// (la porte fermée n'est pas dans l'encombrement — elle bouge — mais on ne passe pas la
+// main au travers : le regard la traverse-t-il avant d'atteindre la chose, à t mètres ?)
+function porteFermeeEntre(oeil, direction, t, g) {
+  if (bateau.descenteOuverte || g.id === 'descente' || Math.abs(direction.z) < 1e-6) return false;
+  const s = (TIMONERIE.zArriere - oeil.z) / direction.z;
+  if (s <= 0 || s >= t) return false;
+  const y = oeil.y + direction.y * s;
+  return Math.abs(oeil.x + direction.x * s) < TIMONERIE.porte.demiLargeur && y > COCKPIT.plancher && y < TIMONERIE.porte.haut;
+}
 function commencerAction(cle) {
   const g = etat.geste;
   if (!g || !g[cle]) return;
@@ -552,7 +564,8 @@ function simuler(dt) {
   }
   monde.mesurer('physique', () => physique.avancer(dt, monde.houle, v, Math.max(2, Math.ceil(dt * 240))));
   apparitions.maj(nuit?.peur ?? null, {
-    temps: monde.temps, eclairage: etat.eclairage, ambiance: monde.ecl.ambiance, eclair: monde.eclair.intensite, lampe: etat.lampe,
+    temps: monde.temps, eclairage: etat.eclairage, ambiance: monde.ecl.ambiance, eclair: monde.eclair.eclaire, lampe: etat.lampe,
+    faisceau: monde.lampe,
   });
 
   // à pied : le marin bouge, sent le bateau, vise et agit
@@ -576,15 +589,26 @@ function simuler(dt) {
       etat.attenteRetenu = 4;
     }
     etat.attenteRetenu = Math.max(0, (etat.attenteRetenu ?? 0) - dt);
+    // (il pousse contre la porte fermée de la timonerie : on lui dit comment l'ouvrir — une
+    // fois, puis plus avant six secondes)
+    const contreLaPorte = !bateau.descenteOuverte && avance > 0 && marin.vitesseMarche < 0.15
+      && Math.abs(marin.position.x) < 0.35 && Math.abs(marin.position.z - TIMONERIE.zArriere) < 0.45;
+    etat.contreLaPorte = contreLaPorte ? (etat.contreLaPorte ?? 0) + dt : Math.min(0, (etat.contreLaPorte ?? 0) + dt);
+    if (etat.contreLaPorte > 0.6) {
+      afficherMessage('La porte de la timonerie est fermée : regarde-la et appuie sur E pour l\'ouvrir');
+      etat.contreLaPorte = -6;
+    }
     const oeil = marin.position.clone();
     oeil.y += marin.hauteurYeux();
-    etat.geste = gesteVise(gestes, oeil, marin.direction());
+    etat.geste = gesteVise(gestes, oeil, marin.direction(), { encombrement: marin.encombrement, obstacle: porteFermeeEntre });
     poursuivreAction(dt);
     dangers();
   } else if (etat.mode === 'poste') {
     // assis au poste de la timonerie : on peut aussi agir sur ce que l'on regarde (la VHF,
     // le radar, le traceur, le tableau électrique…), sans se lever
-    etat.geste = gesteVise(gestes.filter((g) => g.id !== 'poste' && g.id !== 'siege'), YEUX_POSTE, marin.direction(), 1.3);
+    etat.geste = gesteVise(gestes.filter((g) => g.id !== 'poste' && g.id !== 'siege'), YEUX_POSTE, marin.direction(), {
+      portee: 1.1, encombrement: marin.encombrement, obstacle: porteFermeeEntre,
+    });
     poursuivreAction(dt);
   } else {
     etat.geste = null;
@@ -653,11 +677,14 @@ function simuler(dt) {
     eclairage: etat.eclairage,
     feux: etat.feux,
     ciel: monde.ecl.ambiance,
-    eclair: monde.eclair.intensite,
+    eclair: monde.eclair.eclaire,
     descente: bateau.descenteOuverte ? 1 : 0,
     pression,
     heure: meteo.heure,
     vacille,
+    pilotePanne: nuit?.avaries.pilote === 'panne',
+    nuit: monde.ecl.nuit,
+    dt,
   });
   const dedans = (etat.mode === 'pied' && !marin.dehors) || etat.mode === 'poste';
   const enTimonerie = etat.mode === 'poste' || (etat.mode === 'pied' && marin.dansLaTimonerie);
@@ -893,7 +920,8 @@ function contexteNuit(dt) {
     ...regardDansLeBateau(),
     lampe: etat.lampe,
     eclairage: etat.eclairage,
-    eclair: monde.eclair.intensite,
+    eclair: monde.eclair.eclaire,
+    noir: monde.ecl.noir ?? 0,
     danger: etat.danger ?? 0,
     calme: etat.calme ?? 0,
     pilote: etat.pilote !== null,
@@ -1062,10 +1090,19 @@ function majRadar(dt) {
     const [cx, cz] = positionCrete(v, monde.houle.temps);
     r.cibles.push({ x: cx, z: cz, ligne: 1.5 * v.largeur, lx: -v.dz, lz: v.dx, largeurLigne: v.largeur, rayon: 16, force: 0.3 + 0.7 * v.force });
   }
-  const e = nuit?.echoFantome;
-  if (e) {
-    const fondu = THREE.MathUtils.smoothstep(e.age, 0, 3) * (1 - THREE.MathUtils.smoothstep(e.age, e.duree - 4, e.duree));
-    r.cibles.push({ x: physique.position.x + Math.sin(e.releve) * e.distance, z: physique.position.z - Math.cos(e.releve) * e.distance, rayon: 22, force: 0.7 * fondu });
+  // l'écho que personne d'autre ne voit (jeu/peur.js) : il garde son relèvement depuis
+  // l'avant, quoi qu'on fasse ; tout près, il fait sonner l'alarme de la zone de garde
+  const e = nuit?.peur?.echo;
+  if (e && e.force > 0.02) {
+    const releve = THREE.MathUtils.degToRad(physique.mesures.cap) + e.releve;
+    // (un gros écho, net, qui tient tour après tour : pas un retour de mer)
+    r.cibles.push({ x: physique.position.x + Math.sin(releve) * e.distance, z: physique.position.z - Math.cos(releve) * e.distance, rayon: e.nom === 'echoProche' ? 26 : 32, force: 0.95 * e.force });
+  }
+  bateau.radar.alarme = !!e?.alarme;
+  etat.bipRadar = e?.alarme ? (etat.bipRadar ?? 0) - dt : 0;
+  if (e?.alarme && etat.bipRadar <= 0) {
+    audio.alarmeRadar?.();
+    etat.bipRadar = 1.2;
   }
   bateau.radar.maj(dt, { x: physique.position.x, z: physique.position.z, cap: physique.mesures.cap }, r, monde.ecl.nuit);
 }
@@ -1114,6 +1151,9 @@ function vivrePeur(e) {
     }, 1700);
   } else if (e === 'chose') etat.vacille = 2.5;
   else if (e === 'eclairSilhouette') audio.battement?.(1);
+  // (l'alarme du radar : les écrans hésitent quand elle se met à sonner ; l'écho qui nous
+  // suit, lui, ne s'annonce pas — on ne le voit que si l'on regarde le radar)
+  else if (e === 'echoProche') etat.vacille = 0.8;
   else if (e.endsWith('-fin') && p?.journal.at(-1)?.regardee) {
     audio.battement?.(0.8);
     etat.vacille = 0.7;
@@ -2054,6 +2094,7 @@ const TEXTES_QUALITE = {
   for (const cle of ['inverser', 'secousses', 'gouttes', 'clignotements', 'voix', 'sousTitres', 'barreAssistee']) {
     document.getElementById(`o-${cle}`).addEventListener('change', (e) => changerOptions({ [cle]: e.target.checked }));
   }
+  for (const b of document.querySelectorAll('[data-nuit]')) b.addEventListener('click', () => changerOptions({ nuit: b.dataset.nuit }));
   majFenetreOptions.curseurs = curseurs;
 }
 function majFenetreOptions() {
@@ -2065,6 +2106,7 @@ function majFenetreOptions() {
     document.getElementById(`v-${cle}`).textContent = texte(options[cle]);
   }
   for (const cle of ['inverser', 'secousses', 'gouttes', 'clignotements', 'voix', 'sousTitres', 'barreAssistee']) document.getElementById(`o-${cle}`).checked = options[cle];
+  for (const b of document.querySelectorAll('[data-nuit]')) b.setAttribute('aria-pressed', String(b.dataset.nuit === options.nuit));
   document.getElementById('o-sousTitres').disabled = !options.voix; // (sans la voix, les sous-titres restent)
 }
 function ouvrirFenetre(id) {
@@ -2189,13 +2231,51 @@ window.__jeu = {
     etat.fige = true;
     try {
       return await essayerLaMarche({
-        marin, gestes, gesteVise, commandes, seLever, bateau, regarder,
+        marin, gestes, gesteVise, commandes, seLever, bateau, regarder, obstacle: porteFermeeEntre,
         uneImage: (dt) => monde.image(dt, { simuler, placerCamera }),
         basculerDescente: () => jeu.basculerDescente(),
       }, o);
     } finally {
       etat.fige = false;
     }
+  },
+  // (les essais d'entrée : un marin automatique vise à peu près la porte ou l'escalier, de
+  // plusieurs endroits ; la carte des passages les trace, vus de dessus, dans captures/)
+  essayerLesEntrees: async ({ de = 0, nombre = Infinity, carte = null } = {}) => {
+    const { essayerLesEntrees, essaisEntree } = await import('./atelier/essais-marche.js');
+    const essais = essaisEntree(TIMONERIE.zArriere).slice(de, de + nombre);
+    etat.fige = true;
+    try {
+      const r = await essayerLesEntrees({
+        marin, commandes, seLever, bateau,
+        uneImage: (dt) => monde.image(dt, { simuler, placerCamera }),
+        basculerDescente: () => jeu.basculerDescente(),
+      }, { essais });
+      (window.__cheminsEssais ??= []).push(...r.map((x) => ({ points: x.points, ok: x.ok })));
+      if (carte) await window.__jeu.carteDesPassages(carte, { chemins: window.__cheminsEssais });
+      const lignes = r.map((x) => `${x.ok ? '✓' : '✗'} ${x.nom} : ${x.secondes.toFixed(1)} s, bloqué ${x.pireBlocage.toFixed(1)} s au pire${x.ok ? '' : ` — arrêté en (${x.fin.map((v) => v.toFixed(2)).join(', ')}), ${x.zone}`}`);
+      // (gardées aussi dans la page : une longue série peut dépasser le temps d'attente de l'outil)
+      (window.__resultatsEssais ??= []).push(...lignes);
+      return lignes;
+    } finally {
+      etat.fige = false;
+    }
+  },
+  // (d'où atteint-on chaque chose ? zone par zone, debout et accroupi)
+  carteDesGestes: async (o) => {
+    const { carteDesGestes } = await import('./atelier/essais-marche.js');
+    const { surfacesEn } = await import('./joueur/pont.js');
+    const r = carteDesGestes({ marin, gestes, gesteVise, obstacle: porteFermeeEntre, surfacesEn }, o);
+    return Object.entries(r).map(([id, x]) => `${id} : ${Object.entries(x.zones).map(([z, n]) => `${z} ${n}`).join(', ') || 'nulle part !'} — au plus loin ${x.plusLoin.toFixed(2)} m, depuis ${x.depuis ?? '—'}`);
+  },
+  carteDesPassages: async (nom = 'carte-passages', o = {}) => {
+    const { dessinerCartePassages } = await import('./atelier/carte-passages.js');
+    const reperes = [
+      [0, TIMONERIE.zArriere, 'porte'], [SIEGE.x, SIEGE.z, 'siège'], [bateau.interieur.positionCire.x, bateau.interieur.positionCire.z, 'ciré'],
+      [bateau.interieur.positionTableau.x, bateau.interieur.positionTableau.z, 'tableau'], [0, 2.47, 'barre'],
+    ];
+    const image = dessinerCartePassages(marin, { reperes, ...o });
+    return (await fetch('/__capture', { method: 'POST', body: JSON.stringify({ nom, image }) })).text();
   },
 };
 function boucle(maintenant) {

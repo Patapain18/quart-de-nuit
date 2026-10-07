@@ -170,6 +170,14 @@ export function eclairage(meteo) {
   const intensiteLune = 0.9 * eclatLune * lisse(-0.05, 0.12, l.y) * nuit;
   const tLune = transmittance(2, dirLune);
 
+  // La nuit d'orage : noir d'encre. Sous des nuages de plusieurs kilomètres d'épaisseur,
+  // sans lune ni lumière à terre, il ne reste presque rien de la lumière du ciel (7 %) : on
+  // ne voit plus que ce qu'éclairent les lumières du bord, le plancton et les éclairs. Le
+  // noir s'installe avec l'orage, après le coucher du soleil, et se lève quand le front est
+  // passé. (noirMax : l'option de la nuit d'orage peut l'adoucir, pour un écran peu lumineux)
+  const noir = nuit * lisse(0.55, 0.9, meteo.orage) * (meteo.noirMax ?? 1);
+  const reste = 1 - 0.93 * noir;
+
   // Les nuages épais coupent le soleil direct et assombrissent la lumière du ciel
   const couverture = Math.min(1, meteo.nuages);
   const voile = Math.min(1, lisse(0.55, 1.0, couverture) * 0.88 + meteo.orage * 0.12);
@@ -186,7 +194,7 @@ export function eclairage(meteo) {
   const ambiance = [0, 1, 2].map((c) => {
     const v = (ambSoleil[c] + ambLune[c]) * assombrissement;
     const moyenne = (ambSoleil[0] + ambSoleil[1] + ambSoleil[2] + ambLune[0] + ambLune[1] + ambLune[2]) / 3;
-    return v * (1 - gris * 0.6) + moyenne * assombrissement * gris * 0.6 + 0.0025;
+    return (v * (1 - gris * 0.6) + moyenne * assombrissement * gris * 0.6 + 0.0025) * reste;
   });
 
   // Exposition : comme l'œil (ou l'appareil photo) qui s'habitue à la pénombre ;
@@ -213,11 +221,12 @@ export function eclairage(meteo) {
     soleil: tMer.map((v) => v * 3.2 * directVisible),
     // lumière du soleil qui éclaire les nuages (elle reste orange après le coucher)
     soleilNuages: tNuages.map((v) => v * 3.2),
-    lune: tLune.map((v, c) => v * intensiteLune * [0.6, 0.75, 1.0][c] * directVisible),
+    lune: tLune.map((v, c) => v * intensiteLune * [0.6, 0.75, 1.0][c] * directVisible * reste),
     // la lune qui éclaire le dessus des nuages (sans être cachée par eux) ; sous un
     // orage, les nuages sont si épais que presque rien ne passe
-    luneNuages: tLune.map((v, c) => v * intensiteLune * [0.6, 0.75, 1.0][c] * (1 - 0.82 * meteo.orage)),
-    intensiteLune,
+    luneNuages: tLune.map((v, c) => v * intensiteLune * [0.6, 0.75, 1.0][c] * (1 - 0.82 * meteo.orage) * reste),
+    intensiteLune: intensiteLune * reste,
+    noir,
     eclatLune,
     ambiance,
     zenith,

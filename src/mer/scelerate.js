@@ -1,7 +1,8 @@
-// La vague scélérate : une vague isolée, deux à trois fois plus haute que les autres (10 à
-// 12 m du creux à la crête), précédée d'un creux profond — le « trou dans la mer » que
-// décrivent les marins qui en ont vu une — et suivie d'un creux moindre. Elle traverse la
-// houle à la vitesse des vagues de sa longueur (≈ 13 m/s pour 110 m).
+// La vague scélérate : une vague isolée, trois à quatre fois plus haute que les autres (18
+// à 22 m du creux à la crête : presque deux fois le mât), précédée d'un creux profond — le
+// « trou dans la mer » que décrivent les marins qui en ont vu une — et suivie d'un creux
+// moindre. Elle traverse la houle à la vitesse des vagues de sa longueur (≈ 16 m/s pour
+// 170 m). (Celle de Draupner, en mer du Nord, le 1er janvier 1995 : 25,6 m.)
 //
 // Sa forme : une vague de Gerstner (les points d'eau tournent sur des cercles : la crête
 // est pointue, le creux plat) dans une enveloppe : courte derrière la crête, plus longue
@@ -20,10 +21,15 @@ const DERRIERE = 0.45;
 
 // Une vague scélérate.
 //   x, z : où passe sa crête à l'instant tPassage ; dx, dz : vers où elle va ; hauteur :
-//   du creux de devant à la crête (m) ; longueur : sa longueur d'onde (m) ; largeur : la
-//   demi-longueur de sa crête (m)
+//   du creux de devant à la crête (m) ; longueur : sa longueur d'onde (m : par défaut 8,5
+//   fois sa hauteur, une pente de 24° sous la crête ; plus courte, 7,4 fois — à la limite
+//   où une vague se brise —, le bateau part en travers dans sa descente même droit dans
+//   l'arrière : scripts/reglage-scelerate.js) ; largeur : la demi-longueur de sa crête (m)
 // Sa force (0 → 1 : elle grandit, puis s'efface) est réglée de l'extérieur : v.force.
-export function creerScelerate({ x, z, dx, dz, hauteur = 11, longueur = 110, largeur = 130, tPassage = 0 }) {
+export const LONGUEUR_PAR_METRE = 8.5;
+export function creerScelerate({
+  x, z, dx, dz, hauteur = 20, longueur = Math.round(hauteur * LONGUEUR_PAR_METRE), largeur = 1.15 * longueur, tPassage = 0,
+}) {
   const k = (2 * Math.PI) / longueur;
   const n = Math.hypot(dx, dz) || 1;
   const v = {

@@ -1,7 +1,10 @@
 // Les apparitions de la nuit (jeu/peur.js décide quand et où ; ici, ce qu'on voit) :
 //  - la silhouette : quelqu'un debout sur le pont avant, en ciré jaune délavé (comme le
 //    tien), la capuche rabattue, sans visage ; de dos, regardant la mer — ou, dans un
-//    éclair, face à toi ;
+//    éclair, face à toi. Dans le noir, on ne la voit qu'à ses bandes réfléchissantes (sur
+//    la capuche, la poitrine, les bras, comme sur tous les cirés de mer) : elles renvoient
+//    la lumière de la frontale vers celui qui la porte, des traits argentés qui flottent
+//    au bout du bateau, au bord de la vue ;
 //  - le reflet : la même silhouette, dans le pare-brise de la timonerie, juste derrière toi
 //    (elle est dessinée DEVANT la vitre, à l'endroit où la vitre renverrait quelqu'un qui
 //    se tiendrait derrière toi : quand tu te retournes, il n'y a personne) ;
@@ -52,6 +55,27 @@ function geometrieSilhouette() {
   return mergeGeometries(morceaux.map((g) => preparer(g, ['color'])));
 }
 
+// Les bandes réfléchissantes du ciré (les pieds à l'origine) : autour de la poitrine, des
+// deux bras, et sur le haut de la capuche
+function geometrieBandes() {
+  const bandes = [];
+  const poitrine = new THREE.CylinderGeometry(0.252, 0.25, 0.045, 20, 1, true);
+  poitrine.scale(1, 1, 0.74);
+  poitrine.translate(0, 1.2, 0);
+  bandes.push(poitrine);
+  for (const s of [-1, 1]) {
+    const bras = new THREE.CylinderGeometry(0.063, 0.063, 0.04, 12, 1, true);
+    bras.rotateZ(s * 0.06);
+    bras.translate(s * 0.27, 1.16, 0.02);
+    bandes.push(bras);
+  }
+  const capuche = new THREE.CylinderGeometry(0.13, 0.15, 0.035, 18, 1, true);
+  capuche.scale(0.92, 1, 1.18);
+  capuche.translate(0, 1.73, 0.03);
+  bandes.push(capuche);
+  return mergeGeometries(bandes.map((g) => g.toNonIndexed()));
+}
+
 // Le reflet : sombre, très transparent, les bords qui s'effacent (une vitre mouillée ne
 // renvoie qu'une image floue), le visage plus noir que le reste
 const SOMMET_REFLET = /* glsl */ `
@@ -91,6 +115,14 @@ export class Apparitions {
     this.silhouette.visible = false;
     this.silhouette.castShadow = false;
     bateau.groupe.add(this.silhouette);
+    // (ses bandes réfléchissantes : leur éclat ne dépend que de la lumière qu'elles reçoivent
+    // d'une lampe à côté de nos yeux — elles la renvoient vers nous)
+    this.materiauBandes = new THREE.MeshBasicMaterial({ color: 0xd9dee2, transparent: true, opacity: 1 });
+    this.bandes = new THREE.Mesh(geometrieBandes(), this.materiauBandes);
+    this.bandes.name = 'silhouette-bandes';
+    this.silhouette.add(this.bandes);
+    this._oeil = new THREE.Vector3();
+    this._axe = new THREE.Vector3();
     // son reflet, dans le pare-brise (une silhouette sans relief, de la couleur de la
     // lumière de la timonerie)
     this.uniformsReflet = { uCouleur: { value: new THREE.Color(0x3a0d08) }, uOpacite: { value: 0 } };
@@ -130,8 +162,9 @@ export class Apparitions {
   get objets() { return [this.silhouette, this.reflet]; }
 
   // peur : jeu/peur.js ; temps ; eclairage ('rouge', 'blanc', 'eteint') ; ambiance (la
-  // lumière du ciel, [r, g, b]) ; eclair (0 → 1) ; lampe (la frontale allumée)
-  maj(peur, { temps = 0, eclairage = 'eteint', ambiance = [0, 0, 0], eclair = 0, lampe = false } = {}) {
+  // lumière du ciel, [r, g, b]) ; eclair (0 → 1) ; lampe (la frontale allumée) ;
+  // faisceau : la frontale elle-même (sa position et sa cible, dans le monde)
+  maj(peur, { temps = 0, eclairage = 'eteint', ambiance = [0, 0, 0], eclair = 0, lampe = false, faisceau = null } = {}) {
     const groupe = this.bateau.groupe;
     // la silhouette
     const s = peur?.silhouette;
@@ -141,6 +174,22 @@ export class Apparitions {
       this.silhouette.rotation.set(0, s.face, 0);
       this.materiau.opacity = s.opacite;
       this.materiau.depthWrite = s.opacite > 0.9;
+      // ses bandes : dans le faisceau, elles brillent ; dans le halo autour (là où elle se
+      // tient, au bord de la vue), moins ; sans lampe, à peine — sauf dans un éclair
+      let renvoi = 0;
+      if (lampe && faisceau) {
+        this.silhouette.getWorldPosition(this._p);
+        this._p.y += 1.2;
+        const vers = this._v.subVectors(this._p, faisceau.position);
+        const d = vers.length();
+        const axe = this._axe.subVectors(faisceau.target.position, faisceau.position).normalize();
+        const cos = vers.dot(axe) / Math.max(d, 1e-3);
+        const cone = THREE.MathUtils.smoothstep(cos, Math.cos(1.25), Math.cos(0.5)) * 0.65 + THREE.MathUtils.smoothstep(cos, Math.cos(0.56), Math.cos(0.3)) * 0.35;
+        renvoi = 0.55 * cone / (1 + d * d * 0.004);
+      }
+      const k = Math.min(1.2, renvoi + 0.6 * eclair + 0.004);
+      this.materiauBandes.color.setRGB(0.85 * k, 0.87 * k, 0.88 * k);
+      this.materiauBandes.opacity = s.opacite;
     }
     // le reflet : la silhouette debout derrière toi (face à la vitre), renvoyée par le
     // pare-brise

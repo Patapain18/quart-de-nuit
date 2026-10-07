@@ -15,17 +15,19 @@ import { EVENEMENTS, surEcran, coinDeLOeil, enFace } from '../jeu/peur.js';
 const NOMS = {
   gemissement: 'La mer gémit', silhouette: 'Quelqu\'un à l\'avant', reflet: 'Le reflet dans la vitre', forme: 'La forme dans l\'eau',
   chose: 'La chose sous la coque', pas: 'Des pas sur le pont', nom: 'Ton nom sur le 16', coupCoque: 'Le choc (sursaut)',
-  eclairSilhouette: 'Dans l\'éclair (sursaut)',
+  eclairSilhouette: 'Dans l\'éclair (sursaut)', echoSuiveur: 'L\'écho qui nous suit', echoProche: 'L\'alarme du radar',
 };
 // (pourquoi une chose ne peut pas arriver maintenant)
 const CONDITIONS = {
-  silhouette: 'dehors ou dans la timonerie, l\'avant du bateau au bord de la vue',
+  silhouette: 'dehors ou dans la timonerie, l\'avant du bateau au bord de la vue (dans le noir : la frontale allumée)',
   eclairSilhouette: 'un éclair, l\'avant du bateau dans la vue',
   reflet: 'dans la timonerie, la lumière allumée, en regardant le pare-brise',
   forme: 'dehors, l\'eau le long de la coque au bord de la vue',
   pas: 'dans le carré ou la timonerie, la porte fermée',
   coupCoque: 'dedans, 40 s sans déferlante',
   nom: 'pendant le silence de Jos (ou à la fin de sa fenêtre)',
+  echoSuiveur: 'un radar sous les yeux : à la barre ou dans la timonerie',
+  echoProche: 'un radar sous les yeux : à la barre ou dans la timonerie',
 };
 const heure = (h) => `${String(Math.floor(h % 24)).padStart(2, '0')} h ${String(Math.floor((h % 1) * 60)).padStart(2, '0')}`;
 
@@ -151,7 +153,7 @@ function dessinerFrise(svg, nuit) {
     ['Jos se tait', [[pr.silence, pr.silence + 0.55]]],
     ['Scélérates', [0, 1, 2].filter((k) => Number.isFinite(pr[`scelerate${k}`])).map((k) => [pr[`scelerate${k}`], pr[`scelerate${k}`] + 0.9])],
     ['Trombe, cargo', [[pr.trombe, pr.trombe + 2.2], [pr.cargo, pr.cargo + 2.2]]],
-    ['Étrange', ['lumiere', 'voix16', 'echo', 'coups'].map((n) => [pr[n], pr[n] + 0.15])],
+    ['Étrange', ['lumiere', 'voix16', 'coups'].map((n) => [pr[n], pr[n] + 0.15])],
     ...Object.keys(EVENEMENTS).map((nom) => [NOMS[nom].replace(/ \(sursaut\)/, ' !'), [[EVENEMENTS[nom].de, EVENEMENTS[nom].a]], nom]),
   ];
   const h = 13;

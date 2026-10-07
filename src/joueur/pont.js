@@ -110,11 +110,33 @@ const SURFACES = [
   },
 ];
 
+// Les passages étroits : quand on marche vers l'un d'eux à peu près de face, on est guidé
+// vers son milieu (le marin s'aligne sans y penser pour franchir une porte : le joueur, qui
+// ne voit pas ses épaules, n'a pas à viser au centimètre). x, z : le milieu du seuil ;
+// demiLargeur : l'ouverture qui reste quand les battants sont rangés (ils dépassent de 3 cm)
+export const PASSAGES = [{ nom: 'porte', x: 0, z: TIMONERIE.zArriere, demiLargeur: TIMONERIE.porte.demiLargeur - 0.015 }];
+
 // La porte de la timonerie est-elle ouverte ? (on garde le nom « descente » : c'est
 // toujours le chemin vers l'intérieur)
 let descenteOuverte = true;
 export function ouvrirDescente(ouverte) {
   descenteOuverte = ouverte;
+}
+
+// La porte fermée est un mur : un pas de (x0, z0) à (x1, z1) la traverse-t-il, ou entre-t-il
+// dans son épaisseur ? (Dedans, ses battants sont à 7 et 10 cm de la paroi : les yeux en
+// restent à 15 cm.) Si elle s'est fermée sur nous, on en sort du côté où l'on est. (Sans ce
+// mur, le marin, qui enjambe les petits vides — le bord penché du rouf —, enjambait la bande
+// sans sol de la porte fermée.)
+const PORTE_DEDANS = 0.28;
+const PORTE_DEHORS = 0.08;
+export function bloqueParLaPorte(x0, z0, x1, z1) {
+  if (descenteOuverte) return false;
+  if (Math.min(Math.abs(x0), Math.abs(x1)) > TIMONERIE.porte.demiLargeur + 0.05) return false;
+  const a = z0 - Z_PORTE;
+  const b = z1 - Z_PORTE;
+  if (Math.sign(a) !== Math.sign(b)) return true;
+  return b > -PORTE_DEDANS && b < PORTE_DEHORS && Math.abs(b) < Math.abs(a);
 }
 
 // Obstacles ronds (le mât sur le rouf, l'épontille dans le carré) : [x, z, rayon, yMin, yMax]

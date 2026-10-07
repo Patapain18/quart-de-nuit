@@ -622,6 +622,118 @@ Feuille de route :
     aucune au-delà de 25 ms, 2 ms de travail par image sur le fil principal ; aucune erreur
     dans la console.
 
+### Le chantier du noir (octobre 2026) : « ça fait toujours pas si peur »
+
+Les retours de Mathis le 2026-10-07, après avoir joué la nuit : on a du mal à entrer dans
+la timonerie ; on ne voit pas le tableau électrique ; on peut prendre les objets sans
+limite de distance, à travers les parois (le ciré, depuis la timonerie) ; et ça ne fait
+toujours pas assez peur : il veut qu'il fasse vraiment nuit, qu'on soit obligé de
+regarder le radar, ou d'attendre les éclairs pour voir la mer, et une vague scélérate
+plus grande. Ses choix :
+- **noir d'encre** : au cœur de la tempête, ciel et mer sont noirs ; on ne voit que ce
+  qu'éclairent ses lumières (frontale, feux, timonerie), l'écume et le plancton tout près,
+  et toute la mer pendant un éclair ;
+- **une vague scélérate de 20 m**, plus raide : presque deux fois le mât, toujours
+  tenable droit dans l'arrière ;
+- **pas de projecteur** : la frontale, les feux, le radar et les éclairs suffisent ;
+- **le radar fait peur lui aussi** : des échos qui n'existent pas (un écho qui suit le
+  bateau puis s'efface, un écho tout près que l'éclair ne montre jamais).
+
+Feuille de route :
+
+22. ✅ **Les gestes et la timonerie** (`src/joueur/marin.js`, `pont.js`, `gestes.js`,
+    `encombrement.js`, `src/bateau/tableau-electrique.js`) — **La porte.** Deux nouveaux
+    outils ont mesuré le mal : la carte des passages (`__jeu.carteDesPassages()` : le bord
+    vu de dessus, tous les 2 cm, là où le corps passe, frôle ou bute, avec le chemin de
+    chaque essai) et les essais d'entrée (`__jeu.essayerLesEntrees()` : trente marins
+    lâchés de la barre, des bancs, des winchs, du siège, de l'escalier, qui visent à peu
+    près un point de l'autre côté — comme un joueur, sans viser au centimètre). Seuls 6 sur
+    27 passaient : la porte ne laisse que 20 cm au corps (52 cm, moins les épaules), et
+    juste derrière, le dossier du siège de quart barrait le passage tout droit (le couloir
+    entre lui et la cuisine faisait 16 cm, décalé de la porte). Le siège est décalé de 11 cm
+    vers tribord ; le marin glisse maintenant le long de ce qui l'arrête (il essaie la même
+    direction, tournée de 20°, 40° puis 60°, d'abord du côté qui a marché la fois d'avant)
+    au lieu de s'y coller ; et quand il marche vers la porte à peu près de face, il
+    s'aligne sur son milieu. Les 30 essais passent, en une seconde en moyenne. Au passage,
+    un vieux bug : la porte fermée se traversait (le marin enjambe les petits vides — le
+    bord penché du rouf — et elle n'en était qu'un de 12 cm) ; c'est maintenant un mur, et
+    si l'on pousse contre, le jeu dit comment l'ouvrir (`npm run test-pont` le vérifie).
+    **Les gestes.** On attrapait tout à 1,9 m, à travers les cloisons, le plancher et les
+    vitres (le ciré, au pied de l'escalier, depuis la timonerie). Maintenant, à portée de
+    main (1,25 m des yeux au bord de la chose), et jamais si quelque chose de dur est entre
+    les yeux et elle : un rayon lancé dans la grille de l'encombrement, de boîte en boîte
+    (Amanatides et Woo), qui ne compte pas les pièces de la chose elle-même ; la porte
+    fermée compte aussi. Un troisième outil le vérifie (`__jeu.carteDesGestes()` : debout et
+    accroupi, tous les 10 cm, d'où le jeu propose chaque chose) : le ciré, seulement depuis
+    le carré ; la console, depuis la timonerie (et le seuil de la porte ouverte) ; porte
+    fermée, plus rien entre le cockpit et la timonerie. **Le tableau électrique** était sur
+    la paroi tribord, sous la corniche, derrière le siège, à hauteur des genoux, noir sur du
+    bois sombre : invisible. Il est sur le pupitre de la console, entre la commande du pilote
+    et le compas : six disjoncteurs à levier (feux de navigation, pilote, éclairage, radar,
+    VHF, pompe de cale), leurs voyants, leurs noms rétroéclairés la nuit et un voltmètre ;
+    quand le pilote lâche, son disjoncteur saute (levier à mi-course, voyant rouge qui
+    clignote). On l'atteint assis au poste. Et le rappel de la leçon disait le ciré « dans
+    la timonerie, à côté de la porte » : il est au pied de l'escalier, dans le carré.
+    Images : `docs/etape22-*.jpg` (dont la carte des passages, avant et après).
+23. ✅ **La nuit noire** (`src/monde/meteo.js`, `src/rendu/eau.js`, `monde3d.js`,
+    `apparitions.js`) — noir d'encre : sous les nuages de la tempête, il ne reste que 7 % de
+    la lumière du ciel (la lune, le ciel, les nuages, le brouillard), de 21 h environ à
+    3 h 30 ; le noir s'installe avec l'orage après le coucher du soleil, et se lève quand
+    le front est passé, vers 4 h. On ne voit plus que : les instruments ; la frontale, dont
+    la mer reçoit maintenant la lumière (des éclats sur chaque ride tournée vers soi, l'écume
+    qui blanchit, la pluie qui brille dans le faisceau) ; les feux de navigation, devenus
+    des projecteurs dans leur secteur, comme les vrais (le rouge et le vert teintent l'écume
+    de l'étrave, chacun de son côté ; le blanc de poupe éclaire le sillage, plus le
+    cockpit) ; le plancton, dans le sillage et maintenant dans chaque vague qui brise près du
+    bateau (on devine la mer autour de soi à sa lueur, qui s'éteint au loin dans la pluie) ;
+    et les éclairs. Un éclair proche montre toute la mer, les nuages, la pluie ; un éclair
+    lointain, surtout le ciel et l'horizon (ce qu'il éclaire autour du bateau baisse avec
+    la distance) ; ils viennent par salves, puis de longues attentes dans le noir — et jamais
+    plus de trois éclats par seconde : sur un écran presque noir, des éclats plus serrés
+    peuvent être dangereux pour les personnes photosensibles (l'option des éclairs doux
+    reste là). La silhouette de l'avant ne se voit plus, dans le noir, qu'à la frontale : à
+    ses bandes réfléchissantes (comme sur tous les cirés de mer), des traits argentés qui
+    flottent au bout du bateau, au bord de la vue ; sans lampe, elle n'apparaît pas. Dehors
+    sans lampe, la peur monte plus vite. La veilleuse rouge de la timonerie est deux fois
+    plus faible : les écrans y sont la vraie lumière. Une option, « La nuit d'orage »
+    (noir d'encre, très sombre, sombre : 7 %, 26 % ou 44 % de la lumière du ciel), pour les
+    écrans peu lumineux ; noir d'encre par défaut. 120 images par seconde la nuit,
+    frontale et feux allumés (95 % des images en moins de 10 ms, aucune au-delà de 25 ms).
+    Images : `docs/etape23-*.jpg` (la même vue à la barre, dans le noir, dans un éclair
+    proche et dans un éclair lointain).
+24. ✅ **La vague scélérate de 20 m** (`src/mer/scelerate.js`, `src/monde/scelerates.js`,
+    `scripts/reglage-scelerate.js`) — 18 m (matelot), 20 m (marin), 22 m (cap-hornier) du
+    creux à la crête, presque deux fois le mât, précédée d'un creux de 8 m. Sa forme a été
+    choisie avec un nouvel outil, `node scripts/reglage-scelerate.js` (plusieurs réglages à
+    la fois, un processus chacun, la vraie physique, trois mers, trois façons de la
+    prendre) : à 7,4 fois sa hauteur de long (une pente de 27°, à la limite où une vague se
+    brise), le bateau partait en travers dans sa descente, même droit dans l'arrière, et se
+    couchait une fois sur trois ; à 8,5 fois (170 m, une pente de 24°) et avec un choc de
+    crête un peu moins fort (0,5), la règle est nette : droit derrière, ça passe toujours
+    (14 à 44° de gîte, pour 18, 20 et 22 m) ; de trois quarts, ça passe le plus souvent,
+    mais elle peut coucher le bateau ; par la hanche ou de travers, couché. Sa lèvre grandit
+    avec elle (6 m au-dessus de la crête). L'éclair qui la montre tombe maintenant quand le
+    bateau est au fond du creux, à 70 m de la crête : de là, un mur de vingt mètres au-dessus
+    de l'arrière (plus près, le bateau est déjà soulevé sur sa pente : on ne la voit plus
+    au-dessus de soi). `npm run test-scelerate` est passé à 20 m (`HAUTEUR=22` pour une
+    autre) ; `npm run test-nuit` : le prudent prend ses trois vagues de 20 m à 162-175°,
+    12 à 28° de gîte ; l'imprudent est emporté par la première. Images :
+    `docs/etape24-*.jpg`.
+25. ✅ **Les échos fantômes** (`src/jeu/peur.js`, `src/bateau/radar.js`) — deux nouvelles
+    choses étranges, dans la peur, jamais confirmées, quand on a un radar sous les yeux (à
+    la barre, le répétiteur ; dans la timonerie, la console) : **l'écho qui nous suit**
+    (vers 22 h - 2 h 30) — en arrière du travers, de 1,25 à 0,45 mille, toujours au même
+    relèvement, quel que soit le cap : il nous suit ; **l'alarme du radar** (vers 1 h -
+    4 h 30) — un écho à 270 m, puis 110 m, presque dans notre sillage, dans la zone de
+    garde : l'anneau d'un quart de mille clignote en rouge sur l'écran, « ALARME — ZONE DE
+    GARDE », des bips à deux notes. Quand un éclair montre la mer, il n'y a rien : l'écho
+    n'est plus là au tour d'antenne suivant, l'alarme se tait. Le journal de bord le note,
+    Jos cherche une explication (un grain qui file avec le vent, une crête qui brise
+    derrière soi…). Ils remplacent l'écho de l'étape 11. L'atelier de la peur les provoque ;
+    `npm run test-peur` vérifie que l'un garde son relèvement et se rapproche sans alarme,
+    que l'autre fait sonner l'alarme, et qu'un éclair les efface. Image :
+    `docs/etape25-l-alarme-du-radar.jpg`.
+
 ## 4. Pistes graphiques notées pour plus tard
 
 Toutes celles du grand chantier sont faites (étapes 13 à 17).

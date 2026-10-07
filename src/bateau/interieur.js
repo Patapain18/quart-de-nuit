@@ -28,6 +28,7 @@ import { PANNEAU_PONT, tranchesCoteRouf, dansUnHublot } from './modele.js';
 import { CARRE, TABLE, TREMIE } from '../joueur/pont.js';
 import { boite, entre, uvBois, echelleUV, teinter, bande, preparer } from './outils-geometrie.js';
 import { construireInterieurTimonerie } from './interieur-timonerie.js';
+import { TableauElectrique } from './tableau-electrique.js';
 import { texturesBoisVerni, texturesSolCabine, texturesLattes, texturesPlafond, texturesTissu } from './textures.js';
 import { ecranRadio, cadranBarometre, cadranPendule, angleBarometre } from './peintures.js';
 
@@ -684,6 +685,9 @@ export class Interieur {
       mat, garder, ajouter, boisGeos, inoxGeos, noirGeos, objets,
       cadrans: { barometre: cadranBarometre(), pendule: cadranPendule() },
     });
+    // le tableau électrique, sur le pupitre de la console
+    this.tableau = new TableauElectrique(this.groupe, { noir: mat.noir, inox: mat.inox, garder });
+    this.positionTableau = this.tableau.position.clone();
 
     // tout le bois verni en un seul objet ; de même pour l'inox, le noir et les objets
     ajouter(mergeGeometries(boisGeos.map((g) => preparer(g, ['uv']))), mat.bois, 'boiseries');
@@ -745,8 +749,11 @@ export class Interieur {
   //   ciel (eclairage(meteo).ambiance) ; eclair : un éclair illumine les hublots ;
   //   descente : 0 (fermée) → 1 (ouverte) ; pression (hPa) et heure, pour les cadrans
   //   vacille : 0 → 1, la lumière des plafonniers (1 : normale ; moins : elle faiblit, quand
-  //   le courant hésite)
-  regler({ eclairage, feux, ciel, eclair = 0, descente = 1, pression = 1015, heure = 12, vacille = 1 }) {
+  //   le courant hésite) ; pilotePanne : le disjoncteur du pilote a sauté (le tableau) ;
+  //   nuit : 0 → 1 (les noms du tableau s'éclairent) ; dt : le temps écoulé
+  regler({
+    eclairage, feux, ciel, eclair = 0, descente = 1, pression = 1015, heure = 12, vacille = 1, pilotePanne = false, nuit = 0, dt = 0,
+  }) {
     this.eclairage = eclairage;
     const u = this.uniforms;
     const S = u.uSourceCouleur.value;
@@ -762,7 +769,7 @@ export class Interieur {
     // (le plafonnier de la timonerie est plus faible : on y veille la nuit, il ne doit pas
     // éblouir — on garde sa vision de nuit pour voir dehors, par les vitres ; en rouge, ce
     // n'est plus qu'une veilleuse : le bois sombre, les écrans pour seule vraie lumière)
-    const kTimonerie = eclairage === 'rouge' ? 0.12 : 0.35;
+    const kTimonerie = eclairage === 'rouge' ? 0.07 : 0.35;
     for (const [i, l, k] of [[0, this.lampes[0], 1], [1, this.lampes[1], 1], [5, this.lampeTimonerie, kTimonerie]]) {
       S[i].copy(lampe).multiplyScalar(k * vacille);
       l.diffuseur.material.emissive.copy(lampe).multiplyScalar(3.2 * k * vacille);
@@ -807,9 +814,8 @@ export class Interieur {
     this.luminance = luminance([r, g, b]);
     this.luminanceTimonerie = luminance(timonerie);
 
-    // les voyants du tableau, l'aiguille du baromètre, les aiguilles de la pendule
-    this.voyants[0].material.color.set(feux ? 0x30ff60 : 0x331111);
-    this.voyants[1].material.color.set(eclairage !== 'eteint' ? (eclairage === 'rouge' ? 0xff3010 : 0xffe0a0) : 0x331111);
+    // le tableau (ses voyants et ses leviers), l'aiguille du baromètre, les aiguilles de la pendule
+    this.tableau.regler(dt, { feux, eclairage, pilotePanne, nuit, vacille });
     this.aiguilles.pression.rotation.z = -angleBarometre(pression);
     const h = ((heure % 12) + 12) % 12;
     this.aiguilles.heures.rotation.z = -(h / 12) * Math.PI * 2;

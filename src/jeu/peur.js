@@ -13,9 +13,10 @@
 //   position des yeux, la direction du regard et le haut de la vue, dans le repère du
 //   bateau (l'avant vers −z, tribord vers +x) ; tanX, tanY : le champ de vision (la
 //   tangente du demi-angle, en largeur et en hauteur) ; lampe (la frontale allumée) ; eclairage ('eteint', 'rouge', 'blanc') ; eclair
-//   (0 → 1 : un éclair en ce moment) ; occupe (une vague scélérate, la trombe, le cargo, un
-//   danger : rien d'étrange ne vient s'y mêler) ; danger (0 → 1) ; silence (Jos ne répond
-//   plus) ; calme (secondes depuis la dernière déferlante) ; porteOuverte.
+//   (0 → 1 : un éclair en ce moment) ; noir (0 → 1 : le noir d'encre de la nuit d'orage) ;
+//   occupe (une vague scélérate, la trombe, le cargo, un danger : rien d'étrange ne vient
+//   s'y mêler) ; danger (0 → 1) ; silence (Jos ne répond plus) ; calme (secondes depuis la
+//   dernière déferlante) ; porteOuverte.
 import { zDe, hauteurPont } from '../bateau/forme.js';
 
 const lisse = (a, b, x) => {
@@ -69,6 +70,12 @@ export const EVENEMENTS = {
   coupCoque: { fois: 1, de: 25.2, a: 29.2, choc: 0.6 },
   // dans un éclair, quelqu'un à l'avant ; à l'éclair suivant, plus personne (un sursaut)
   eclairSilhouette: { fois: 1, de: 24.3, a: 28.8, choc: 0.7 },
+  // sur le radar, un écho qui nous suit : toujours au même relèvement, quel que soit notre
+  // cap, et il se rapproche ; dans un éclair, la mer est vide — et il n'est plus là
+  echoSuiveur: { fois: 1, de: 21.9, a: 26.4, choc: 0.3 },
+  // l'alarme du radar : un écho tout près, dans la zone de garde, presque dans notre
+  // sillage ; un éclair montre la mer : il n'y a rien (et l'alarme se tait)
+  echoProche: { fois: 1, de: 24.9, a: 28.6, choc: 0.55 },
 };
 const ATTENTE = 75; // secondes au moins entre deux choses étranges (hors gémissements)
 const DEHORS = new Set(['barre', 'pont']);
@@ -131,6 +138,7 @@ export class Peur {
     this.reflet = null; // { x, y, z (où se tient la chose, derrière toi), age, duree, opacite }
     this.forme = null; // { x, z (repère du bateau), age, duree, opacite }
     this.chose = null; // { x, z, angle (repère du bateau), age, duree, force, sonde }
+    this.echo = null; // { nom, releve (depuis l'avant, + vers tribord), distance (m), force, alarme, age, duree }
     this.force = {}; // (l'atelier de la peur : ce qu'on veut voir tout de suite)
     this.tensionForcee = null; // (l'atelier de la peur : une tension choisie)
   }
@@ -147,7 +155,8 @@ export class Peur {
     this.t += dt;
     const evts = [];
     this.choc *= Math.exp(-dt / 90);
-    const obscurite = DEHORS.has(ctx.lieu) ? (ctx.lampe ? 0 : 0.05) : (ctx.eclairage === 'eteint' && !ctx.lampe ? 0.12 : 0);
+    // (dehors sans lampe, dans le noir d'encre, on ne voit plus rien : la peur monte)
+    const obscurite = DEHORS.has(ctx.lieu) ? (ctx.lampe ? 0 : 0.05 + 0.08 * (ctx.noir ?? 0)) : (ctx.eclairage === 'eteint' && !ctx.lampe ? 0.12 : 0);
     this.tension = this.tensionForcee ?? Math.min(1, tensionDeFond(ctx.heure) + 0.55 * this.choc + 0.35 * (ctx.danger ?? 0) + obscurite);
     this.dernierCtx = ctx; // (pour l'atelier de la peur)
     this.suivreApparitions(dt, ctx, evts);
@@ -184,6 +193,7 @@ export class Peur {
     if (nom === 'reflet') return !!this.reflet;
     if (nom === 'forme') return !!this.forme;
     if (nom === 'chose') return !!this.chose;
+    if (nom === 'echoSuiveur' || nom === 'echoProche') return !!this.echo;
     return false;
   }
 
@@ -193,6 +203,8 @@ export class Peur {
     switch (nom) {
       case 'silhouette': {
         if (lieu === 'carre' || yeux.z < SILHOUETTE.z + 3) return false;
+        // (dans le noir d'encre, on ne la voit qu'à la frontale : ses bandes la renvoient)
+        if ((ctx.noir ?? 0) > 0.5 && !ctx.lampe) return false;
         const e = surEcran(ctx, this.pointSilhouette(ctx, 1.1));
         return coinDeLOeil(e) && Math.max(Math.abs(e.x), Math.abs(e.y)) < 0.88;
       }
@@ -218,6 +230,11 @@ export class Peur {
       case 'nom':
         // (pendant que Jos ne répond plus, si l'on peut ; sinon, quand même)
         return ctx.silence || ctx.heure > EVENEMENTS.nom.a - 0.5;
+      case 'echoSuiveur':
+      case 'echoProche':
+        // (il faut un radar sous les yeux : la console de la timonerie, ou le répétiteur du
+        // cockpit, à la barre)
+        return lieu === 'timonerie' || lieu === 'barre';
       default:
         return true;
     }
@@ -258,6 +275,17 @@ export class Peur {
       const cote = h() < 0.5 ? -1 : 1;
       const angle = cote * (0.5 + 0.5 * h()); // (sa route, par rapport au bateau)
       this.chose = { age: 0, duree: 16, cote, angle, x: 0, z: 0, force: 0, sous: false, sonde: null };
+    } else if (nom === 'echoSuiveur' || nom === 'echoProche') {
+      // le suiveur : abaft du travers, de 1,25 à 0,45 mille ; le proche : presque dans le
+      // sillage, de 270 à 110 m (dans la zone de garde : l'alarme sonne)
+      const cote = h() < 0.5 ? -1 : 1;
+      const proche = nom === 'echoProche';
+      const depart = proche ? 270 : 2300;
+      this.echo = {
+        nom, age: 0, duree: proche ? 26 + 6 * h() : 48 + 10 * h(),
+        releve: cote * (proche ? 2.65 + 0.35 * h() : 1.75 + 0.6 * h()),
+        depart, arrivee: proche ? 110 : 820, distance: depart, force: 0, alarme: false, vu: false,
+      };
     }
     this.journal.push({ nom, heure: ctx.heure, regardee: false });
     evts.push(nom);
@@ -324,6 +352,26 @@ export class Peur {
         evts.push('chose-fin');
       }
     }
+    // l'écho du radar : il garde son relèvement (il nous suit, quoi qu'on fasse) et se
+    // rapproche ; quand un éclair montre la mer, il n'y a rien — au tour d'antenne suivant,
+    // il n'est plus là (et l'alarme se tait)
+    const o = this.echo;
+    if (o) {
+      o.age += dt;
+      o.distance = o.depart + (o.arrivee - o.depart) * lisse(0, o.duree * 0.85, o.age);
+      if (!o.vu && (ctx.eclair ?? 0) > 0.45) {
+        o.vu = true;
+        o.age = Math.max(o.age, o.duree - 1.2);
+        const p = { x: Math.sin(o.releve) * o.distance, y: 0.5, z: -Math.cos(o.releve) * o.distance };
+        this.noter(o.nom, enFace(surEcran(ctx, p)));
+      }
+      o.force = lisse(0, 3, o.age) * (1 - lisse(o.duree - (o.vu ? 1.2 : 4), o.duree, o.age));
+      o.alarme = o.nom === 'echoProche' && o.age > 2.5 && o.force > 0.5;
+      if (o.age > o.duree) {
+        this.echo = null;
+        evts.push(`${o.nom}-fin`);
+      }
+    }
   }
 
   finir(nom, evts, regardee) {
@@ -346,7 +394,7 @@ export class Peur {
     if (!s) return;
     Object.assign(this.fois, s.fois ?? {});
     this.choc = s.choc ?? 0;
-    this.silhouette = this.reflet = this.forme = this.chose = null;
+    this.silhouette = this.reflet = this.forme = this.chose = this.echo = null;
     this.dernier = this.t;
   }
 }

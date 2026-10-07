@@ -8,8 +8,8 @@
 //  - au centre et à tribord, sous le pare-brise, la console : un pupitre incliné vers le
 //    siège de quart, avec l'écran du radar, le traceur de cartes, la commande du pilote et
 //    le compas ; au plafond, devant, les répétiteurs (vitesse, vent) ; sur la paroi
-//    tribord, le baromètre et la pendule, la VHF à portée de main du siège, le tableau
-//    électrique derrière lui ;
+//    tribord, le baromètre et la pendule, la VHF à portée de main du siège ; le tableau
+//    électrique est sur le pupitre (tableau-electrique.js), à portée de main, assis ou debout ;
 //  - à bâbord, derrière l'escalier, le coin cuisine (un réchaud sur cardan, l'évier, la
 //    bouilloire) et l'extincteur.
 // Les parois sont lambrissées sous les vitres ; le plafond est le dessous du toit.
@@ -37,7 +37,9 @@ const Y_CARRE = -0.3;
 export const CONSOLE = {
   x0: -0.03, x1: 0.53, xBas: 0.72, z0: 0.27, z1: 0.6, haut: 1.15, pupitre: { bas: [1.15, 0.6], haut: [1.45, 0.36] },
 };
-export const SIEGE = { x: 0.25, z: 1.0, assise: 0.95, demiLargeur: 0.19 };
+// (le siège est à tribord de l'axe : de la porte, on entre tout droit en le laissant à sa
+// droite, entre lui et la cuisine)
+export const SIEGE = { x: 0.36, z: 1.0, assise: 0.95, demiLargeur: 0.19 };
 // (un palier de 20 cm entre le haut de l'escalier et la cuisine : on y tourne vers la porte)
 // (et 7 cm devant la paroi arrière : le battant de la porte y coulisse)
 export const CUISINE = { x0: -0.76, x1: -0.38, z0: 1.05, z1: 1.36, haut: 1.28 };
@@ -479,7 +481,7 @@ export function construireInterieurTimonerie(i, { mat, garder, ajouter, boisGeos
   noirGeos.push(new THREE.CylinderGeometry(0.018, 0.026, 0.05, 12).translate(-0.62, Y + 0.375, zE), entre(-0.645, -0.595, Y + 0.14, Y + 0.17, K.z0 - 0.02, K.z0));
 
   // --- sur la paroi tribord : le baromètre et la pendule juste après la console, la VHF à
-  // portée de main du siège, le tableau électrique derrière lui ---
+  // portée de main du siège ---
   const xParoi = (z, y) => xLambris(uDe(z), y) - 0.012;
   const radio = new THREE.Group();
   const boitier = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.08, 0.14), mat.noir);
@@ -494,22 +496,6 @@ export function construireInterieurTimonerie(i, { mat, garder, ajouter, boisGeos
   radio.position.set(xParoi(0.88, 1.18) - 0.07, 1.18, 0.88);
   groupe.add(radio);
   i.positionRadio = radio.position.clone();
-  const zT = 1.3;
-  const xT = xParoi(zT, 1.0) - 0.008;
-  const tableau = new THREE.Mesh(new THREE.BoxGeometry(0.016, 0.16, 0.24), mat.noir);
-  tableau.position.set(xT, 1.0, zT);
-  groupe.add(tableau);
-  i.positionTableau = tableau.position.clone();
-  for (let k = 0; k < 6; k++) {
-    inoxGeos.push(boite(0.014, 0.02, 0.012, xT - 0.014, 1.04 - Math.floor(k / 3) * 0.055, zT - 0.07 + (k % 3) * 0.045));
-  }
-  i.voyants = [0, 1].map((k) => {
-    const v = new THREE.Mesh(new THREE.CircleGeometry(0.008, 12), new THREE.MeshBasicMaterial({ color: 0x331111 }));
-    v.rotation.y = -Math.PI / 2;
-    v.position.set(xT - 0.01, 1.04 - k * 0.055, zT + 0.08);
-    groupe.add(v);
-    return v;
-  });
   const instrument = (y, texture, nom) => {
     const z = 0.68;
     const x = xParoi(z, y) - 0.015;

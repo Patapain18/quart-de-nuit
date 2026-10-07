@@ -132,6 +132,16 @@ uniform int uSillageN;
 uniform vec4 uSillageBoite;
 uniform float uVitesseBateau; // m/s
 uniform float uPlancton;      // la nuit, l'écume remuée par le bateau s'illumine (0 → 1)
+// la lumière du bord : la frontale (position, direction ; intensité, cosinus du bord du
+// cône et de son plein, portée) et les quatre feux de navigation, chacun dans son secteur
+// (position, portée ; direction, cosinus du bord du cône ; couleur × intensité, cosinus
+// de son plein)
+uniform vec3 uLampePos;
+uniform vec3 uLampeDir;
+uniform vec4 uLampe;
+uniform vec4 uFeux[4];
+uniform vec4 uFeuxDir[4];
+uniform vec4 uFeuxCouleur[4];
 // le cargo : son repère (pour l'écume le long de sa coque), présent ou non et sa vitesse,
 // et son sillage (comme celui du bateau)
 uniform mat4 uCargoInverse;
@@ -364,6 +374,17 @@ float eclat(vec3 n, vec3 v, vec3 l, float a) {
   return D * G * F / (4.0 * nv);
 }
 
+// La lumière qu'une lampe du bord envoie sur ce point de la mer (comme Three le calcule
+// pour le bateau : décroissance avec la distance, coupée à sa portée), et sa direction
+float eclairement(vec3 position, float portee, float decroissance, out vec3 l) {
+  vec3 versLampe = position - vMonde;
+  float d = length(versLampe);
+  l = versLampe / max(d, 1e-3);
+  float k = 1.0 / max(pow(d, decroissance), 0.01);
+  if (portee > 0.0) k *= pow(saturer(1.0 - pow(d / portee, 4.0)), 2.0);
+  return k;
+}
+
 void main() {
   // pas d'eau à l'intérieur du bateau (la cabine, le cockpit quand il gîte)
   if (uClipCoque > 0.5 && dansCoque(vMonde)) discard;
@@ -424,6 +445,29 @@ ${cascades.map((_, i) => `  p = texture(uPentes${i}, vSource / uGrille${i}.x);
     float dosVague = saturer(dot(n, -v) * 0.5 + 0.6); // les faces qui se dérobent au regard
     corps += uCouleurTranslucide * (uSoleil * contreJour * 1.4 + uAmbiance * 0.35) * crete * crete * dosVague;
 
+    // la lumière du bord : la frontale dans son cône, les feux tout autour d'eux ; l'eau en
+    // renvoie des éclats sur chaque ride tournée vers nous (le faisceau d'une lampe sur
+    // l'eau noire : une tache d'étincelles), et un peu de son bleu sombre
+    vec3 lumiereBord = vec3(0.0);
+    if (uLampe.x > 0.0) {
+      vec3 l;
+      float k = eclairement(uLampePos, uLampe.w, 1.5, l);
+      k *= smoothstep(uLampe.y, uLampe.z, dot(-l, uLampeDir));
+      vec3 e = vec3(1.0, 0.91, 0.78) * uLampe.x * k;
+      lumiereBord += e * max(dot(n, l), 0.0);
+      eclats += e * eclat(n, v, l, max(a, 0.08)) * 1.6;
+    }
+    for (int i = 0; i < 4; i++) {
+      if (uFeux[i].w <= 0.0) continue;
+      vec3 l;
+      float k = eclairement(uFeux[i].xyz, uFeux[i].w, 2.0, l);
+      k *= smoothstep(uFeuxDir[i].w, uFeuxCouleur[i].w, dot(-l, uFeuxDir[i].xyz));
+      vec3 e = uFeuxCouleur[i].rgb * k;
+      lumiereBord += e * max(dot(n, l), 0.0);
+      eclats += e * eclat(n, v, l, max(a, 0.08)) * 1.6;
+    }
+    corps += uCouleurFond * lumiereBord * 1.5 + uCouleurTranslucide * lumiereBord * 0.25 * crete;
+
     couleur = corps * (1.0 - fresnel) + reflet * fresnel + eclats;
     // sous les remous du bateau, l'eau pleine de bulles s'éclaircit, turquoise
     couleur += uCouleurTranslucide * lumiere * bateau.w * 0.4 * (1.0 - fresnel);
@@ -458,7 +502,8 @@ ${cascades.map((_, i) => `  p = texture(uPentes${i}, vSource / uGrille${i}.x);
     // au-delà, sa teinte moyenne, plus claire que la mer mais pas blanche)
     voile = max(voile, mix(bateau.y, bateau.x * 0.35, saturer(distance / 700.0)));
     fraiche = max(fraiche, bateau.x);
-    vec3 lumiereEcume = uAmbiance * 0.9 + uSoleil * (0.25 + 0.75 * max(dot(n, uDirSoleil), 0.0)) + uLune * 0.8 + vec3(uEclair * 0.5 * saturer(dot(n, uDirEclair) * 0.8 + 0.25));
+    vec3 lumiereEcume = uAmbiance * 0.9 + uSoleil * (0.25 + 0.75 * max(dot(n, uDirSoleil), 0.0)) + uLune * 0.8 + vec3(uEclair * 0.5 * saturer(dot(n, uDirEclair) * 0.8 + 0.25))
+                      + lumiereBord * 0.9;
     // l'écume épaisse est blanche, la dentelle laisse voir l'eau verte en dessous
     vec3 couleurEcume = mix(vec3(0.55, 0.72, 0.72), vec3(0.88, 0.9, 0.92), fraiche) * lumiereEcume;
     couleur = mix(couleur, couleurEcume, voile);
@@ -494,6 +539,15 @@ ${cascades.map((_, i) => `  p = texture(uPentes${i}, vSource / uGrille${i}.x);
         couleur += vec3(0.02, 0.32, 0.34) * uPlancton * uChose.w * (corps * 0.018 + bord * plaques * (0.03 + 0.14 * etincelle)) * (1.0 - fresnel * 0.5);
       }
     }
+    // (la nuit, chaque crête qui déferle près du bateau s'allume aussi : dans le noir, on
+    // devine les vagues qui brisent autour de soi à leur lueur bleu-verte, qui s'éteint
+    // au loin, dans la pluie)
+    if (uPlancton > 0.01) {
+      float brise = smoothstep(uSeuilEcume + 0.05, uSeuilEcume + 0.4, ecume);
+      float pres = 1.0 - smoothstep(35.0, 170.0, distance);
+      float scintille = smoothstep(0.72, 0.92, texture(uBruit, vec3(vMonde.xz * 1.7, uTemps * 1.3)).a);
+      couleur += vec3(0.03, 0.4, 0.42) * uPlancton * brise * pres * (0.009 + 0.035 * scintille) * (1.0 - fresnel * 0.6);
+    }
     // (et dans l'écume de la vague scélérate qui s'écroule : toute sa crête s'allume)
     couleur += vec3(0.03, 0.4, 0.42) * uPlancton * mousseScelerate * (0.06 + 0.3 * smoothstep(0.75, 0.95, texture(uBruit, vec3(vMonde.xz * 0.9, uTemps * 0.7)).a));
     if (uPlancton > 0.01 && bateau.w > 0.01) {
@@ -503,7 +557,7 @@ ${cascades.map((_, i) => `  p = texture(uPentes${i}, vSource / uGrille${i}.x);
       // (au loin, on ne les distingue plus : il en reste leur lueur moyenne)
       float loin = smoothstep(15.0, 60.0, distance);
       etincelles *= 1.0 - loin;
-      couleur += vec3(0.03, 0.4, 0.42) * uPlancton * bateau.w * (bateau.y * 0.05 + etincelles * 0.12 + 0.01 + 0.035 * loin);
+      couleur += vec3(0.03, 0.4, 0.42) * uPlancton * bateau.w * (bateau.y * 0.028 + etincelles * 0.11 + 0.006 + 0.02 * loin);
     }
   }
 
@@ -618,6 +672,12 @@ export class Eau {
       uSillageBoite: { value: new THREE.Vector4() },
       uVitesseBateau: { value: 0 },
       uPlancton: { value: 0 },
+      uLampePos: { value: new THREE.Vector3() },
+      uLampeDir: { value: new THREE.Vector3(0, -1, 0) },
+      uLampe: { value: new THREE.Vector4() },
+      uFeux: { value: [0, 1, 2, 3].map(() => new THREE.Vector4()) },
+      uFeuxDir: { value: [0, 1, 2, 3].map(() => new THREE.Vector4()) },
+      uFeuxCouleur: { value: [0, 1, 2, 3].map(() => new THREE.Vector4()) },
       uSeuilEcume: { value: 0.2 },
       uDirVent: { value: new THREE.Vector2(1, 0) },
       uBateauInverse: { value: new THREE.Matrix4() },
@@ -751,6 +811,25 @@ export class Eau {
     u.uCargo.value.set(1, this.vitesseCargo, 0, 0);
   }
 
+
+  // La lumière du bord sur la mer : la frontale (la SpotLight du monde, qui suit le
+  // regard) et les feux de navigation ([{ lumiere }], des SpotLight du bateau)
+  eclairerParLeBord(lampe, feux) {
+    const u = this.uniforms;
+    u.uLampePos.value.copy(lampe.position);
+    u.uLampeDir.value.subVectors(lampe.target.position, lampe.position).normalize();
+    u.uLampe.value.set(lampe.intensity, Math.cos(lampe.angle), Math.cos(lampe.angle * (1 - lampe.penumbra)), lampe.distance);
+    for (let i = 0; i < 4; i++) {
+      const f = feux[i]?.lumiere;
+      const p = u.uFeux.value[i];
+      if (!f || f.intensity <= 0) { p.w = 0; continue; }
+      const ici = f.getWorldPosition(this._feu ??= new THREE.Vector3());
+      p.set(ici.x, ici.y, ici.z, f.distance);
+      const vers = f.target.getWorldPosition(this._cible ??= new THREE.Vector3()).sub(ici).normalize();
+      u.uFeuxDir.value[i].set(vers.x, vers.y, vers.z, Math.cos(f.angle));
+      u.uFeuxCouleur.value[i].set(f.color.r * f.intensity, f.color.g * f.intensity, f.color.b * f.intensity, Math.cos(f.angle * (1 - f.penumbra)));
+    }
+  }
 
   // Lumières et ambiance (voir monde/meteo.js)
   regler(meteo, ecl) {

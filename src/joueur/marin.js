@@ -12,9 +12,11 @@
 //  4. il a un corps : rien de dur n'entre dans ses hanches, sa poitrine ni ses yeux (la
 //     caméra). Ce qui est dur vient du vrai modèle 3D (encombrement.js), plus la bôme,
 //     qui bouge : il baisse la tête dessous, ou, trop basse, elle lui barre le passage.
-//     (La barre franche, à hauteur des genoux, on l'enjambe.)
+//     (La barre franche, à hauteur des genoux, on l'enjambe.) Quand quelque chose l'arrête,
+//     il glisse le long (un coin de meuble, un montant de porte ne le collent pas sur
+//     place), et quand il marche vers la porte de la timonerie, il s'aligne sur son milieu.
 import { Vector3 } from 'three';
-import { solEn, plafondEn, margeAuBord, dansLaTimonerie } from './pont.js';
+import { solEn, plafondEn, margeAuBord, dansLaTimonerie, PASSAGES, bloqueParLaPorte } from './pont.js';
 import { zDe, MAT } from '../bateau/forme.js';
 
 const SUR_LE_PONT = new Set(['passavant', 'pont-avant', 'pont-arriere', 'rouf', 'rouf-panneau', 'hiloire']);
@@ -57,6 +59,7 @@ export class Marin {
     // bome : { x, y, z (le pivot au mât), angle, longueur, rayon }
     this.pieces = { bome: null };
     this.sousLaBome = false; // (il a baissé la tête pour passer dessous)
+    this.coteGlisse = 1; // (le côté par lequel il a contourné un obstacle à l'image d'avant)
     this._f = new Vector3();
     this._d = new Vector3();
     this._dep = new Vector3();
@@ -154,6 +157,7 @@ export class Marin {
     const souhait = f.multiplyScalar(entrees.avance).addScaledVector(d, entrees.lateral);
     if (souhait.lengthSq() > 1) souhait.normalize();
     souhait.multiplyScalar(vitesse);
+    this.guiderVersLesPassages(souhait, vitesse, dt);
 
     // 2. le pont penche : la part de la pesanteur « dans le plan du pont » le pousse
     const normale = Math.max(0, -pesanteur.y);
@@ -171,7 +175,9 @@ export class Marin {
     // 3. le déplacement, surface par surface (on glisse le long des murs)
     const dep = this._dep.copy(souhait).add(this.glissade).multiplyScalar(dt);
     const avant = this._avant.copy(this.position);
-    if (!this.essayer(dep.x, dep.z)) {
+    // (arrêté : il contourne ce qui le bloque, sauf quand le bateau se couche — là, plaqué
+    // contre les filières, il ne glisse pas le long : il y reste, ou passe par-dessus)
+    if (!this.essayer(dep.x, dep.z) && (couche || !this.contourner(dep.x, dep.z))) {
       const okX = this.essayer(dep.x, 0);
       const okZ = this.essayer(0, dep.z);
       if (!okX) this.glissade.x = 0;
@@ -258,6 +264,7 @@ export class Marin {
       ? this.degagement(p.x, p.z, p.y, this.yeuxEn(p.x, p.z, p.y)) : 1;
     let x = p.x + dx;
     let z = p.z + dz;
+    if (bloqueParLaPorte(p.x, p.z, x, z)) return false;
     if (!this.praticable(x, z, maintenant)) {
       if (solEn(x, z, p.y)) return false; // (un sol, mais pas la place : un mur pour le corps)
       // un vide : y a-t-il un sol juste derrière ?
@@ -266,13 +273,56 @@ export class Marin {
       for (let s = 0.04; s <= ENJAMBEE + 1e-6 && !trouve; s += 0.04) {
         const ex = x + (dx / l) * s;
         const ez = z + (dz / l) * s;
-        if (this.praticable(ex, ez, maintenant)) { x = ex; z = ez; trouve = true; }
+        if (!bloqueParLaPorte(p.x, p.z, ex, ez) && this.praticable(ex, ez, maintenant)) { x = ex; z = ez; trouve = true; }
       }
       if (!trouve) return false;
     }
     p.x = x;
     p.z = z;
     return true;
+  }
+
+  // Arrêté net dans la direction (dx, dz) : il essaie la même direction, tournée de plus
+  // en plus d'un côté puis de l'autre (20°, 40°, 60°), en n'avançant que de ce qui reste
+  // dans la direction voulue — il glisse le long d'un mur, contourne un coin. Il commence
+  // par le côté qui a marché la dernière fois (sinon, devant un coin, il hésiterait d'une
+  // image à l'autre). Renvoie true s'il a bougé.
+  contourner(dx, dz) {
+    const cotes = this.coteGlisse < 0 ? [-1, 1] : [1, -1];
+    for (const a of [0.35, 0.7, 1.05]) {
+      const c = Math.cos(a);
+      const s = Math.sin(a);
+      for (const k of cotes) {
+        const gx = (dx * c - dz * s * k) * c;
+        const gz = (dx * s * k + dz * c) * c;
+        if (this.essayer(gx, gz)) {
+          this.coteGlisse = k;
+          return true;
+        }
+      }
+    }
+    return false;
+  }
+
+  // En marchant vers un passage étroit (la porte de la timonerie), à peu près de face et
+  // à moins de 90 cm de son seuil, il dérive vers son milieu : de plus en plus près du
+  // seuil, jamais au-delà du milieu. (S'il marche de biais, de plus de 45°, ou s'il s'en
+  // éloigne, rien ne change : il va peut-être ailleurs.)
+  guiderVersLesPassages(souhait, vitesse, dt) {
+    const v = Math.hypot(souhait.x, souhait.z);
+    if (v < 0.05) return;
+    for (const p of PASSAGES) {
+      const versSeuil = p.z - this.position.z;
+      if (Math.abs(versSeuil) > 0.9 || Math.abs(versSeuil) < 0.02) continue;
+      // (il va vers le seuil, de face à 45° près)
+      if (souhait.z * Math.sign(versSeuil) < 0.7 * v) continue;
+      const ecart = this.position.x - p.x;
+      if (Math.abs(ecart) > p.demiLargeur + 0.5) continue;
+      const proche = Math.min(1, (0.9 - Math.abs(versSeuil)) / 0.6);
+      const derive = -ecart * 3.2 * proche * (v / Math.max(vitesse, 0.1));
+      // (sans dépasser le milieu d'ici la prochaine image)
+      souhait.x += Math.sign(derive) * Math.min(Math.abs(derive), Math.abs(ecart) / Math.max(dt, 1e-3));
+    }
   }
 
   // Le replacer quelque part (prendre la barre, se relever, ressortir de la cabine)
