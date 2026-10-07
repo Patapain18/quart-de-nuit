@@ -97,6 +97,13 @@ vec3 agx(vec3 c) {
 }
 
 float hasard(vec2 p) { return fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453); }
+// (un bruit doux : le hasard, lissé entre les cases)
+float bruitDoux(vec2 p) {
+  vec2 i = floor(p);
+  vec2 f = fract(p);
+  f = f * f * (3.0 - 2.0 * f);
+  return mix(mix(hasard(i), hasard(i + vec2(1.0, 0.0)), f.x), mix(hasard(i + vec2(0.0, 1.0)), hasard(i + vec2(1.0, 1.0)), f.x), f.y);
+}
 
 void main() {
   // une goutte est une petite lentille : elle montre la scène décalée (et retournée), et
@@ -125,9 +132,16 @@ void main() {
   float l = dot(c, vec3(0.2126, 0.7152, 0.0722));
   c = mix(vec3(l), c, uSaturation);
   c = (c - 0.5) * uContraste + 0.5;
-  // (l'eau pulvérisée diffuse la lumière : tout se noie dans un gris laiteux qui bouge)
-  float nuee = 0.75 + 0.25 * hasard(floor(vUv * 18.0 + vec2(uTemps * 9.0, uTemps * 4.0)) * 0.37);
-  c = mix(c, vec3(0.42, 0.47, 0.52) * nuee, uEmbruns * 0.7);
+  // (l'eau pulvérisée diffuse la lumière : tout se noie dans un gris laiteux, où passent
+  // des bouffées plus ou moins épaisses, emportées par le tourbillon)
+  if (uEmbruns > 0.0) {
+    vec2 p = vUv * vec2(1.6, 1.0);
+    float bouffees = bruitDoux(p * 4.0 + vec2(uTemps * 1.9, uTemps * 0.6)) * 0.55
+                   + bruitDoux(p * 9.0 + vec2(uTemps * 3.7, -uTemps * 1.1)) * 0.3
+                   + bruitDoux(p * 21.0 + vec2(uTemps * 6.5, uTemps * 0.4)) * 0.15;
+    float nuee = 0.72 + 0.4 * bouffees;
+    c = mix(c, vec3(0.42, 0.47, 0.52) * nuee, uEmbruns * (0.45 + 0.35 * bouffees));
+  }
   // vignettage
   vec2 centre = vUv - 0.5;
   c *= 1.0 - uVignettage * dot(centre, centre) * 1.6;

@@ -1,0 +1,20 @@
+/* Atelier de la trombe : le même panneau que l'atelier de la mer, et une légende en bas */
+.espace { margin-top: var(--espace-2); }
+
+#legende {
+  position: fixed;
+  left: var(--espace-3);
+  bottom: var(--espace-3);
+  max-width: min(560px, calc(100vw - 2 * var(--espace-3)));
+  margin: 0;
+  padding: var(--espace-2) var(--espace-3);
+  background: var(--panneau);
+  border: 1px solid var(--bordure);
+  border-radius: var(--rayon);
+  font-size: 13px;
+  color: var(--texte);
+  pointer-events: none;
+}
+#legende:empty { display: none; }
+
+#variantes button { min-height: 40px; }

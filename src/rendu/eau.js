@@ -125,6 +125,7 @@ uniform float uForceEcume;
 uniform float uSeuilEcume;
 uniform vec2 uDirVent;
 uniform vec4 uTrombe; // la trombe : x, z, rayon de son cœur (m), force (0 : pas de trombe)
+uniform vec4 uTrombeVie; // sa vie sur l'eau : la tache sombre, les spirales, l'anneau d'embruns (0 → 1), sa rotation (rad/s)
 // le sillage : où était la poupe (x, z), à quel instant (s), à quelle vitesse (m/s) ; le
 // premier point est la poupe elle-même ; et la boîte qui les contient tous (pour aller vite)
 uniform vec4 uSillage[${N_SILLAGE}];
@@ -481,17 +482,44 @@ ${cascades.map((_, i) => `  p = texture(uPentes${i}, vSource / uGrille${i}.x);
                    + texture(uBruit, vec3(vSource * 0.9, 0.4)).a * 0.15;
     // seuil réglé selon le vent : ~1 % de la mer blanchit par 13 nœuds, ~20 % par 48 nœuds
     float fraiche = smoothstep(uSeuilEcume, uSeuilEcume + 0.35, ecume);
-    // la trombe arrache la mer : autour de son pied, un anneau d'écume en spirales qui
-    // tournent, d'autant plus vite que l'on est près du cœur
+    // la trombe arrache la mer. Sa vie, sur l'eau (Golden, 1974) : d'abord une tache
+    // sombre ; puis des bandes d'écume qui s'enroulent en spirales vers son pied ; puis
+    // l'anneau d'embruns, une couronne d'eau blanche et chaotique qui tourbillonne autour
+    // du cœur (vite près du cœur, lentement au loin : le tourbillon de Rankine)
+    float ecumeTrombe = 0.0;
     if (uTrombe.w > 0.01) {
       vec2 dt = vMonde.xz - uTrombe.xy;
       float d = length(dt);
       float R = uTrombe.z;
-      float angle = uTemps * 30.0 * R / max(d * d, R * R); // (30 m/s au bord du cœur)
-      vec2 tourne = mat2(cos(angle), -sin(angle), sin(angle), cos(angle)) * dt;
-      float spirale = texture(uBruit, vec3(tourne * 0.018, 0.37)).a * 0.6 + texture(uBruit, vec3(tourne * 0.06, 0.71)).b * 0.4;
-      float anneau = smoothstep(R * 0.3, R * 0.9, d) * (1.0 - smoothstep(R * 1.6, R * 4.5, d));
-      fraiche = max(fraiche, anneau * smoothstep(0.38, 0.62, spirale + anneau * 0.25) * uTrombe.w);
+      if (d < R * 14.0) {
+        // (deux motifs qui vivent chacun 3 s, l'un apparaissant quand l'autre s'efface :
+        // sinon, tournant plus vite au centre, le motif s'enroulerait sans fin)
+        float omega = uTrombeVie.w * R * R / max(d * d, R * R);
+        float x = uTemps / 3.0;
+        float fa = fract(x);
+        float fb = fract(x + 0.5);
+        float wa = 1.0 - abs(2.0 * fa - 1.0);
+        vec2 qa = mat2(cos(omega * fa * 3.0), sin(omega * fa * 3.0), -sin(omega * fa * 3.0), cos(omega * fa * 3.0)) * dt;
+        vec2 qb = mat2(cos(omega * fb * 3.0), sin(omega * fb * 3.0), -sin(omega * fb * 3.0), cos(omega * fb * 3.0)) * dt;
+        float ca = floor(x);
+        float cb = floor(x + 0.5) + 0.5;
+        vec4 na = texture(uBruit, vec3(qa / (R * 1.6), 0.37 + fract(ca * 0.618)));
+        vec4 nb = texture(uBruit, vec3(qb / (R * 1.6), 0.37 + fract(cb * 0.618)));
+        vec4 n = mix(nb, na, wa);
+        // les spirales : des bandes en spirale logarithmique qui s'enroulent vers le cœur
+        // et tournent lentement
+        float a = atan(dt.y, dt.x);
+        float bande = 0.5 + 0.5 * sin(3.0 * (a + 2.3 * log(max(d, 1.0) / R)) + uTemps * 0.9 * uTrombeVie.w);
+        float zoneSpirales = smoothstep(R * 0.9, R * 2.2, d) * (1.0 - smoothstep(R * 5.0, R * 13.0, d));
+        float spirales = smoothstep(0.62, 0.92, bande * 0.75 + n.a * 0.45) * zoneSpirales * uTrombeVie.y;
+        // l'anneau : l'eau blanche, arrachée, qui tourbillonne
+        float zoneAnneau = smoothstep(R * 0.3, R * 0.85, d) * (1.0 - smoothstep(R * 1.5, R * 3.4, d + (n.r - 0.5) * R));
+        float anneau = zoneAnneau * smoothstep(0.25, 0.55, n.g * 0.6 + n.b * 0.4 + zoneAnneau * 0.2) * uTrombeVie.z;
+        ecumeTrombe = max(spirales * 0.75, anneau) * min(1.0, uTrombe.w * 1.5);
+        fraiche = max(fraiche, ecumeTrombe);
+        // la tache sombre : sous le tourbillon qui naît, l'eau fonce
+        couleur *= 1.0 - 0.5 * uTrombeVie.x * (1.0 - smoothstep(R * 0.7, R * 3.0, d));
+      }
     }
     float mousseScelerate = ecumeScelerate(sc, vSource);
     fraiche = max(fraiche, mousseScelerate);
@@ -548,6 +576,8 @@ ${cascades.map((_, i) => `  p = texture(uPentes${i}, vSource / uGrille${i}.x);
       float scintille = smoothstep(0.72, 0.92, texture(uBruit, vec3(vMonde.xz * 1.7, uTemps * 1.3)).a);
       couleur += vec3(0.03, 0.4, 0.42) * uPlancton * brise * pres * (0.009 + 0.035 * scintille) * (1.0 - fresnel * 0.6);
     }
+    // (et l'eau que la trombe arrache : la couronne d'embruns, à son pied, luit dans le noir)
+    couleur += vec3(0.03, 0.4, 0.42) * smoothstep(0.5, 0.95, uPlancton) * ecumeTrombe * (0.1 + 0.4 * smoothstep(0.7, 0.92, texture(uBruit, vec3(vMonde.xz * 0.35, uTemps * 0.9)).a));
     // (et dans l'écume de la vague scélérate qui s'écroule : toute sa crête s'allume)
     couleur += vec3(0.03, 0.4, 0.42) * uPlancton * mousseScelerate * (0.06 + 0.3 * smoothstep(0.75, 0.95, texture(uBruit, vec3(vMonde.xz * 0.9, uTemps * 0.7)).a));
     if (uPlancton > 0.01 && bateau.w > 0.01) {
@@ -667,6 +697,7 @@ export class Eau {
       uCouleurTranslucide: { value: new THREE.Vector3(0.025, 0.16, 0.13) },
       uForceEcume: { value: 1 },
       uTrombe: { value: new THREE.Vector4(0, 0, 30, 0) },
+      uTrombeVie: { value: new THREE.Vector4(0, 0, 1, 1) },
       uSillage: { value: Array.from({ length: N_SILLAGE }, () => new THREE.Vector4()) },
       uSillageN: { value: 0 },
       uSillageBoite: { value: new THREE.Vector4() },

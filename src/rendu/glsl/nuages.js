@@ -22,6 +22,7 @@ export const UNIFORMS_NUAGES = {
   uAmbBas: { value: null }, // lumière renvoyée par la mer, sous les nuages
   uEclair: { value: null }, // position (m) et intensité d'un éclair
   uCirrus: { value: 0.3 }, // voile de cirrus très haut (0 → 1)
+  uTrombeCiel: { value: null }, // le nuage d'orage qui porte la trombe : x, z, rayon (m), force (0 : pas de trombe)
 };
 
 export const GLSL_NUAGES = /* glsl */ `
@@ -40,6 +41,7 @@ uniform vec3 uAmbHaut;
 uniform vec3 uAmbBas;
 uniform vec4 uEclair;
 uniform float uCirrus;
+uniform vec4 uTrombeCiel;
 
 const float ECHELLE_FORME = 1.0 / 9000.0;   // le motif de forme se répète tous les 9 km
 const float ECHELLE_DETAIL = 1.0 / 1300.0;  // le motif de détail tous les 1,3 km
@@ -54,6 +56,12 @@ float densiteNuage(vec3 p, float h, bool detaille) {
   float carte = texture(uBruitNuages, vec3(q.xz * (1.0 / 30000.0), 0.37)).r * 0.65
               + texture(uBruitNuages, vec3(q.xz * (1.0 / 11000.0), 0.81)).r * 0.35;
   float zone = smoothstep(1.0 - uCouverture - 0.12, 1.0 - uCouverture + 0.12, carte);
+  // au-dessus d'une trombe, le nuage d'orage qui la porte : le ciel y est bouché
+  float parent = 0.0;
+  if (uTrombeCiel.w > 0.0) {
+    parent = uTrombeCiel.w * (1.0 - smoothstep(uTrombeCiel.z * 0.4, uTrombeCiel.z, length(p.xz - uTrombeCiel.xy)));
+    zone = max(zone, parent);
+  }
   if (zone <= 0.0) return 0.0;
 
   // Profil vertical : base plate, puis la densité diminue avec la hauteur, ce qui
@@ -64,7 +72,7 @@ float densiteNuage(vec3 p, float h, bool detaille) {
   // au cœur d'une zone, le seuil est bas (gros nuages serrés) ; en bordure, il est haut
   // (petits nuages épars) ; par ciel couvert, il descend jusqu'à boucher le ciel
   float plein = smoothstep(0.7, 1.0, uCouverture);
-  float seuil = mix(0.92, mix(0.42, 0.05, plein), zone);
+  float seuil = mix(mix(0.92, mix(0.42, 0.05, plein), zone), 0.06, parent);
   float base = saturer((forme * profil - seuil) / (1.0 - seuil));
   if (base <= 0.0 || !detaille) return base;
 

@@ -309,6 +309,7 @@ export class Ciel {
     u.uDeriveNuages.value = new THREE.Vector2();
     for (const nom of ['uDirSoleil', 'uSoleilNuages', 'uDirLune', 'uLuneNuages', 'uAmbHaut', 'uAmbBas']) u[nom].value = v3();
     u.uEclair.value = new THREE.Vector4();
+    u.uTrombeCiel.value = new THREE.Vector4();
     // Le front orageux (glsl/front.js), partagé par le fond, le cube et la mer
     this.uniformsFront = {
       uFront: { value: new THREE.Vector4() },

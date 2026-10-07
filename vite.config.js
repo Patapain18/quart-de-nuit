@@ -57,6 +57,7 @@ export default defineConfig({
         atelierBateau: path.resolve('atelier-bateau.html'),
         atelierTempete: path.resolve('atelier-tempete.html'),
         atelierSon: path.resolve('atelier-son.html'),
+        atelierTrombe: path.resolve('atelier-trombe.html'),
       },
     },
   },

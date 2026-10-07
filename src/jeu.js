@@ -60,6 +60,8 @@ marin.encombrement = construireEncombrement(bateau);
 if (parametres.has('perf')) import('./atelier/fluidite.js').then((m) => m.afficherFluidite(monde));
 // (jeu.html?peur : l'atelier de la peur, à droite)
 if (parametres.has('peur')) import('./atelier/atelier-peur.js').then((m) => m.ouvrirAtelierPeur(window.__jeu));
+// (jeu.html?trombe=fil : une autre trombe que celle du jeu — voir l'atelier de la trombe)
+if (parametres.has('trombe')) monde.trombe.choisirVariante(parametres.get('trombe'));
 const bouees = new Bouees(monde.scene, monde.houle);
 // (la peur : ce qu'on voit du coin de l'œil — jeu/peur.js décide, ceci le montre)
 const apparitions = new Apparitions(monde.scene, bateau, monde.houle, monde.eau);

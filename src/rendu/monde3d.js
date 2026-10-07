@@ -17,16 +17,19 @@ import { Gouttes } from './gouttes.js';
 import { Cargo3D } from './cargo.js';
 import { Trombe3D } from './trombe.js';
 import { LumiereEtrange } from './lumiere-etrange.js';
+import { ChronoGPU } from './chrono-gpu.js';
 
 // Les niveaux de qualité de l'image (les options du jeu) : la finesse de l'image (au plus
 // tant de pixels par point de l'écran), l'anticrénelage, la taille de la carte des
 // ombres, les nuages (leur résolution et le nombre de pas pour les traverser), le
 // nombre de rayons de la toile d'araignée de la mer, la pluie et les embruns.
+// (trombe : la taille de son volume par rapport à l'écran, le nombre de pas pour le
+// traverser, et si la matière fait de l'ombre sur elle-même)
 export const QUALITES = {
-  economique: { nom: 'Économique', pixels: 1, msaa: 0, ombres: 1024, nuages: 0.34, pas: 22, mer: 256, pluie: 0.45, particules: 0.4 },
-  moyenne: { nom: 'Moyenne', pixels: 1.25, msaa: 2, ombres: 2048, nuages: 0.42, pas: 28, mer: 320, pluie: 0.7, particules: 0.7 },
-  haute: { nom: 'Haute', pixels: 1.5, msaa: 4, ombres: 2048, nuages: 0.5, pas: 36, mer: 384, pluie: 1, particules: 1 },
-  superbe: { nom: 'Superbe', pixels: 2, msaa: 4, ombres: 4096, nuages: 0.6, pas: 44, mer: 448, pluie: 1, particules: 1 },
+  economique: { nom: 'Économique', pixels: 1, msaa: 0, ombres: 1024, nuages: 0.34, pas: 22, mer: 256, pluie: 0.45, particules: 0.4, trombe: { echelle: 0.33, pas: 72, ombres: false } },
+  moyenne: { nom: 'Moyenne', pixels: 1.25, msaa: 2, ombres: 2048, nuages: 0.42, pas: 28, mer: 320, pluie: 0.7, particules: 0.7, trombe: { echelle: 0.4, pas: 96, ombres: true } },
+  haute: { nom: 'Haute', pixels: 1.5, msaa: 4, ombres: 2048, nuages: 0.5, pas: 36, mer: 384, pluie: 1, particules: 1, trombe: { echelle: 0.5, pas: 128, ombres: true } },
+  superbe: { nom: 'Superbe', pixels: 2, msaa: 4, ombres: 4096, nuages: 0.6, pas: 44, mer: 448, pluie: 1, particules: 1, trombe: { echelle: 0.6, pas: 160, ombres: true } },
 };
 
 export class Monde3D {
@@ -100,6 +103,8 @@ export class Monde3D {
     // calcul, image par image ; gpu : on attend la carte graphique après chaque morceau
     // (plus lent, mais on voit son vrai travail)
     this.chrono = { actif: false, gpu: false, image: null, images: [] };
+    // (le vrai temps de la carte graphique, morceau par morceau : chrono-gpu.js)
+    this.chronoGPU = new ChronoGPU(this.renderer.getContext());
     this.eclair = { intensite: 0, eclaire: 0, prochain: 4, flashs: [] };
     this.mesures = { houleMs: 0, imageMs: 0, ips: 0 };
     this._compteur = { images: 0, depuis: performance.now() };
@@ -124,6 +129,7 @@ export class Monde3D {
     this.eau.changerDensite(q.mer);
     this.pluie.facteur = q.pluie;
     this.embruns.facteur = q.particules;
+    this.trombe.reglerQualite(q.trombe);
     this.redimensionner();
   }
 
@@ -149,6 +155,8 @@ export class Monde3D {
     const r = this.renderer;
     const ancienne = r.getRenderTarget();
     try {
+      // (les passes de la trombe, calculées hors de la scène)
+      await this.trombe.precompiler(this.camera);
       r.setRenderTarget(this.post.cible);
       await r.compileAsync(this.scene, this.camera);
       // puis une vraie image, cachée (dans l'image intermédiaire, pas à l'écran) : elle
@@ -206,6 +214,7 @@ export class Monde3D {
     const taille = r.getDrawingBufferSize(new THREE.Vector2());
     this.post.redimensionner(taille.x, taille.y);
     this.ciel.redimensionner(taille.x, taille.y);
+    this.trombe?.redimensionner(taille.x, taille.y);
     this.camera.userData.hauteurPixels = taille.y;
     if (this.gouttes) {
       this.gouttes.redimensionner(taille.x, taille.y);
@@ -362,6 +371,7 @@ export class Monde3D {
 
   // (le chronomètre : mesure une partie du calcul, si on l'a demandé)
   mesurer(nom, f) {
+    if (this.chronoGPU.actif) return this.chronoGPU.mesurer(nom, f);
     const c = this.chrono;
     if (!c.actif || !c.image) return f();
     const gl = this.renderer.getContext();
@@ -381,6 +391,7 @@ export class Monde3D {
     const debut = performance.now();
     const chrono = this.chrono;
     if (chrono.actif) chrono.image = { temps: this.temps };
+    this.chronoGPU.relever();
     this.temps += dt;
     const m = this.meteo;
     const t0 = performance.now();
@@ -439,7 +450,9 @@ export class Monde3D {
     // (son sillage : c'est la mer qui le dessine)
     if (this.etatCargo) this.cargo.groupe.updateMatrixWorld();
     this.eau.suivreCargo(this.etatCargo ? this.cargo.groupe : null, this.temps, dt);
-    this.trombe.maj(dt, this.etatTrombe, { temps: this.temps, directionVent: angleVers(m.directionVent), camera: this.camera });
+    this.trombe.maj(dt, this.etatTrombe, {
+      temps: this.temps, directionVent: angleVers(m.directionVent), camera: this.camera, nuit: this.ecl.nuit, eclaire: this.eclair.eclaire,
+    });
     if (this.eau.brumeDeBase) this.eau.uniforms.uBrume.value = this.eau.brumeDeBase * (1 + 160 * this.trombe.brouillard ** 1.5);
     this.post.reglages.uEmbruns.value = this.dansLaCabine ? 0 : this.trombe.brouillard ** 1.5;
     this.lumiereEtrange.maj(dt, this.camera);
@@ -451,6 +464,7 @@ export class Monde3D {
     this.post.reglages.uForceGouttes.value = this.dansLaCabine || !this.gouttesActives ? 0 : 1;
     this.mesurer('eau', () => this.eau.preparer(this.camera));
     this.mesurer('ciel', () => this.ciel.preparer(this.camera, { toutLeCube }));
+    this.mesurer('trombe', () => this.trombe.preparer(this.camera));
     this.mesurer('rendu', () => this.post.rendre(this.scene, this.camera));
 
     if (chrono.actif && chrono.image) {

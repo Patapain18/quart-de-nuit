@@ -734,6 +734,92 @@ Feuille de route :
     que l'autre fait sonner l'alarme, et qu'un éclair les efface. Image :
     `docs/etape25-l-alarme-du-radar.jpg`.
 
+### La trombe en volume (octobre 2026) : « le rendu de la tornade me dérange encore »
+
+Ce que Mathis a demandé : « une grosse update sur la tornade, en prenant bien en compte
+tous les paramètres et en animant bien chaque partie, avec plusieurs rendus pour que je
+dise celui que je préfère ».
+
+26. ✅ **La trombe calculée en volume** (`src/rendu/trombe.js`, `src/rendu/glsl/trombe.js`,
+    `atelier-trombe.html`) — Avant (étape 10) : un tube de triangles texturé, des « voiles »
+    d'embruns, une soucoupe de nuage ; de près, on voyait les surfaces, et rien ne tournait
+    vraiment. Maintenant elle est calculée comme les nuages du ciel : pour chaque pixel, on
+    avance pas à pas le long du regard à travers sa matière — la vapeur condensée de
+    l'entonnoir, l'eau de mer pulvérisée, le nuage-mur, la pluie — et on additionne la
+    lumière que chaque bout renvoie vers l'œil, en tenant compte de ce qu'il cache.
+    **Ce qu'il y a dedans**, de haut en bas : le **nuage-mur**, la partie abaissée de la
+    base des nuages d'orage (un ventre bosselé, au contour irrégulier, des bandes en arcs
+    de cercle sur ses flancs, des lambeaux qui montent en spirale vers lui) ; au-dessus,
+    le nuage d'orage qui la porte (le ciel y est bouché : `uTrombeCiel` dans
+    `glsl/nuages.js`) ; **l'entonnoir** : une trompe, fine sur presque toute sa longueur,
+    évasée dans le nuage-mur, souvent creuse (plus opaque sur ses bords), striée de bandes
+    qui montent en hélice, l'axe courbé par le vent (le haut emporté, le pied qui traîne)
+    et parcouru d'ondulations qui descendent le long du tube ; **la gerbe d'embruns** : un
+    dôme bouillonnant d'eau arrachée, aussi large que haut, d'où sort l'entonnoir, plus
+    haut près du cœur, retombant sur les bords, un œil plus clair au centre ; parfois un
+    **rideau de pluie** derrière elle, et des **trombes sœurs**. Sur la mer (`eau.js`), la
+    tache sombre, les bandes d'écume en spirale logarithmique, la couronne d'eau blanche.
+    **Tout bouge comme l'air** : le motif (le bruit 3D des nuages) est lu dans un repère
+    qui tourne avec le tourbillon — d'un bloc dans le cœur, de moins en moins vite au-delà
+    (le tourbillon de Rankine), d'autant plus vite que l'entonnoir est étroit (le moment
+    cinétique se conserve) — et qui monte avec l'air (en hélice dans l'entonnoir, en
+    gerbe au pied, l'eau qui retombe sur les bords). Pour que le motif ne s'enroule pas
+    sans fin, deux motifs vivent chacun quelques secondes, l'un apparaissant pendant que
+    l'autre s'efface, comme la condensation qui se forme et s'évapore.
+    **Sa vie** (comme les vraies, Golden 1974) : le nuage-mur s'abaisse, une tache sombre
+    sur l'eau, des spirales d'écume, l'anneau d'embruns se lève pendant que l'entonnoir
+    descend du nuage à sa rencontre (50 s) ; la pleine force ; puis, la dernière minute,
+    elle s'amincit en corde, se couche, se tord, sa vapeur remonte dans le nuage et la
+    gerbe retombe.
+    **La lumière** : une petite carte du ciel tout autour (lue dans le cube des reflets,
+    qui contient les nuages, rangée « en octaèdre » pour la lire sans calculer d'angles)
+    éclaire chaque bout de matière du côté où il est tourné ; la lueur du couchant sur
+    l'horizon fait briller les bords ; la lune ne passe pas le nuage d'orage ; chaque
+    matière sait combien d'elle-même la lumière traverse (une corde dans un cercle), et
+    une mesure de plus, tout près, modèle les bosses ; l'eau pulvérisée, très blanche,
+    renvoie bien plus de lumière qu'un nuage épais ; pendant un éclair, c'est lui la
+    lumière principale : la trombe se découpe sur le nuage qu'il allume ; la nuit, l'eau
+    arrachée au pied s'allume de plancton, par étincelles qui tournent avec elle.
+    **Quatre trombes au choix** (`VARIANTES`) : *la colonne* (une trombe d'orage massive,
+    un tronc gris de 50 à 80 m sous un grand nuage-mur), *le fil* (la trombe des photos :
+    une corde de vapeur de 15 m qui ondule en S, un buisson d'embruns blanc à son pied),
+    *la bête* (noire et large, à demi cachée dans la pluie, sous un nuage-mur énorme),
+    *les sœurs* (une trombe et deux plus fines qui descendent du même nuage, touchent la
+    mer et remontent). `jeu.html?trombe=fil` pour en essayer une dans le jeu.
+    **Comment c'est dessiné** : le volume est calculé sur une image plus petite que
+    l'écran (de 0,29 à 0,55 de sa largeur en qualité haute, selon la distance : de près,
+    elle remplit l'écran et ses formes sont grandes), décalé au hasard d'un pixel et d'une image à
+    l'autre, puis accumulé d'une image à l'autre (en retrouvant chaque point à sa place),
+    agrandi par un filtre bicubique, et posé dans la scène à la distance où il commence :
+    derrière le bateau et les crêtes qui sont devant lui. On n'avance à petits pas que
+    dans la boîte de chaque pièce, et dans chaque boîte, la distance à la vraie matière
+    dit jusqu'où sauter. **Ce qu'on a appris en chemin** : le programme de la carte
+    graphique était 5 fois trop lent parce que la fonction de la matière y était recopiée
+    une dizaine de fois (pour chaque sœur, chaque mesure d'ombre) : réécrit compact
+    (variables globales, une seule copie), il est devenu 4 à 5 fois plus rapide ; la
+    pluie, matière légère et lisse, coûtait le plus (on la traverse à grands pas) ; puis
+    le nuage-mur, qui tourne lentement et presque d'un bloc : un seul motif qui tourne
+    suffit (au lieu de deux qui se relaient), deux fois moins de lectures ; le « damier »
+    (un pixel sur deux par image) ne gagne rien, la carte graphique calculant les pixels
+    par carrés de quatre ; « finish » ne sert à rien pour chronométrer (il rend la main
+    tout de suite) : il faut lire un pixel. **Mesuré** (M4 Pro, 1920 × 1200) : sans la
+    trombe, 120 images par seconde ; avec elle à l'écran, de 84 à 94 en qualité haute
+    (selon sa distance), 100 en économique, 76 en superbe.
+    **Corrigés en passant** : le bord du front orageux, trop net dans la brume de la mer
+    (vue d'un peu haut, la mer changeait de couleur le long d'une ligne droite) ; le voile
+    des embruns de l'étape 10, fait de gros carrés, remplacé par des bouffées douces qui
+    défilent.
+    **Les outils** : l'atelier de la trombe (`atelier-trombe.html` : les quatre trombes et
+    l'ancienne, sa vie au curseur ou en accéléré, quatre moments, six points de vue dont
+    une vue immobile pour filmer, les éclairs, les mesures ; `__trombe.planche()`,
+    `__trombe.film()` et `filmer()`, `compter()` (pas et éclairages par pixel, et sa carte
+    de chaleur), `comparerAuxNuages()`, `couts()` (le prix de chaque ingrédient),
+    `seul(['ent', 'emb'])` pour ne voir qu'une pièce) ; `scripts/film.mjs` (les images d'un
+    film → une vidéo) ; `scripts/fente.py` (la « fente temporelle » : une ligne de chaque
+    image d'un film, empilées ; ce qui tourne ou monte y dessine des traînées obliques,
+    pour juger un mouvement sans regarder la vidéo) ; `src/rendu/chrono-gpu.js` (les
+    requêtes de minutage de la carte graphique). Images : `docs/etape26-*.jpg`.
+
 ## 4. Pistes graphiques notées pour plus tard
 
 Toutes celles du grand chantier sont faites (étapes 13 à 17).

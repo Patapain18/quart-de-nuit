@@ -84,6 +84,9 @@ vec4 frontOrage(vec3 d, vec3 ciel, float detail) {
   float dessous = plafond - epaisseur + H * 0.05 * (fibres - 0.5);
   float enclume = etendue * smoothstep(dessous - H * 0.03, dessous + H * 0.02, el) * (1.0 - smoothstep(plafond - H * 0.01, plafond + H * 0.006, el));
   float a = max(tour, enclume * 0.9);
+  // (dans la brume de la mer et dans ses reflets, son bord s'estompe : sinon, vue d'un peu
+  // haut, la mer changerait de couleur d'un coup, le long d'une ligne droite)
+  if (detail < 0.5) a *= 1.0 - smoothstep(0.55, 1.0, ax);
   if (a < 0.002) return vec4(0.0);
 
   // ---- la lumière ----

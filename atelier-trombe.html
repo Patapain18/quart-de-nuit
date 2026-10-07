@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Atelier de la trombe · Quart de nuit</title>
+  <meta name="description" content="Comparer les trombes marines du jeu : leurs caractères, leur vie de la naissance à la corde, au crépuscule, dans la nuit noire et sous les éclairs.">
+  <link rel="stylesheet" href="./src/atelier-mer.css">
+  <link rel="stylesheet" href="./src/atelier-trombe.css">
+</head>
+<body>
+  <canvas id="scene" aria-label="La trombe marine vue depuis le voilier"></canvas>
+  <p id="legende" aria-live="polite"></p>
+  <aside id="panneau" aria-label="Réglages de l'atelier">
+    <header>
+      <h1>Atelier de la trombe</h1>
+      <button type="button" id="replier" aria-expanded="true" aria-controls="contenu">Replier</button>
+    </header>
+    <div id="contenu">
+      <section aria-labelledby="titre-variantes">
+        <h2 id="titre-variantes">Les trombes</h2>
+        <div id="variantes" class="grille-boutons"></div>
+        <p class="aide" id="resume"></p>
+      </section>
+      <section aria-labelledby="titre-vie">
+        <h2 id="titre-vie">Sa vie</h2>
+        <div class="curseur">
+          <label for="age">Son âge</label><output for="age" id="age-texte"></output>
+          <input type="range" id="age" min="0" max="260" step="0.5" value="120">
+        </div>
+        <div class="grille-boutons">
+          <button type="button" id="vivre" aria-pressed="false">Elle vit (×1)</button>
+          <button type="button" id="vivre-vite" aria-pressed="false">En accéléré (×6)</button>
+          <button type="button" data-age="0">Naissance</button>
+          <button type="button" data-age="30">Elle descend</button>
+          <button type="button" data-age="120">Pleine force</button>
+          <button type="button" data-age="222">La corde</button>
+        </div>
+        <p class="aide" id="etape-vie" aria-live="polite"></p>
+      </section>
+      <section aria-labelledby="titre-moment">
+        <h2 id="titre-moment">Le moment</h2>
+        <div id="moments" class="grille-boutons"></div>
+        <div class="grille-boutons espace">
+          <button type="button" id="eclair">Un éclair dans son nuage</button>
+          <button type="button" id="eclairs" aria-pressed="true">Les éclairs de l'orage</button>
+        </div>
+      </section>
+      <section aria-labelledby="titre-vue">
+        <h2 id="titre-vue">Point de vue</h2>
+        <div id="vues" class="grille-boutons"></div>
+        <div class="curseur espace">
+          <label for="distance">Distance</label><output for="distance" id="distance-texte"></output>
+          <input type="range" id="distance" min="60" max="4000" step="10" value="900">
+        </div>
+        <label class="case"><input type="checkbox" id="avance"> Elle avance avec le vent (7 m/s)</label>
+        <p class="aide">Glisse sur l'image pour regarder autour de toi.</p>
+      </section>
+      <section aria-labelledby="titre-mesures">
+        <h2 id="titre-mesures">Mesures</h2>
+        <dl id="mesures"></dl>
+        <div class="grille-boutons">
+          <button type="button" id="mesurer">Mesurer la carte graphique</button>
+          <button type="button" id="photo">Photo</button>
+        </div>
+        <p id="etat" class="aide" role="status"></p>
+      </section>
+    </div>
+  </aside>
+  <script type="module" src="./src/atelier-trombe.js"></script>
+</body>
+</html>
