@@ -682,7 +682,9 @@ function simuler(dt) {
     eclair: monde.eclair.eclaire,
     descente: bateau.descenteOuverte ? 1 : 0,
     pression,
-    heure: meteo.heure,
+    // (la pendule donne l'heure de l'horloge : la lumière du ciel, elle, peut retarder —
+    // le crépuscule s'attarde pendant le passage de la trombe, jeu/nuit.js)
+    heure: nuit ? nuit.heure % 24 : meteo.heure,
     vacille,
     pilotePanne: nuit?.avaries.pilote === 'panne',
     nuit: monde.ecl.nuit,
@@ -702,8 +704,9 @@ function simuler(dt) {
   // (quand la peur monte, la nuit se referme : l'œil ne s'habitue plus aussi bien au noir)
   const peurNuit = (nuit?.peur?.tension ?? 0) ** 2 * monde.ecl.nuit;
   reglages.uExposition.value *= 1 - 0.3 * peurNuit;
-  // (sous le nuage-mur de la trombe, il fait sombre)
-  if (nuit?.trombe) reglages.uExposition.value *= 1 - 0.32 * nuit.trombe.force * (1 - THREE.MathUtils.smoothstep(nuit.trombe.distance, 150, 900));
+  // (sous le nuage-mur de la trombe, il fait un peu plus sombre — un peu seulement : elle
+  // vient à la tombée de la nuit, il faut encore la voir)
+  if (nuit?.trombe) reglages.uExposition.value *= 1 - 0.12 * nuit.trombe.force * (1 - THREE.MathUtils.smoothstep(nuit.trombe.distance, 150, 900));
   // (et les couleurs de la nuit — bleues, délavées — ne valent que dehors)
   const et = monde.etalonnage;
   reglages.uSaturation.value = THREE.MathUtils.lerp(et.saturation, 1.05, etat.adaptation);

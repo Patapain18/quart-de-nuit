@@ -115,6 +115,10 @@ export function meteoDeLaNuit(heure, niveau = DIFFICULTES.marin) {
   return m;
 }
 
+// La trombe touche le bateau à moins de RAYON_TOUCHE mètres de son axe : dans le plus
+// épais de sa gerbe d'embruns (celle de la bête, rendu/trombe.js, a 52 m de cœur)
+export const RAYON_TOUCHE = 95;
+
 // ---------- L'eau à bord ----------
 export const EAU = {
   planchers: 150, // litres dans la cale : au-delà, l'eau passe au-dessus des planchers
@@ -168,6 +172,7 @@ export class Nuit {
     this.heure = HEURE_COUCHER;
     this.c = 0; // le chapitre en cours
     this.t = 0; // secondes (réelles) depuis le début de la nuit
+    this.retardLumiere = 0; // (heures : de combien la lumière du ciel retarde sur l'horloge)
     this.etat = 'nuit'; // 'nuit', 'aube' (gagné) ou 'perdue'
     this.meteo = meteoDeLaNuit(this.heure, this.niveau);
     this.deferlantes = new Deferlantes(graine * 31 + 5);
@@ -178,7 +183,9 @@ export class Nuit {
     this.fatigue = { grandVoile: 0, foc: 0 };
     // l'heure (du jeu) où arriveront les imprévus
     this.prevu = {
-      trombe: 19.05 + this.hasard() * 0.25,
+      // (la trombe vient au début de la nuit, quand il reste un peu de lumière : voir
+      // retarderLumiere)
+      trombe: 19.4 + this.hasard() * 0.15,
       cargo: 22.4 + this.hasard() * 0.5,
       ecouteFoc: 24.8 + this.hasard() * 1.2,
       pilote: 26.0 + this.hasard() * 0.9,
@@ -268,7 +275,8 @@ export class Nuit {
     }
     this.t += dt;
     this.avancerHeure(dt, ctx);
-    this.meteo = meteoDeLaNuit(this.heure, this.niveau);
+    this.retarderLumiere(dt);
+    this.meteo = this.meteoIci();
     ctx.meteo = this.meteo;
     this.suivreScelerates(dt, ctx);
     this.suivreDeferlantes(dt, ctx);
@@ -283,6 +291,31 @@ export class Nuit {
     this.suivreMoments();
     this.conseiller(dt, ctx);
     if (this.heure >= HEURE_AUBE) this.leverDuJour();
+  }
+
+  // Le temps qu'il fait maintenant. La lumière peut retarder sur l'horloge : pendant que la
+  // trombe est là, le crépuscule s'attarde (la hauteur du soleil, l'épaisseur de l'orage,
+  // les nuages, le front, la brume sont ceux d'un moment plus tôt) ; le vent, la mer et la
+  // pluie, eux, restent à l'heure.
+  meteoIci() {
+    const m = meteoDeLaNuit(this.heure, this.niveau);
+    if (this.retardLumiere > 0) {
+      const l = meteoDeLaNuit(this.heure - this.retardLumiere, this.niveau);
+      Object.assign(m, { heure: l.heure, orage: l.orage, nuages: l.nuages, front: l.front, brume: l.brume });
+    }
+    return m;
+  }
+
+  // La trombe vient au début de la nuit, quand il reste un peu de lumière ; mais l'heure du
+  // jeu avance vite (une heure en une minute et demie au crépuscule) et elle vit plus de
+  // quatre minutes : pendant qu'elle est là, la lumière n'avance qu'au dixième de
+  // l'horloge (on la voit encore se découper sur le ciel quand elle passe) ; une fois
+  // partie, la nuit tombe, un peu plus vite que l'horloge, jusqu'à la rattraper.
+  retarderLumiere(dt) {
+    const ch = this.chapitre;
+    const vitesse = (ch.a - ch.de) / ch.duree; // (heures de jeu par seconde)
+    if (this.trombe && this.trombe.force > 0.05) this.retardLumiere = Math.min(3, this.retardLumiere + dt * vitesse * 0.9);
+    else if (this.retardLumiere > 0) this.retardLumiere = Math.max(0, this.retardLumiere - dt * vitesse * 1.6);
   }
 
   avancerHeure(dt, ctx) {
@@ -623,7 +656,7 @@ export class Nuit {
       this.dire(['Elle arrive sur toi ! Accroche ton harnais, et tiens-toi ! Écarte-toi d\'elle, vite !'], { urgent: true });
       this.emettre('trombe-proche');
     }
-    if (t.distance < 75 && t.force > 0.5 && !t.touche) {
+    if (t.distance < RAYON_TOUCHE && t.force > 0.5 && !t.touche) {
       t.touche = true;
       this.stats.trombeTouche = true;
       this.ecrire('La trombe est passée sur le bateau !');
@@ -654,9 +687,10 @@ export class Nuit {
     const dx = x - t.x;
     const dz = z - t.z;
     const d = Math.max(1, Math.hypot(dx, dz));
-    const coeur = 40;
+    // (le cœur : l'entonnoir de la trombe du jeu, la bête, fait 100 m de large au pied)
+    const coeur = 50;
     const vmax = 38 * t.force; // ~74 nœuds au bord du cœur
-    const v = (d < coeur ? (vmax * d) / coeur : (vmax * coeur) / d) * (1 - lisse(260, 540, d));
+    const v = (d < coeur ? (vmax * d) / coeur : (vmax * coeur) / d) * (1 - lisse(300, 600, d));
     return sortie.set((dz / d) * v - (dx / d) * v * 0.3, 0, (-dx / d) * v - (dz / d) * v * 0.3);
   }
 
@@ -1089,6 +1123,7 @@ export class Nuit {
     for (const nom of ['trombe', 'cargo', 'lumiere', 'voix16', 'silence', 'coups', 'scelerate0', 'scelerate1', 'scelerate2']) if (this.prevu[nom] < this.heure) this.faits.add(nom);
     for (const nom of ['ecouteFoc', 'pilote']) if (this.prevu[nom] < this.heure) this.prevu[nom] = Infinity;
     this.silence = this.faits.has('silence') && this.heure < this.prevu.silence + 0.55;
+    this.retardLumiere = 0;
     this.meteo = meteoDeLaNuit(this.heure, this.niveau);
   }
 
@@ -1153,6 +1188,7 @@ export class Nuit {
     Object.assign(p, s.voiles);
     p.eauCale = this.eau.cale;
     p.eauCockpit = 0;
+    this.retardLumiere = 0;
     this.meteo = meteoDeLaNuit(this.heure, this.niveau);
     this.ecrire(`Reprise : ${this.chapitre.titre.toLowerCase()}.`);
     this.dire([`On reprend, ${NOM_BATEAU}. ${this.chapitre.titre} : courage.`]);

@@ -31,6 +31,8 @@ import { GLSL_TROMBE } from './glsl/trombe.js';
 
 const lisse = THREE.MathUtils.smoothstep;
 const lerp = THREE.MathUtils.lerp;
+// (smoothstep(a, b, x) comme en GLSL)
+const smoothstep01 = (a, b, x) => lisse(x, a, b);
 
 // ---------- Les caractères ----------
 // Quatre trombes possibles, toutes physiquement plausibles, pour choisir la sienne.
@@ -73,7 +75,7 @@ export const VARIANTES = {
     rideau: { angle: 0.4, ouverture: 1.9, rayon: 600, densite: 0.6 },
     soeurs: 0,
     ext: { ent: 0.08, emb: 0.09, mur: 0.095, pluie: 0.006 },
-    teinte: [0.45, 0.47, 0.5], noirceur: 0.45,
+    teinte: [0.55, 0.57, 0.6], noirceur: 0.35,
   },
   soeurs: {
     nom: 'Les sœurs',
@@ -88,7 +90,8 @@ export const VARIANTES = {
     teinte: [0.66, 0.69, 0.74], noirceur: 0.25,
   },
 };
-export const VARIANTE_DU_JEU = 'colonne';
+// (celle du jeu : la bête, choisie par Mathis le 2026-10-07)
+export const VARIANTE_DU_JEU = 'bete';
 
 // ---------- Sa vie ----------
 // age, duree : en secondes (jeu/nuit.js : elle vit 260 s). Renvoie ce qui se voit à cet âge.
@@ -183,6 +186,7 @@ uniform vec3 uLune;
 uniform vec4 uEclair;        // un éclair (position dans le monde, intensité) : celui des nuages
 uniform float uEclaire;      // l'éclair qui illumine tout autour de nous
 uniform float uNuit;
+uniform float uNoir;         // le noir de la nuit d'orage (0 → 1) : le plancton ne se voit que dans le noir
 uniform float uOmbres;       // 1 : les ombres de la matière sur elle-même (la qualité)
 uniform sampler2D uDeplacement0;
 uniform sampler2D uDeplacement1;
@@ -422,8 +426,8 @@ void main() {
       recue *= 1.0 + 0.8 * partEmbruns;
       vec3 lum = couleur * recue;
       // 4. la nuit, l'eau arrachée au pied s'allume : le plancton qu'elle emporte
-      // (seulement dans le vrai noir : au crépuscule, on ne le voit pas)
-      float noirDeNuit = smoothstep(0.5, 0.95, uNuit);
+      // (seulement dans le vrai noir : tant qu'il reste de la lumière, on le devine à peine)
+      float noirDeNuit = smoothstep(0.5, 0.95, uNuit) * mix(0.25, 1.0, smoothstep(0.35, 0.8, uNoir));
       if (noirDeNuit > 0.0 && emb > 0.0) {
         // (surtout au ras de l'eau, là où elle vient d'être arrachée ; par étincelles, qui
         // s'allument et s'éteignent en tournant avec elle)
@@ -661,6 +665,7 @@ export class Trombe3D {
       uEclair: un.uEclair,
       uEclaire: { value: 0 },
       uNuit: { value: 0 },
+      uNoir: { value: 0 },
       uOmbres: { value: 1 },
       uDeplacement0: ue.uDeplacement0,
       uDeplacement1: ue.uDeplacement1,
@@ -783,7 +788,7 @@ export class Trombe3D {
   // trombe : { x, z, force, age, duree } (jeu/nuit.js), ou null ; directionVent : vers où
   // va le vent (radians, dans le plan) ; temps : l'horloge du monde ; nuit : 0 → 1 ;
   // eclaire : l'éclair autour de nous (monde3d)
-  maj(dt, trombe, { temps, directionVent, camera = null, nuit = 0, eclaire = 0 }) {
+  maj(dt, trombe, { temps, directionVent, camera = null, nuit = 0, noir = 0, eclaire = 0 }) {
     const visible = !!trombe && trombe.force > 0.005;
     // (quand elle réapparaît, on oublie les anciennes images)
     if (visible && !this.visible) this.reinitialiser = true;
@@ -804,7 +809,10 @@ export class Trombe3D {
     u.uT.value = temps;
     u.uVent.value.set(Math.cos(directionVent), Math.sin(directionVent));
     u.uNuit.value = nuit;
+    u.uNoir.value = noir;
     u.uEclaire.value = eclaire;
+    // (le plancton de la couronne d'écume, sur la mer : lui aussi, seulement dans le noir)
+    if (ue.uTrombePlancton) ue.uTrombePlancton.value = smoothstep01(0.5, 0.95, nuit) * lerp(0.25, 1, smoothstep01(0.35, 0.8, noir));
     const pied = this.houle.hauteur(trombe.x, trombe.z);
     u.uPied.value.set(trombe.x, pied, trombe.z);
     // la base des nuages au-dessus d'elle (le nuage parent), et le nuage-mur dessous

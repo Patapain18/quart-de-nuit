@@ -451,7 +451,7 @@ export class Monde3D {
     if (this.etatCargo) this.cargo.groupe.updateMatrixWorld();
     this.eau.suivreCargo(this.etatCargo ? this.cargo.groupe : null, this.temps, dt);
     this.trombe.maj(dt, this.etatTrombe, {
-      temps: this.temps, directionVent: angleVers(m.directionVent), camera: this.camera, nuit: this.ecl.nuit, eclaire: this.eclair.eclaire,
+      temps: this.temps, directionVent: angleVers(m.directionVent), camera: this.camera, nuit: this.ecl.nuit, noir: this.ecl.noir ?? 0, eclaire: this.eclair.eclaire,
     });
     if (this.eau.brumeDeBase) this.eau.uniforms.uBrume.value = this.eau.brumeDeBase * (1 + 160 * this.trombe.brouillard ** 1.5);
     this.post.reglages.uEmbruns.value = this.dansLaCabine ? 0 : this.trombe.brouillard ** 1.5;

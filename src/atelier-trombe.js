@@ -2,7 +2,7 @@
 // au crépuscule (comme dans le jeu), dans la nuit noire, sous les éclairs, de près, de
 // loin, d'en haut.
 //
-// Adresse : atelier-trombe.html?variante=colonne&moment=crepuscule&vue=cockpit&distance=900&age=120
+// Adresse : atelier-trombe.html?variante=bete&moment=jeu&vue=cockpit&distance=900&age=120
 // Dans la console : __trombe (voir en bas : photo, planche, film).
 import * as THREE from 'three';
 import { Monde3D } from './rendu/monde3d.js';
@@ -20,14 +20,15 @@ const lisse = THREE.MathUtils.smoothstep;
 const DUREE = 260;
 
 // ---------- Les moments ----------
-// (le crépuscule : l'heure où la trombe vient dans le jeu, 19 h 05 à 19 h 20)
+// (le début de nuit : la lumière quand la trombe passe près du bateau, dans le jeu — elle
+// vient vers 19 h 30 et le crépuscule s'attarde pendant son passage, jeu/nuit.js)
 const MOMENTS = {
-  crepuscule: { nom: 'Crépuscule (le jeu)', meteo: () => meteoDeLaNuit(19.15) },
-  tombee: { nom: 'La nuit tombe', meteo: () => meteoDeLaNuit(19.7) },
+  jeu: { nom: 'Début de nuit (le jeu)', meteo: () => meteoDeLaNuit(19.7) },
+  crepuscule: { nom: 'Crépuscule', meteo: () => meteoDeLaNuit(19.15) },
   nuit: { nom: 'Nuit noire', meteo: () => meteoDeLaNuit(23.2) },
   jour: { nom: 'Jour d\'orage', meteo: () => etatMeteo({ ...AMBIANCES['fin-apres-midi'], heure: 15.2, nuages: 0.9, orage: 0.7, pluie: 0.15, brume: 0.3, vent: 26, directionVent: 222 }) },
 };
-let moment = MOMENTS[parametres.get('moment')] ? parametres.get('moment') : 'crepuscule';
+let moment = MOMENTS[parametres.get('moment')] ? parametres.get('moment') : 'jeu';
 let meteo = MOMENTS[moment].meteo();
 monde.regler(meteo);
 
@@ -216,6 +217,11 @@ for (const [id, m] of Object.entries(MOMENTS)) {
   b.addEventListener('click', () => choisirMoment(id));
   boutonsMoment.set(id, b);
   zoneMoments.append(b);
+}
+// (n'importe quelle heure de la nuit du jeu : __trombe.heure(19.6))
+function choisirHeure(h) {
+  MOMENTS.heure = { nom: `${Math.floor(h % 24)} h ${String(Math.round((h % 1) * 60)).padStart(2, '0')}`, meteo: () => meteoDeLaNuit(h) };
+  choisirMoment('heure');
 }
 function choisirMoment(id) {
   moment = id;
@@ -744,7 +750,7 @@ async function filmer(liste) {
   for (const f of liste) {
     suivi.enCours = f.nom;
     choisirVariante(f.variante ?? 'colonne');
-    choisirMoment(f.moment ?? 'crepuscule');
+    choisirMoment(f.moment ?? 'jeu');
     choisirVue(f.vue ?? 'cockpit');
     distanceTrombe(f.distance ?? 600);
     regard.cap = f.cap ?? 0;
@@ -792,7 +798,7 @@ async function fluidite(secondes = 3) {
 window.__trombe = {
   banc, bancImages, compter, comparerAuxNuages, couts, filmer, fluidite,
   monde, etat, reglage, regard, ancienne, seul, tout, montrerBateau,
-  variante: choisirVariante, moment: choisirMoment, vue: choisirVue,
+  variante: choisirVariante, moment: choisirMoment, vue: choisirVue, heure: choisirHeure,
   age: (a) => { etat.age = a; afficherAge(); },
   distance: distanceTrombe,
   vivre, mesurer, photo, planche, film, uneImage,

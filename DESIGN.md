@@ -819,6 +819,23 @@ dise celui que je préfère ».
     image d'un film, empilées ; ce qui tourne ou monte y dessine des traînées obliques,
     pour juger un mouvement sans regarder la vidéo) ; `src/rendu/chrono-gpu.js` (les
     requêtes de minutage de la carte graphique). Images : `docs/etape26-*.jpg`.
+    **Son choix** (le même soir) : *la bête*, « en début de nuit, quand il y a encore un
+    peu de luminosité ». Elle vient maintenant vers 19 h 25 - 19 h 35 (au lieu de 19 h 05 -
+    19 h 20). Mais l'heure du jeu avance vite (une heure en une minute et demie au
+    crépuscule) et elle vit plus de quatre minutes : sans rien faire, la nuit noire
+    tomberait pendant qu'elle passe. Alors, pendant qu'elle est là, **le crépuscule
+    s'attarde** : la lumière du ciel (la hauteur du soleil, l'épaisseur de l'orage, les
+    nuages, le front, la brume) n'avance qu'au dixième de l'horloge (`retardLumiere`,
+    `meteoIci()` dans `jeu/nuit.js`) ; le vent, la mer, la pluie et les événements restent
+    à l'heure, la pendule de la cabine aussi. Quand elle est partie, la nuit tombe en deux
+    minutes et demie, jusqu'à rattraper l'horloge. Mesuré dans le jeu : à 20 h 40 à
+    l'horloge, le ciel en est à 19 h 38 quand elle passe à 500 m. Le reste, accordé à elle :
+    son tourbillon a un cœur de 50 m (au lieu de 40), elle touche le bateau à moins de 95 m
+    (au lieu de 75 : le plus épais de sa gerbe) ; « sous le nuage-mur, il fait sombre »
+    n'assombrit plus que de 12 % (au lieu de 32 %) ; le plancton de son pied ne s'allume
+    vraiment que dans le noir (`uNoir`), sinon c'était un trait de néon sur l'horizon ;
+    elle est un peu moins noire, pour qu'on voie encore sa texture à la tombée de la nuit.
+    L'atelier de la trombe s'ouvre sur elle, au « Début de nuit (le jeu) ».
 
 ## 4. Pistes graphiques notées pour plus tard
 

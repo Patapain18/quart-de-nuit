@@ -126,6 +126,7 @@ uniform float uSeuilEcume;
 uniform vec2 uDirVent;
 uniform vec4 uTrombe; // la trombe : x, z, rayon de son cœur (m), force (0 : pas de trombe)
 uniform vec4 uTrombeVie; // sa vie sur l'eau : la tache sombre, les spirales, l'anneau d'embruns (0 → 1), sa rotation (rad/s)
+uniform float uTrombePlancton; // le plancton de sa couronne d'écume (0 → 1 : seulement dans le noir)
 // le sillage : où était la poupe (x, z), à quel instant (s), à quelle vitesse (m/s) ; le
 // premier point est la poupe elle-même ; et la boîte qui les contient tous (pour aller vite)
 uniform vec4 uSillage[${N_SILLAGE}];
@@ -577,7 +578,7 @@ ${cascades.map((_, i) => `  p = texture(uPentes${i}, vSource / uGrille${i}.x);
       couleur += vec3(0.03, 0.4, 0.42) * uPlancton * brise * pres * (0.009 + 0.035 * scintille) * (1.0 - fresnel * 0.6);
     }
     // (et l'eau que la trombe arrache : la couronne d'embruns, à son pied, luit dans le noir)
-    couleur += vec3(0.03, 0.4, 0.42) * smoothstep(0.5, 0.95, uPlancton) * ecumeTrombe * (0.1 + 0.4 * smoothstep(0.7, 0.92, texture(uBruit, vec3(vMonde.xz * 0.35, uTemps * 0.9)).a));
+    couleur += vec3(0.03, 0.4, 0.42) * uTrombePlancton * ecumeTrombe * (0.06 + 0.3 * smoothstep(0.7, 0.92, texture(uBruit, vec3(vMonde.xz * 0.35, uTemps * 0.9)).a));
     // (et dans l'écume de la vague scélérate qui s'écroule : toute sa crête s'allume)
     couleur += vec3(0.03, 0.4, 0.42) * uPlancton * mousseScelerate * (0.06 + 0.3 * smoothstep(0.75, 0.95, texture(uBruit, vec3(vMonde.xz * 0.9, uTemps * 0.7)).a));
     if (uPlancton > 0.01 && bateau.w > 0.01) {
@@ -698,6 +699,7 @@ export class Eau {
       uForceEcume: { value: 1 },
       uTrombe: { value: new THREE.Vector4(0, 0, 30, 0) },
       uTrombeVie: { value: new THREE.Vector4(0, 0, 1, 1) },
+      uTrombePlancton: { value: 0 },
       uSillage: { value: Array.from({ length: N_SILLAGE }, () => new THREE.Vector4()) },
       uSillageN: { value: 0 },
       uSillageBoite: { value: new THREE.Vector4() },
