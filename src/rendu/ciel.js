@@ -8,7 +8,8 @@
 //  3. le fond du ciel, en pleine résolution : carte du ciel + disque du soleil + lune +
 //     étoiles, puis les nuages par-dessus ;
 //  4. un « cube de reflets » : le ciel vu dans les six directions, en petit, que la mer
-//     reflète et qui éclaire le bateau. On en recalcule une face par image.
+//     reflète et qui éclaire le bateau. On en recalcule une face par image (et, pendant un
+//     éclair, toutes celles qu'il allume).
 import * as THREE from 'three';
 import { GLSL_ATMOSPHERE } from './glsl/atmosphere.js';
 import { GLSL_NUAGES, UNIFORMS_NUAGES } from './glsl/nuages.js';
@@ -338,6 +339,17 @@ void main() {
 }
 `;
 
+// La face du cube de reflets où se range la direction (x, y, z) : celle de son plus grand
+// côté (dans l'ordre de Three : +x, −x, +y, −y, +z, −z)
+function faceDuCube(x, y, z) {
+  const ax = Math.abs(x);
+  const ay = Math.abs(y);
+  const az = Math.abs(z);
+  if (ax >= ay && ax >= az) return x > 0 ? 0 : 1;
+  if (ay >= az) return y > 0 ? 2 : 3;
+  return z > 0 ? 4 : 5;
+}
+
 export class Ciel {
   constructor(renderer) {
     this.renderer = renderer;
@@ -360,9 +372,11 @@ export class Ciel {
     // Le front orageux (glsl/front.js), partagé par le fond, le cube et la mer
     this.uniformsFront = {
       uFront: { value: new THREE.Vector4() },
+      uFrontEnclume: { value: new THREE.Vector4() },
       uFrontEclair: { value: new THREE.Vector4() },
       uFrontAmbiance: { value: v3() },
       uFrontSoleil: { value: v3() },
+      uFrontSoleilHaut: { value: v3() },
       uFrontDirSoleil: { value: v3() },
     };
 
@@ -482,6 +496,7 @@ export class Ciel {
     this.sceneCube.add(new THREE.Mesh(new THREE.BoxGeometry(2, 2, 2), this.materiauCube));
     this.faceCube = 0;
     this.cubeComplet = false;
+    this.facesAllumees = new Set(); // (celles qu'un éclair allumait à l'image d'avant)
 
     // Lumière d'ambiance pour le bateau (cube préfiltré par Three, mis à jour de temps en temps)
     this.pmrem = new THREE.PMREMGenerator(renderer);
@@ -530,8 +545,14 @@ export class Ciel {
     const uf = this.uniformsFront;
     const front = geometrieFront(meteo);
     uf.uFront.value.set(front.azimut, front.demiLargeur, front.sommet, front.visibilite);
+    // (l'ombre de la Terre : quand le soleil s'est couché, elle monte le long des tours ;
+    // sa hauteur, rapportée à celle des sommets — 11 km)
+    const abaissement = Math.max(0, -ecl.dirSoleil[1]);
+    const ombre = (6371000 * abaissement * abaissement) / 2 / 11000;
+    uf.uFrontEnclume.value.set(front.avancee, front.distance / 1000, ombre, 0);
     uf.uFrontAmbiance.value.copy(amb).multiplyScalar(1 / Math.PI);
     uf.uFrontSoleil.value.fromArray(ecl.soleilNuages).multiplyScalar(2.5);
+    uf.uFrontSoleilHaut.value.fromArray(ecl.soleilHaut).multiplyScalar(2.5);
     uf.uFrontDirSoleil.value.fromArray(ecl.dirSoleil);
   }
 
@@ -580,27 +601,56 @@ export class Ciel {
     const fov = THREE.MathUtils.degToRad(camera.fov);
     this.fond.material.uniforms.uTaillePixel.value = fov / ecran.y;
 
-    // le cube : une face par image (ou les six d'un coup quand le temps change brusquement)
+    // le cube : une face par image (ou les six d'un coup quand le temps change brusquement).
+    // Un éclair, lui, change le ciel d'un coup : tant qu'il dure, on redessine toutes les
+    // faces qu'il allume, puis une fois encore quand il s'éteint (sinon, une face allumée
+    // et sa voisine pas encore : la mer montrait une moitié de ciel éclairée, l'autre noire,
+    // le long d'une diagonale — la couture entre deux faces)
     this.materiauCube.uniforms.uPositionCamera.value.copy(camera.position);
     this.cameraCube.position.set(0, 0, 0);
     this.cameraCube.updateMatrixWorld();
-    const faces = toutLeCube || !this.cubeComplet ? [0, 1, 2, 3, 4, 5] : [this.faceCube];
+    const eclairees = this.facesEclairees();
+    const faces = toutLeCube || !this.cubeComplet
+      ? [0, 1, 2, 3, 4, 5]
+      : [...new Set([this.faceCube, ...eclairees, ...this.facesAllumees])];
+    this.facesAllumees = eclairees;
     const cameras = this.cameraCube.children;
-    for (const face of faces) {
+    const texture = this.cube.texture;
+    faces.forEach((face, i) => {
+      // (après une face, Three refait les « mipmaps », les versions floues du cube que la
+      // mer lit quand elle est agitée : une seule fois, après la dernière)
+      if (this.cubeComplet) texture.generateMipmaps = i === faces.length - 1;
       r.setRenderTarget(this.cube, face);
       r.render(this.sceneCube, cameras[face]);
-    }
-    // (après chaque face, Three refait les « mipmaps », les versions floues du cube
-    // que la mer lit quand elle est agitée)
+    });
+    texture.generateMipmaps = true;
     this.cubeComplet = true;
     this.faceCube = (this.faceCube + 1) % 6;
     r.setRenderTarget(ancienne);
   }
 
-  // Éclairage d'ambiance du bateau (recalculé au plus toutes les demi-secondes)
+  // Les faces du cube de reflets qu'un éclair allume à cette image : un éclair dans les
+  // nuages (d'un grain, de la trombe, de l'orage) éclaire tout le ciel ; un éclair dans le
+  // front, au loin, n'éclaire que lui (les faces où il est)
+  facesEclairees() {
+    if (this.uniformsNuages.uEclair.value.w > 0) return new Set([0, 1, 2, 3, 4, 5]);
+    const faces = new Set();
+    const [azimut, demiLargeur, sommet, visibilite] = this.uniformsFront.uFront.value.toArray();
+    if (this.uniformsFront.uFrontEclair.value.w > 0 && visibilite > 0) {
+      const el = sommet * 0.5;
+      for (let k = -4; k <= 4; k++) {
+        const az = azimut + (k / 4) * demiLargeur;
+        faces.add(faceDuCube(Math.sin(az) * Math.cos(el), Math.sin(el), -Math.cos(az) * Math.cos(el)));
+      }
+    }
+    return faces;
+  }
+
+  // Éclairage d'ambiance du bateau (recalculé au plus toutes les demi-secondes ; pas
+  // pendant un éclair, que le bateau garderait une demi-seconde après)
   environnementPour(dt, force = false) {
     this.ageEnvironnement += dt;
-    if (force || this.ageEnvironnement > 0.5 || !this.environnement) {
+    if (force || (this.ageEnvironnement > 0.5 && this.facesAllumees.size === 0) || !this.environnement) {
       const ancien = this.environnement;
       this.environnement = this.pmrem.fromCubemap(this.cube.texture, ancien ?? undefined);
       this.ageEnvironnement = 0;

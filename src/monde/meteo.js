@@ -120,7 +120,8 @@ const lisse = (a, b, x) => {
 // en radians, sens du compas), sa demi-largeur, la hauteur de ses sommets au-dessus de
 // l'horizon (radians) et sa visibilité. Ses sommets sont à 11 km d'altitude ; il est à
 // 160 km (front = 0, sous l'horizon) puis s'approche jusqu'à 22 km (front = 1 : il couvre
-// déjà le ciel, on ne le voit plus comme un mur).
+// déjà le ciel, on ne le voit plus comme un mur). Son enclume s'avance devant lui, vers
+// nous, sur un bon tiers de sa distance (avancee).
 export function geometrieFront(meteo) {
   const f = meteo.front ?? 0;
   const distance = 160000 * Math.exp(-2 * f);
@@ -130,20 +131,31 @@ export function geometrieFront(meteo) {
     demiLargeur: ((meteo.largeurFront ?? 62) * Math.PI) / 180,
     sommet: Math.max(0.01, Math.atan((11000 - chute) / distance)),
     distance,
+    avancee: 0.36,
     visibilite: lisse(0.02, 0.12, f) * (1 - lisse(0.9, 0.97, f)),
   };
 }
-// Part du soleil cachée par le front (0 → 1) : quand il passe derrière ses tours
+// Part du soleil cachée par le front (0 → 1) : quand il passe derrière ses tours, ou
+// derrière son enclume (plus mince : elle en laisse passer un peu)
 function soleilDerriereLeFront(meteo, s) {
   const front = geometrieFront(meteo);
   if (front.visibilite <= 0) return 0;
   const ecart = Math.atan2(Math.sin(s.azimut - front.azimut), Math.cos(s.azimut - front.azimut));
   const x = ecart / front.demiLargeur;
   if (Math.abs(x) >= 1) return 0;
+  const hauteur = Math.asin(Math.max(-1, Math.min(1, s.y)));
   // (la hauteur moyenne des tours ; leurs bosses font une marge)
   const tours = front.sommet * Math.sqrt(1 - x * x) * 0.72;
   const marge = front.sommet * 0.12;
-  return front.visibilite * lisse(tours + marge, tours - marge, Math.asin(Math.max(-1, Math.min(1, s.y))));
+  let cache = lisse(tours + marge, tours - marge, hauteur);
+  // (l'enclume, comme glsl/front.js la dessine : son bord, droit, qui s'avance vers nous ;
+  // sa largeur à ce bord, plus grande d'un côté)
+  const e = front.avancee;
+  const bord = Math.atan((Math.tan(front.sommet) * Math.cos(ecart)) / (1 - e));
+  const cote = Math.tan(Math.max(-1.37, Math.min(1.37, ecart))) * (1 - e) - 0.07;
+  const dedans = lisse(1.08, 0.7, Math.abs(cote) / (cote > 0 ? 0.6 : 0.42));
+  cache = Math.max(cache, 0.92 * dedans * lisse(bord + marge * 0.2, bord - marge * 1.5, hauteur));
+  return front.visibilite * cache;
 }
 
 // La lumière qui découle du temps qu'il fait : direction et couleur du soleil et de
@@ -161,6 +173,7 @@ export function eclairage(meteo) {
   // (là où sont les nuages : ils restent éclairés après le coucher du soleil)
   const tMer = transmittance(2, dirSoleil);
   const tNuages = transmittance(2000, dirSoleil);
+  const tHaut = transmittance(10000, dirSoleil);
   const jour = lisse(-0.12, 0.08, s.y); // 0 la nuit, 1 le jour
   const nuit = 1 - lisse(-0.2, -0.02, s.y);
 
@@ -221,6 +234,8 @@ export function eclairage(meteo) {
     soleil: tMer.map((v) => v * 3.2 * directVisible),
     // lumière du soleil qui éclaire les nuages (elle reste orange après le coucher)
     soleilNuages: tNuages.map((v) => v * 3.2),
+    // et là-haut, à 10 km (le sommet des orages : rouge, encore quelques minutes après)
+    soleilHaut: tHaut.map((v) => v * 3.2),
     lune: tLune.map((v, c) => v * intensiteLune * [0.6, 0.75, 1.0][c] * directVisible * reste),
     // la lune qui éclaire le dessus des nuages (sans être cachée par eux) ; sous un
     // orage, les nuages sont si épais que presque rien ne passe

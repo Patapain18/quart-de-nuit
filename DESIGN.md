@@ -942,6 +942,32 @@ l'annoncer. Son choix, dans cet ordre :
     compare), `fluidite()` (les vraies images par seconde, avec et sans) ; dans l'atelier
     de la tempête, la courbe de la pluie de chaque marin et une colonne « Grains ».
     Images : `docs/etape27-*.jpg`.
+    **Corrigés ensuite** (le 8 octobre : deux défauts plus anciens, repérés pendant
+    l'étape) :
+    - *l'enclume du front orageux* n'était qu'une planche mince et sombre posée sur les
+      tours : au coucher, elle barrait le ciel d'un trait. Elle est refaite comme on la voit
+      vraiment, d'en bas : un toit de glace qui part du haut des tours du milieu et
+      s'avance vers nous en éventail (il déborde des tours, plus d'un côté que de l'autre),
+      de plus en plus haut dans le ciel ; son bord droit, le « toit plat » de Jos, à peine
+      effiloché ; dessous, gris, bosselé là où il sort des tours (`enclumeFront` dans
+      `glsl/front.js` : pour chaque direction du regard, on retrouve le point de son dessous
+      qu'on regarde ; son bord est une ligne droite, pas un arc autour de nous). Et la
+      lumière : le soleil couché pour nous ne l'est pas encore à 10 km d'altitude ;
+      pendant quelques minutes après le coucher, l'enclume rougeoie, éclairée par en
+      dessous, ainsi que le haut des tours, au-dessus de l'ombre de la Terre qui monte
+      (`soleilHaut` dans l'éclairage). À l'aube, le front qui s'en va prend une lueur rose.
+      Même coût qu'avant (0,035 ms pour le fond du ciel, en plein écran).
+    - *la frontière en diagonale sur la mer pendant les éclairs* : le reflet du ciel est un
+      cube dont on ne redessine qu'une face par image ; un éclair dure un tiers de seconde :
+      une face était allumée, sa voisine pas encore, et la mer montrait la couture entre
+      les deux. Maintenant, tant que dure un éclair, on redessine toutes les faces qu'il
+      allume (les six pour un éclair dans les nuages, les deux ou trois du front pour un
+      éclair lointain), une fois encore quand il s'éteint, et les versions floues du cube
+      une seule fois par image ; la lumière d'ambiance du bateau attend la fin de l'éclair
+      pour se recalculer (sinon il la gardait une demi-seconde). Coût : 0,1 ms de plus par
+      image, le temps de l'éclair.
+    Images : `docs/etape27-enclume-avant-apres.jpg`, `docs/etape27-enclume-au-coucher.jpg`,
+    `docs/etape27-enclume-de-loin.jpg`, `docs/etape27-eclair-avant-apres.jpg`.
 
 ## 4. Pistes graphiques notées pour plus tard
 
