@@ -30,6 +30,7 @@ import { Deferlantes } from '../monde/deferlantes.js';
 import { Scelerates, chocScelerate } from '../monde/scelerates.js';
 import { Grains } from '../monde/grains.js';
 import { Foudre } from '../monde/foudre.js';
+import { pressionDuJour, tendance, tendanceEnMots } from '../monde/pression.js';
 import { Peur } from './peur.js';
 import { directionEnMots } from './radio.js';
 import { NOM_BATEAU, JOS, HEURE_COUCHER, heureEnTexte } from './journee.js';
@@ -54,19 +55,29 @@ export const CHAPITRES = [
       'Avis de tempête pour la zone du large.',
       'Vent de sud-ouest force neuf, rafales à cinquante-cinq nœuds. Mer très grosse.',
     ],
-    dire: ['Tu as entendu ? Ça forcit. Deux ris dans la grand-voile et le foc presque roulé, c\'est le moment ou jamais.'],
+    // (le baromètre l'annonçait : il dégringole)
+    dire: (n) => [
+      `Tu as entendu ? Ça forcit. Et ton baromètre dégringole : ${Math.round(-tendance(n.heure))} hectopascals en trois heures, c'est la tempête qui vient.`,
+      'Deux ris dans la grand-voile et le foc presque roulé, c\'est le moment ou jamais.',
+    ],
   },
   {
     id: 'pic', titre: 'Au cœur de la tempête', de: 24, a: 27.5, duree: 420,
-    dire: [
-      `Minuit, ${NOM_BATEAU}. Le plus dur arrive : quarante nœuds, et plus dans les grains.`,
-      'Le mieux maintenant : affaler la grand-voile, et fuir sous un mouchoir de foc, les vagues bien dans l\'arrière. Et pompe de temps en temps.',
-    ],
+    dire: (n, ctx) => {
+      const p = pressionDuJour(n.heure);
+      // (si l'on a calé l'aiguille témoin avant la nuit : de combien il a baissé depuis)
+      const t = ctx?.barometre?.temoin;
+      const depuis = t != null && t - p > 5 ? ` Depuis que tu as calé ton aiguille, il a perdu ${Math.round(t - p)} hectopascals.` : '';
+      return [
+        `Minuit, ${NOM_BATEAU}. Ton baromètre est à ${Math.round(p)}, et il baisse encore.${depuis} Le plus dur arrive : quarante nœuds, et plus dans les grains.`,
+        'Le mieux maintenant : affaler la grand-voile, et fuir sous un mouchoir de foc, les vagues bien dans l\'arrière. Et pompe de temps en temps.',
+      ];
+    },
   },
   {
     id: 'accalmie', titre: 'L\'accalmie', de: 27.5, a: HEURE_AUBE, duree: 270,
     dire: [
-      'Le vent tourne à l\'ouest et le baromètre remonte : le front est passé.',
+      'Le vent tourne à l\'ouest, et ton baromètre remonte, vite : le front est passé.',
       'Ça va tomber peu à peu. Tiens encore un peu, l\'aube est à six heures.',
     ],
   },
@@ -268,6 +279,9 @@ export class Nuit {
     this.plansGrains = GRAINS_DE_LA_NUIT.map((g) => ({ ...g, arrivee: g.arrivee + (hg() - 0.5) * 40, ecart: g.ecart * (hg() < 0.5 ? -1 : 1) }));
     this.plansGrains.forEach((g, k) => { this.prevu[`grain${k}`] = heureA(g.arrivee - DANS_GRAIN); });
     this.ici = null; // (ce que font les grains là où est le bateau : la pluie, leur vent…)
+    // la pression ici (monde/pression.js : celle de la dépression qui arrive, et le bond des
+    // grains quand arrive leur rafale)
+    this.pression = pressionDuJour(this.heure);
     // la foudre (monde/foudre.js) : elle part de leurs nuages, et de celui de la trombe
     this.foudre = new Foudre(graine * 6151 + 29);
     // la peur (jeu/peur.js) : la tension, et ce qu'on voit du coin de l'œil
@@ -282,6 +296,7 @@ export class Nuit {
       cargoDistance: Infinity, cargoAppele: false, trombeDistance: Infinity, aLaBarre: 0,
       scelerates: 0, sceleratesCouche: 0, grains: 0, rafaleMax: 0,
       eclairs: 0, eclairPlusPres: Infinity, frappes: 0, surLeMat: 0,
+      pressionMin: Infinity, heurePressionMin: null,
     };
     this.journal = [];
     this.conseils = {};
@@ -340,6 +355,7 @@ export class Nuit {
     this.meteo = this.meteoIci();
     ctx.meteo = this.meteo;
     this.suivreGrains(dt, ctx);
+    this.suivreBarometre(dt, ctx);
     this.suivreScelerates(dt, ctx);
     this.suivreDeferlantes(dt, ctx);
     this.suivreEau(dt, ctx);
@@ -394,11 +410,13 @@ export class Nuit {
     const ch = this.chapitre;
     this.sauvegarde = this.instantane(ctx);
     if (ch.bulletin) this.dire(ch.bulletin, { emetteur: 'Kervalen Radio', canal: 16 });
-    if (ch.dire) this.dire(ch.dire);
+    if (ch.dire) this.dire(typeof ch.dire === 'function' ? ch.dire(this, ctx) : ch.dire);
     const m = this.meteo;
+    // (le carnet, comme un vrai journal de bord : le vent, et le baromètre)
+    const baro = `baromètre ${Math.round(pressionDuJour(this.heure))} hPa, ${tendanceEnMots(tendance(this.heure))}`;
     this.ecrire(this.c === 0
-      ? `Le soleil se couche. Vent ${directionEnMots(m.directionVent)} ${Math.round(m.vent)} nœuds, le front orageux approche.`
-      : `${ch.titre}. Vent ${directionEnMots(m.directionVent)} ${Math.round(m.vent)} nœuds.`);
+      ? `Le soleil se couche. Vent ${directionEnMots(m.directionVent)} ${Math.round(m.vent)} nœuds, ${baro} : le front orageux approche.`
+      : `${ch.titre}. Vent ${directionEnMots(m.directionVent)} ${Math.round(m.vent)} nœuds, ${baro}.`);
     this.emettre('chapitre', ch, this.c);
   }
 
@@ -870,6 +888,20 @@ export class Nuit {
     return this.grains.ventEn(x, z, sortie);
   }
 
+  // ---------- Le baromètre ----------
+  // La pression ici : celle de la dépression qui arrive (elle baisse bien avant que le vent
+  // forcisse, touche le fond quand le front passe, puis remonte d'un coup), la marée
+  // barométrique, et le bond des grains, quand arrive leur rafale (monde/pression.js,
+  // monde/grains.js). Le baromètre du bord la montre (jeu.js) ; Jos s'en sert.
+  suivreBarometre(dt, ctx) {
+    const p = ctx.physique.position;
+    this.pression = pressionDuJour(this.heure) + this.grains.pressionEn(p.x, p.z);
+    if (this.pression < (this.stats.pressionMin ?? Infinity)) {
+      this.stats.pressionMin = this.pression;
+      this.stats.heurePressionMin = this.heure;
+    }
+  }
+
   // ---------- La foudre ----------
   // Elle part des nuages des grains et de celui de la trombe (monde/foudre.js) ; le jeu en
   // fait le bruit et la lumière, la nuit en tire les conséquences : le journal, ce que Jos en
@@ -1277,7 +1309,7 @@ export class Nuit {
     const liste = [];
     // la préparation de la nuit, tant qu'elle n'est pas faite (sans la toile : voir plus bas)
     for (const item of LISTE_NUIT) {
-      if (item.id === 'ris' || item.id === 'foc' || item.id === 'lampe') continue;
+      if (item.id === 'ris' || item.id === 'foc' || item.id === 'lampe' || item.id === 'barometre') continue;
       if (!item.fait(ctx)) liste.push({ texte: item.texte, etat: 'afaire' });
     }
     const tropDeToile = this.meteo.vent >= 29 && (p.ris < 2 || p.deroule > 0.45) && av.grandVoile === 'ok';
@@ -1349,6 +1381,7 @@ export class Nuit {
       ['Les vagues scélérates', s.scelerates ? `${s.scelerates}${s.sceleratesCouche ? ` (dont ${s.sceleratesCouche} qui t'${s.sceleratesCouche > 1 ? 'ont' : 'a'} couché)` : ', passées sans être couché'}` : 'aucune'],
       ['Le cargo', s.cargoDistance === Infinity ? 'pas vu' : `${s.cargoAppele ? 'appelé à la radio, ' : ''}passé à ${metres(s.cargoDistance)}`],
       ['Les grains', s.grains ? `${s.grains}, rafales jusqu'à ${Math.round(s.rafaleMax)} nœuds` : 'aucun sur toi'],
+      ['Le baromètre', Number.isFinite(s.pressionMin ?? Infinity) ? `au plus bas ${Math.round(s.pressionMin)} hPa vers ${heureEnTexte(s.heurePressionMin)}, ${Math.round(this.pression)} hPa maintenant` : '—'],
       ['La foudre', s.surLeMat ? `${s.eclairs} éclairs, et un sur le mât !` : s.eclairs ? `${s.eclairs} éclairs, le plus proche à ${metres(s.eclairPlusPres ?? Infinity)}` : 'pas un éclair'],
       ['À la barre', `${Math.round(s.aLaBarre / 60)} min (le reste au pilote)`],
       ['Distance parcourue', `${milles(s.distance)}, jusqu'à ${virgule(s.vitesseMax)} nœuds dans les surfs`],
@@ -1423,8 +1456,9 @@ export class Nuit {
       // (une partie gardée avant les vagues scélérates : elles arrivent quand même)
       prevu: { ...this.prevu, ...s.prevu }, faits: new Set(s.faits),
       stats: {
-        scelerates: 0, sceleratesCouche: 0, grains: 0, rafaleMax: 0, eclairs: 0, frappes: 0, surLeMat: 0, ...s.stats,
+        scelerates: 0, sceleratesCouche: 0, grains: 0, rafaleMax: 0, eclairs: 0, frappes: 0, surLeMat: 0, heurePressionMin: null, ...s.stats,
         trombeDistance: s.stats.trombeDistance ?? Infinity, cargoDistance: s.stats.cargoDistance ?? Infinity, eclairPlusPres: s.stats.eclairPlusPres ?? Infinity,
+        pressionMin: s.stats.pressionMin ?? Infinity,
       },
       etat: 'nuit', raison: null, cargo: null, trombe: null, suiviCoup: null, renverse: 0, annonceVue: null, commence: true,
     });

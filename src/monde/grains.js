@@ -12,6 +12,7 @@
 //    côtés, il fait tourner le vent ; derrière lui, il s'y oppose (le vent mollit après son
 //    passage) ;
 //  - au-dessus, le nuage d'orage, plus large que la pluie : sous lui, il fait plus sombre ;
+//  - cet air froid pèse : quand arrive la rafale, le baromètre fait un bond ;
 //  - les plus forts sont pleins d'éclairs.
 // Ils avancent un peu à droite du vent et un peu moins vite que lui (ils suivent le vent
 // d'altitude, freinés par la mer).
@@ -30,6 +31,7 @@ export const REGLAGES_GRAINS = {
   nombre: 6, // les grains alentour, au plus fort de l'orage (sans ceux qui viennent sur nous)
   naissance: 90, // s pour se former
   mort: 110, // s pour se dissiper
+  bondPression: 2.5, // hPa : le bond du baromètre sous un grain de force 1, quand arrive sa rafale
 };
 
 const lisse = (a, b, x) => {
@@ -277,6 +279,34 @@ export class Grains {
       sortie.z += (dz / r) * U;
     }
     return I * dedans;
+  }
+
+  // La pression sous un grain au point (x, z) (hPa, à ajouter) : l'air froid qui tombe sous
+  // son cœur est plus lourd ; la pression fait un bond d'un à trois hectopascals quand arrive
+  // sa rafale (son bord est celui de la rafale : ventDuGrain), reste haute sous la pluie, puis
+  // retombe derrière lui, un peu plus bas qu'avant (le sillage du grain)
+  pressionDuGrain(g, x, z, I = this.intensite(g)) {
+    if (I <= 0.01) return 0;
+    const c = this.noyau(g, g.noyaux[0], this._c ??= {});
+    const dx = x - c.x;
+    const dz = z - c.z;
+    const r = Math.hypot(dx, dz);
+    const R = g.rayon;
+    if (r > R * 4) return 0;
+    const v = Math.hypot(g.vx, g.vz) || 1;
+    const devant = r > 1 ? (dx * g.vx + dz * g.vz) / (r * v) : 0;
+    const bord = R * (1.05 + 0.85 * (0.5 + 0.5 * devant));
+    const dedans = 1 - lisse(bord - 0.15 * R, bord + 0.2 * R, r);
+    const haute = REGLAGES_GRAINS.bondPression * I * dedans * (0.55 + 0.45 * Math.exp(-((r / R) ** 2)));
+    const derriere = lisse(-0.2, -0.8, devant) * (1 - dedans) * (1 - lisse(2 * R, 4 * R, r));
+    return haute - 0.7 * I * derriere;
+  }
+
+  // La pression des grains au point (x, z) (hPa, à ajouter à celle du large)
+  pressionEn(x, z) {
+    let p = 0;
+    for (const g of this.liste) p += this.pressionDuGrain(g, x, z);
+    return p;
   }
 
   // Le vent des grains au point (x, z) (m/s, à ajouter au vent)

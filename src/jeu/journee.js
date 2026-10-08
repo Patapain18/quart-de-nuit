@@ -191,9 +191,11 @@ export class Journee {
       this.cible = null;
     }
     const jeton = ++this.jeton;
-    if (etape.dire?.length) {
+    // (ce que dit Jos peut dépendre du moment : une fonction qui rend les phrases)
+    const phrases = typeof etape.dire === 'function' ? etape.dire(ctx, this) : etape.dire;
+    if (phrases?.length) {
       this.parle = true;
-      this.dire(etape.dire, { emetteur: etape.emetteur ?? JOS, canal: etape.canal ?? 72 }).then(() => {
+      this.dire(phrases, { emetteur: etape.emetteur ?? JOS, canal: etape.canal ?? 72 }).then(() => {
         if (this.jeton === jeton) this.parle = false;
       });
     } else {

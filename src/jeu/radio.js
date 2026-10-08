@@ -6,6 +6,7 @@
 // Les messages font la queue : on ne se coupe pas la parole à la radio. Le canal 16 est
 // celui de la veille et des appels ; pour bavarder, on passe sur un canal de travail (72).
 import { leverCoucher } from '../monde/astres.js';
+import { tendanceEnMots } from '../monde/pression.js';
 
 const BEAUFORT = [1, 3, 6, 10, 16, 21, 27, 33, 40, 47, 55, 63];
 export function beaufort(noeuds) {
@@ -193,7 +194,9 @@ export class Radio {
     });
   }
 
-  bulletin(meteo, hs) {
+  // baro : { pression (hPa), tendance (hPa en trois heures, ou null) } — ce qu'en dit le
+  // bulletin : la situation générale, et la pression avec sa tendance
+  bulletin(meteo, hs, baro = null) {
     const f = beaufort(meteo.vent);
     const { coucher } = leverCoucher(meteo);
     const heure = Math.floor(coucher);
@@ -206,6 +209,12 @@ export class Radio {
       `Coucher du soleil à ${heure} heures ${minutes}.`,
       f >= 8 ? 'Avis de coup de vent en cours.' : 'Évolution : le vent fraîchira en soirée.',
     ];
+    if (baro) {
+      const dp = baro.tendance;
+      // (la situation générale : ce que fait la dépression, d'après ce que fait la pression)
+      if (dp !== null) phrases.splice(1, 0, `Situation générale : ${dp <= -2 ? 'dépression se creusant à l\'ouest, se déplaçant vers l\'est' : dp >= 2 ? 'la dépression s\'éloigne vers l\'est' : 'peu de changement'}.`);
+      phrases.push(`Pression : ${Math.round(baro.pression)} hectopascals${dp === null ? '' : `, ${tendanceEnMots(dp)}`}.`);
+    }
     this.parler(phrases);
   }
 

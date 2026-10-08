@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Atelier du baromètre · Quart de nuit</title>
+  <meta name="description" content="Le baromètre annonce le temps : la dépression qui arrive, la pression qui baisse de plus en plus vite bien avant le vent, le fond quand le front passe, les bonds des grains ; le cadran, son aiguille témoin, le barographe du traceur.">
+  <link rel="stylesheet" href="./src/atelier-mer.css">
+  <link rel="stylesheet" href="./src/atelier-trombe.css">
+  <link rel="stylesheet" href="./src/atelier-grains.css">
+  <link rel="stylesheet" href="./src/atelier-barometre.css">
+</head>
+<body>
+  <canvas id="scene" aria-label="Le baromètre du bord, dans la timonerie"></canvas>
+  <p id="legende" aria-live="polite"></p>
+  <aside id="panneau" aria-label="Réglages de l'atelier">
+    <header>
+      <h1>Atelier du baromètre</h1>
+      <button type="button" id="replier" aria-expanded="true" aria-controls="contenu">Replier</button>
+    </header>
+    <div id="contenu">
+      <section aria-labelledby="titre-heure">
+        <h2 id="titre-heure">L'heure</h2>
+        <div class="curseur">
+          <label for="heure">De la matinée au lendemain matin</label><output for="heure" id="heure-texte"></output>
+          <input type="range" id="heure" min="9" max="31" step="0.05" value="16.5">
+        </div>
+        <div id="moments" class="grille-boutons"></div>
+        <div class="grille-boutons espace">
+          <button type="button" id="temps-pause" aria-pressed="true">Le temps s'arrête</button>
+          <button type="button" id="temps-vite" aria-pressed="false">Une heure en 6 s</button>
+        </div>
+      </section>
+      <section aria-labelledby="titre-barometre">
+        <h2 id="titre-barometre">Le baromètre</h2>
+        <dl id="lecture"></dl>
+        <div class="grille-boutons">
+          <button type="button" id="tapoter">Tapoter le verre</button>
+          <button type="button" id="caler">Caler l'aiguille témoin</button>
+          <button type="button" id="grain">Un grain sur le bateau</button>
+        </div>
+        <p class="aide">Une baisse de plus de 2 hPa en trois heures annonce du vent ; de plus de 3,5, un coup de vent ; de plus de 6, la tempête.</p>
+      </section>
+      <section aria-labelledby="titre-courbes">
+        <h2 id="titre-courbes">La journée et la nuit</h2>
+        <div id="courbes" role="img" aria-label="De 9 h au lendemain 7 h : la pression, ce qu'elle a fait en trois heures, et le vent"></div>
+      </section>
+      <section aria-labelledby="titre-vue">
+        <h2 id="titre-vue">Point de vue</h2>
+        <div id="vues" class="grille-boutons"></div>
+      </section>
+      <section aria-labelledby="titre-mesures">
+        <h2 id="titre-mesures">Mesures</h2>
+        <div class="grille-boutons">
+          <button type="button" id="photo">Photo</button>
+        </div>
+        <p id="etat" class="aide" role="status"></p>
+      </section>
+    </div>
+  </aside>
+  <script type="module" src="./src/atelier-barometre.js"></script>
+</body>
+</html>

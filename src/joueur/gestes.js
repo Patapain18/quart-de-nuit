@@ -144,13 +144,23 @@ export function creerGestes(jeu, interieur) {
       rayon: 0.13,
       soi: ['noir', 'sans-nom'],
       titre: () => `Radio VHF (canal ${jeu.radio.canal})`,
-      principal: { texte: 'écouter la météo', faire: () => jeu.radio.bulletin(jeu.meteo) },
+      principal: { texte: 'écouter la météo', faire: () => jeu.ecouterMeteo() },
       // pendant la journée et la nuit, on appelle Jos ; quand un cargo arrive sur nous, on
       // l'appelle, lui, sur le canal 16
       secondaire: {
         texte: () => (jeu.nuit?.cargo?.etat === 'route' ? 'appeler le cargo (canal 16)' : jeu.journee || jeu.nuit ? 'appeler Jos' : 'appeler'),
         faire: () => (jeu.journee || jeu.nuit ? jeu.appelerJos() : jeu.radio.appeler()),
       },
+    },
+    {
+      // le baromètre : on tapote le verre (l'aiguille colle un peu), et on cale l'aiguille
+      // témoin sur la noire — plus tard, on verra de combien elle a bougé
+      id: 'barometre',
+      point: interieur.positionBarometre.clone(),
+      rayon: 0.08,
+      soi: ['inox', 'sans-nom', 'barometre'],
+      titre: () => jeu.titreBarometre(),
+      principal: { texte: 'tapoter le verre, caler l\'aiguille témoin', faire: () => jeu.lireBarometre() },
     },
     {
       id: 'cire',

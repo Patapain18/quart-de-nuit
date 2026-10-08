@@ -853,7 +853,7 @@ l'annoncer. Son choix, dans cet ordre :
 27. ✅ **Les grains**, qui existent vraiment, et dont tout dépend.
 28. ✅ **Les rafales qu'on voit venir** : une tache sombre qui court sur l'eau, la risée.
 29. ✅ **Les éclairs qui partent des nuages d'orage**, et plus de n'importe où.
-30. ⬜ **Le baromètre qui annonce le temps**, au lieu de le suivre.
+30. ✅ **Le baromètre qui annonce le temps**, au lieu de le suivre.
 31. ⬜ **La bête, née d'un des grains** qu'on a vus arriver au radar.
 
 27. ✅ **Les grains** (`src/monde/grains.js`, `src/rendu/glsl/grains.js`, `src/rendu/grains.js`,
@@ -1127,6 +1127,72 @@ l'annoncer. Son choix, dans cet ordre :
     tête de mât ; le son, le tonnerre et la radio ; `__eclairs.planche()`, `film()`,
     `figer()` (un éclair figé à son plus fort), `couts()`).
     Images : `docs/etape29-les-eclairs.jpg`.
+
+30. ✅ **Le baromètre** (`src/monde/pression.js`, `atelier-barometre.html`) — Sa pression se
+    calculait d'après le temps qu'il faisait au même moment : il baissait quand l'orage était
+    déjà là. Elle vient maintenant de la dépression qui arrive, et le baromètre annonce le
+    temps, comme un vrai :
+    - *la dépression* : elle arrive de l'Atlantique et passe au nord pendant la nuit ; son
+      front froid traverse la zone vers 3 h 20. Le matin, par beau temps, la pression baisse
+      déjà, lentement ; à 16 h 30, quand le vent n'est qu'à 17 nœuds, elle baisse de 4
+      hectopascals en trois heures (« en baisse rapide » : un coup de vent arrive) ; vers
+      23 h, de plus de 7 (« très rapide » : la tempête), plus de trois heures avant le plus
+      fort du vent ; puis plus lentement dans la nuit, avec une dernière chute juste avant le
+      front ; elle touche le fond (986 hPa) quand il passe, et remonte d'un coup (un
+      hectopascal en un quart d'heure, trois dans l'heure) : le vent tourne à l'ouest, puis
+      tombe. La vieille règle des marins tient à toute heure : une baisse rapide (plus de 3,5
+      hectopascals en trois heures) est suivie d'un coup de vent dans les six heures, une très
+      rapide (plus de 6) de la tempête. (Une courbe sans bosse entre ses points : Fritsch et
+      Carlson.)
+    - *la marée barométrique* : l'atmosphère respire deux fois par jour (un demi-hectopascal
+      plus haut vers 10 h et 22 h) ;
+    - *les grains* : l'air froid qui tombe sous eux pèse — quand arrive leur rafale, la
+      pression fait un bond (de 2,2 hPa en dix secondes sous un grain fort), reste haute sous
+      la pluie, puis retombe un peu plus bas qu'avant, derrière eux (`pressionEn` dans
+      `monde/grains.js`, sur le bord même de leur rafale).
+    **Le baromètre du bord** (`Barometre`) : son aiguille colle un peu (elle ne part qu'au-delà
+    d'un tiers d'hectopascal) — on tapote le verre pour la décoller, et le bateau qui tape dans
+    la mer la décolle aussi ; une aiguille témoin, dorée, qu'on cale à la main sur la noire
+    pour voir, plus tard, de combien elle a bougé ; un barographe qui enregistre les douze
+    dernières heures (quand on arrive en cours de route, ou après une reprise, il comble ce
+    qu'il a enregistré).
+    **Ce qui en dépend** :
+    - *le cadran de la timonerie* : il était posé sous l'appui des vitres, qui le cachait (on
+      ne le voyait qu'à genoux devant : le rayon des yeux au cadran touchait le lambris).
+      Lui et la pendule sont remontés sur la bande de lambris au-dessus de l'appui, un peu
+      plus petits : on les voit du siège et debout ; l'aiguille témoin dorée ;
+    - *le geste* : E sur le baromètre (debout dans la timonerie) — on tapote le verre, et
+      l'aiguille témoin se cale une fois la noire posée ; le titre donne la pression, et
+      l'aiguille témoin ; le message, la tendance et ce qui a changé depuis l'aiguille ;
+    - *les instruments à l'écran* : une case « Baromètre », la pression et une flèche (ce
+      qu'elle fait en ce moment, sur le dernier quart d'heure : sur trois heures, juste après
+      le front, elle montrerait encore la baisse d'avant) ;
+    - *le traceur* : la pression et sa tendance en trois heures dans la bande des données (en
+      orange quand elle baisse vite), et le barographe dans un coin de la carte ;
+    - *Kervalen Radio* : l'avis de coup de vent donne la situation générale (la dépression qui
+      se creuse à l'ouest, son front froid cette nuit) et la pression à Kervalen ; le
+      bulletin de la radio du bord aussi ;
+    - *Jos* : le soir, « Ton baromètre le disait : il baisse depuis ce matin, de plus en plus
+      vite » ; la liste de la nuit a une ligne de plus : caler l'aiguille témoin ; à 21 h,
+      « ton baromètre dégringole : 6 hectopascals en trois heures » ; à minuit, « il est à
+      992, et il baisse encore » — et, si l'on a calé l'aiguille, de combien il a baissé
+      depuis ; à 3 h 30, « il remonte, vite : le front est passé » ;
+    - *le journal et le bilan* : à chaque chapitre, le vent et le baromètre (« baromètre 999
+      hPa, en baisse très rapide ») ; au bilan, le plus bas, et quand.
+    **Mesuré** (`npm run test-barometre`) : 1014,8 hPa à 9 h, 985,6 au plus bas à 3 h 21 ;
+    à midi, −1,5 en trois heures (12 nœuds de vent) ; à 16 h 30, −3,8 (17 nœuds) ; à 18 h,
+    −4,4 ; la baisse la plus rapide, −7,3 à 22 h 54, 3 h 24 avant le plus fort du vent (42
+    nœuds à 2 h 18) ; après le front, +1,0 en un quart d'heure, +2,8 en une heure ; la règle
+    des marins à chaque quart d'heure de 12 h à 2 h ; la marée, ±0,45 ; un grain fort : un bond
+    de 2,2 hPa en 11 s, en même temps que sa rafale, puis −0,6 derrière lui ; à 3 km, à
+    peine ; l'aiguille qui colle, la tape, l'aiguille témoin, le barographe ; ce que disent
+    Jos et la radio. La pression et sa tendance : 0,3 µs.
+    **Les outils** : l'atelier du baromètre (`atelier-barometre.html` : l'heure, de 9 h au
+    lendemain 7 h, ou le temps qui passe — une heure en six secondes ; le cadran de près, du
+    siège, le traceur, dehors ; tapoter, caler l'aiguille témoin, un grain sur le bateau ; ce
+    que montre le baromètre et ce qu'il annonce ; trois courbes : la pression, sa tendance
+    avec les bandes des bulletins, le vent ; `__barometre.planche()`).
+    Images : `docs/etape30-le-barometre.jpg`, `docs/etape30-la-pression.png`.
 
 ## 4. Pistes graphiques notées pour plus tard
 

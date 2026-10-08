@@ -747,12 +747,13 @@ export class Interieur {
   //   eclairage : 'eteint', 'blanc' ou 'rouge' (les plafonniers) ; feux : les feux de
   //   navigation sont-ils allumés (le voyant du tableau) ; ciel : [r, g, b], la lumière du
   //   ciel (eclairage(meteo).ambiance) ; eclair : un éclair illumine les hublots ;
-  //   descente : 0 (fermée) → 1 (ouverte) ; pression (hPa) et heure, pour les cadrans
+  //   descente : 0 (fermée) → 1 (ouverte) ; pression (hPa) et heure, pour les cadrans ;
+  //   temoin (hPa) : l'aiguille témoin du baromètre, calée à la main
   //   vacille : 0 → 1, la lumière des plafonniers (1 : normale ; moins : elle faiblit, quand
   //   le courant hésite) ; pilotePanne : le disjoncteur du pilote a sauté (le tableau) ;
   //   nuit : 0 → 1 (les noms du tableau s'éclairent) ; dt : le temps écoulé
   regler({
-    eclairage, feux, ciel, eclair = 0, descente = 1, pression = 1015, heure = 12, vacille = 1, pilotePanne = false, nuit = 0, dt = 0,
+    eclairage, feux, ciel, eclair = 0, descente = 1, pression = 1015, temoin = null, heure = 12, vacille = 1, pilotePanne = false, nuit = 0, dt = 0,
   }) {
     this.eclairage = eclairage;
     const u = this.uniforms;
@@ -817,6 +818,7 @@ export class Interieur {
     // le tableau (ses voyants et ses leviers), l'aiguille du baromètre, les aiguilles de la pendule
     this.tableau.regler(dt, { feux, eclairage, pilotePanne, nuit, vacille });
     this.aiguilles.pression.rotation.z = -angleBarometre(pression);
+    this.aiguilles.temoin.rotation.z = -angleBarometre(temoin ?? pression);
     const h = ((heure % 12) + 12) % 12;
     this.aiguilles.heures.rotation.z = -(h / 12) * Math.PI * 2;
     this.aiguilles.minutes.rotation.z = -(h % 1) * Math.PI * 2;

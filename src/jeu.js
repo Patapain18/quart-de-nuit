@@ -17,6 +17,7 @@ import { AMBIANCES, etatMeteo } from './monde/meteo.js';
 import { Vent } from './monde/vent.js';
 import { Grains } from './monde/grains.js';
 import { Foudre, REGLAGES_FOUDRE } from './monde/foudre.js';
+import { Barometre, pressionDuJour, pressionDuTemps, tendance, tendanceRecente, tendanceEnMots, fleche } from './monde/pression.js';
 import { PhysiqueVoilier } from './physique/voilier.js';
 import { reglerAutomatiquement, etatReglage } from './physique/regleur.js';
 import { Commandes, TOUCHES } from './jeu/commandes.js';
@@ -63,6 +64,8 @@ let ici = grainsDuDecor.mesurer(0, 0, {});
 // le jour et sur l'écran d'accueil, ceux du décor
 const foudreDuDecor = new Foudre(17);
 const foudreActive = () => nuit?.foudre ?? foudreDuDecor;
+// le baromètre du bord (monde/pression.js) : son aiguille, et l'aiguille témoin qu'on cale
+const barometre = new Barometre();
 const commandes = new Commandes(canvas);
 const audio = new Audio();
 // (les vrais enregistrements se chargent en arrière-plan dès maintenant ; le son ne
@@ -137,7 +140,7 @@ function refuser(nom) {
   afficherMessage(PAS_ENCORE[nom] ?? 'Pas encore : Jos te le montrera');
 }
 const jeu = {
-  physique, bateau, etat, meteo, marin,
+  physique, bateau, etat, meteo, marin, barometre,
   get journee() { return journee; },
   get nuit() { return nuit; },
   autorise(nom) { return !journee || journee.autorise(nom); },
@@ -160,6 +163,29 @@ const jeu = {
     journee.dire([objectif
       ? `Ici ${JOS}, je te reçois. Pour l'instant : ${objectif.charAt(0).toLowerCase()}${objectif.slice(1)}.`
       : `Ici ${JOS}, je te reçois cinq sur cinq. Tout va bien à bord ?`]);
+  },
+  // la radio : le bulletin de Kervalen Radio (le vent, la mer, et la pression, avec ce
+  // qu'elle annonce)
+  ecouterMeteo() {
+    const h = heureIci();
+    jeu.radio.bulletin(meteo, monde.houle.hauteurSignificative, { pression: pressionIci(), tendance: h === null ? null : tendance(h) });
+  },
+  // le baromètre : une tape sur le verre (l'aiguille colle un peu), puis on cale l'aiguille
+  // témoin sur la noire, une fois posée — on verra plus tard de combien elle a bougé
+  lireBarometre() {
+    barometre.tapoter();
+    etat.calerTemoin = 1.2;
+    const h = heureIci();
+    const avant = barometre.temoin;
+    const p = pressionIci();
+    const dp = h === null ? null : tendance(h);
+    const nombre = (x) => `${x >= 0 ? '+' : '−'}${Math.abs(x).toFixed(1).replace('.', ',')}`;
+    const depuis = barometre.calee !== null && avant !== null && Math.abs(p - avant) >= 0.5 ? ` ; ${nombre(p - avant)} hPa depuis l'aiguille témoin` : '';
+    afficherMessage(`Baromètre : ${Math.round(p)} hPa${dp === null ? '' : `, ${tendanceEnMots(dp)} (${nombre(dp)} en 3 h)`}${depuis}`);
+  },
+  titreBarometre() {
+    const t = barometre.calee !== null ? ` · aiguille témoin ${Math.round(barometre.temoin)}` : '';
+    return `Baromètre : ${Math.round(barometre.aiguille ?? pressionIci())} hPa${t}`;
   },
   // le radar : la portée suivante, le filtre de mer
   radarPortee() {
@@ -686,6 +712,8 @@ function simuler(dt) {
     nuit: monde.ecl.nuit,
     // (la chose sous la coque : le sondeur la voit, lui)
     sonde: nuit?.peur?.chose?.sonde ?? null,
+    // (le baromètre électronique : la pression, ce qu'elle a fait en trois heures, sa courbe)
+    baro: barometre.aiguille === null ? null : { p: barometre.aiguille, dp: heureIci() === null ? null : tendance(heureIci()), historique: barometre.historique, heure: heureIci() },
     vacille,
   });
   // les essuie-glaces : sous la pluie, ou quand les embruns arrosent le pare-brise ; et
@@ -702,16 +730,27 @@ function simuler(dt) {
     temps: monde.temps,
   });
   bateau.allumerFeux(etat.feux ? 1 : 0);
+  // le baromètre du bord : il montre la pression d'ici (monde/pression.js : elle annonce le
+  // temps au lieu de le suivre) ; le bateau qui tape dans la mer décolle son aiguille ; une
+  // fois tapoté, on cale l'aiguille témoin quand la noire s'est posée
+  barometre.maj(dt, pressionIci(), { secousse: etat.mouvement ?? 0, heure: heureIci(), passe: pressionDuJour });
+  if (etat.calerTemoin > 0) {
+    etat.calerTemoin -= dt;
+    if (etat.calerTemoin <= 0) {
+      barometre.caler(heureIci());
+      etat.barometreLu = true;
+    }
+  }
   // la cabine : sa lumière (le jour par les hublots, le panneau et la descente, ou les
-  // plafonniers), le baromètre (la pression baisse quand le temps se gâte) et la pendule
-  const pression = 1024 - 6 * meteo.nuages - 34 * meteo.orage - 0.15 * Math.max(0, meteo.vent - 15);
+  // plafonniers), le baromètre et la pendule
   bateau.interieur.regler({
     eclairage: etat.eclairage,
     feux: etat.feux,
     ciel: monde.ecl.ambiance,
     eclair: monde.eclair.eclaire,
     descente: bateau.descenteOuverte ? 1 : 0,
-    pression,
+    pression: barometre.aiguille,
+    temoin: barometre.temoin,
     // (la pendule donne l'heure de l'horloge : la lumière du ciel, elle, peut retarder —
     // le crépuscule s'attarde pendant le passage de la trombe, jeu/nuit.js)
     heure: nuit ? nuit.heure % 24 : meteo.heure,
@@ -842,6 +881,7 @@ function contexteJournee(dt) {
       attache: marin.attache,
       dehors: marin.dehors,
       zone: marin.zone,
+      barometreLu: !!etat.barometreLu,
     },
     evenements: etat.evenements,
     // la risée où l'on est, et celle qui arrive ; en envoyer une sur le bateau (Jos la montre)
@@ -893,9 +933,12 @@ function commencerJournee({ reprise = null } = {}) {
   physique.ecouteFoc = 0.35;
   Object.assign(etat, {
     regleurAuto: true, pilote: Math.round((meteo.directionVent - 65 + 360) % 360),
-    feux: false, lampe: false, lampeEssayee: false, gilet: false, eclairage: 'eteint',
+    feux: false, lampe: false, lampeEssayee: false, gilet: false, eclairage: 'eteint', barometreLu: false, calerTemoin: 0,
     feuxRappel: false, dejaEmbarque: true, evenements: new Set(), majCiel: 0, majMer: 0, soirEnAttente: false,
   });
+  // (une nouvelle journée : l'aiguille témoin n'est pas calée, le barographe repart)
+  barometre.calee = null;
+  barometre.historique.length = 0;
   bateau.interieur.cire.visible = true;
   bateau.ouvrirDescente(true);
   ouvrirDescente(true);
@@ -985,11 +1028,28 @@ function contexteNuit(dt) {
       // (à la barre, on est dans le cockpit : dehors)
       dehors: etat.mode === 'barre' || marin.dehors,
       zone: marin.zone,
+      barometreLu: !!etat.barometreLu,
     },
     evenements: etat.evenements,
     // (là où l'on entend : le tonnerre arrive d'autant plus tard que l'éclair est loin d'ici)
     ecoute: monde.camera.position,
+    // (le baromètre : ce que montre son aiguille, et l'aiguille témoin si on l'a calée)
+    barometre: { aiguille: barometre.aiguille, temoin: barometre.calee !== null ? barometre.temoin : null },
   };
+}
+
+// La pression ici (hPa) : la nuit, celle de la nuit (la dépression qui arrive, et le bond des
+// grains quand arrive leur rafale) ; le jour, celle de la journée ; sans journée ni nuit (la
+// navigation libre), celle qui va avec le temps qu'il fait
+function heureIci() {
+  return nuit ? nuit.heure : (journee ?? journeeFaite)?.heure ?? null;
+}
+function pressionIci() {
+  if (nuit) return nuit.pression;
+  const p = physique.position;
+  const grains = grainsDuDecor.pressionEn(p.x, p.z);
+  const h = heureIci();
+  return (h === null ? pressionDuTemps(meteo) : pressionDuJour(h)) + grains;
 }
 
 // La nuit est enregistrée (toutes les 2 s) : l'atelier de la tempête sait la redessiner,
@@ -1310,7 +1370,8 @@ function commencerNuit({ depuisJournee = false, bateau: bateauGarde = null, repr
     // descente ouverte…) ; Jos donne la liste
     physique.ris = 1;
     physique.deroule = 0.6;
-    Object.assign(etat, { feux: false, gilet: false, lampeEssayee: false, eclairage: 'eteint', regleurAuto: true });
+    Object.assign(etat, { feux: false, gilet: false, lampeEssayee: false, eclairage: 'eteint', regleurAuto: true, barometreLu: false, calerTemoin: 0 });
+    barometre.calee = null;
     bateau.interieur.cire.visible = true;
     bateau.ouvrirDescente(true);
     ouvrirDescente(true);
@@ -1935,6 +1996,11 @@ function afficherInstruments() {
     ['… venant de', cote(m.angleVentApparent), ''],
     ['Vent réel', vent.vitesse.toFixed(0), 'nds'],
   ];
+  // (le baromètre : ce que montre son aiguille ; la flèche, ce qu'il fait en ce moment)
+  if (barometre.aiguille !== null) {
+    const h = heureIci();
+    cases.push(['Baromètre', Math.round(barometre.aiguille), ` hPa ${h === null ? '' : fleche(tendanceRecente(h))}`]);
+  }
   document.getElementById('instruments').innerHTML = cases.map(([e, v, u]) =>
     `<div class="instrument"><span class="etiquette">${e}</span><span class="valeur">${v}<span class="unite">${u}</span></span></div>`).join('');
   for (const [id, incidence] of [['jauge-gv', m.incidenceGV], ['jauge-foc', m.incidenceFoc]]) {

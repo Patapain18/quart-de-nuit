@@ -480,8 +480,9 @@ export function construireInterieurTimonerie(i, { mat, garder, ajouter, boisGeos
   objets.push(teinter(new THREE.CylinderGeometry(0.04, 0.04, 0.3, 16).translate(-0.62, Y + 0.2, zE), 0xc0201a));
   noirGeos.push(new THREE.CylinderGeometry(0.018, 0.026, 0.05, 12).translate(-0.62, Y + 0.375, zE), entre(-0.645, -0.595, Y + 0.14, Y + 0.17, K.z0 - 0.02, K.z0));
 
-  // --- sur la paroi tribord : le baromètre et la pendule juste après la console, la VHF à
-  // portée de main du siège ---
+  // --- sur la paroi tribord : le baromètre et la pendule juste après la console, sur la
+  // bande de lambris au-dessus de l'appui des vitres (plus bas, l'appui les cachait : on ne
+  // les voyait qu'à genoux) ; la VHF à portée de main du siège ---
   const xParoi = (z, y) => xLambris(uDe(z), y) - 0.012;
   const radio = new THREE.Group();
   const boitier = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.08, 0.14), mat.noir);
@@ -496,14 +497,14 @@ export function construireInterieurTimonerie(i, { mat, garder, ajouter, boisGeos
   radio.position.set(xParoi(0.88, 1.18) - 0.07, 1.18, 0.88);
   groupe.add(radio);
   i.positionRadio = radio.position.clone();
-  const instrument = (y, texture, nom) => {
-    const z = 0.68;
-    const x = xParoi(z, y) - 0.015;
-    const bord = new THREE.CylinderGeometry(0.06, 0.06, 0.03, 32);
+  const instrument = (y, z, texture, nom) => {
+    // (sur la bande, au-dessus de l'appui : la paroi du haut)
+    const x = xHaut(uDe(z), y) - 0.012 - 0.015;
+    const bord = new THREE.CylinderGeometry(0.055, 0.055, 0.03, 32);
     bord.rotateZ(Math.PI / 2);
     bord.translate(x, y, z);
     inoxGeos.push(bord);
-    const face = new THREE.Mesh(new THREE.CircleGeometry(0.051, 32), garder(new THREE.MeshStandardMaterial({ map: texture, roughness: 0.3 })));
+    const face = new THREE.Mesh(new THREE.CircleGeometry(0.047, 32), garder(new THREE.MeshStandardMaterial({ map: texture, roughness: 0.3 })));
     face.rotation.y = -Math.PI / 2;
     face.position.set(x - 0.016, y, z);
     face.name = nom;
@@ -514,8 +515,8 @@ export function construireInterieurTimonerie(i, { mat, garder, ajouter, boisGeos
     groupe.add(centre);
     return centre;
   };
-  const barometre = instrument(1.2, cadrans.barometre, 'barometre');
-  const pendule = instrument(1.03, cadrans.pendule, 'pendule');
+  const barometre = instrument(1.412, 0.62, cadrans.barometre, 'barometre');
+  const pendule = instrument(1.412, 0.77, cadrans.pendule, 'pendule');
   const aiguille = (parent, longueur, largeur) => {
     const g = new THREE.BoxGeometry(largeur, longueur, 0.002);
     g.translate(0, longueur * 0.42, 0);
@@ -524,10 +525,22 @@ export function construireInterieurTimonerie(i, { mat, garder, ajouter, boisGeos
     return a;
   };
   i.aiguilles = {
-    pression: aiguille(barometre, 0.048, 0.003),
-    heures: aiguille(pendule, 0.03, 0.004),
-    minutes: aiguille(pendule, 0.043, 0.0028),
+    pression: aiguille(barometre, 0.044, 0.003),
+    heures: aiguille(pendule, 0.028, 0.004),
+    minutes: aiguille(pendule, 0.04, 0.0028),
   };
+  // l'aiguille témoin du baromètre : dorée, fine, par-dessus la noire (on la cale à la main
+  // sur elle, par le bouton du verre, pour voir plus tard de combien elle a bougé)
+  const temoin = new THREE.BoxGeometry(0.0016, 0.046, 0.0015);
+  temoin.translate(0, 0.046 * 0.42, 0.0022);
+  i.aiguilles.temoin = new THREE.Mesh(temoin, new THREE.MeshBasicMaterial({ color: 0xc8a046 }));
+  barometre.add(i.aiguilles.temoin);
+  const bouton = new THREE.Mesh(new THREE.CylinderGeometry(0.006, 0.006, 0.004, 16), new THREE.MeshBasicMaterial({ color: 0xa8842e }));
+  bouton.rotation.x = Math.PI / 2;
+  bouton.position.z = 0.004;
+  barometre.add(bouton);
+  // (là où l'on vise pour le tapoter : le centre du cadran, dans le repère du bateau)
+  i.positionBarometre = barometre.position.clone();
 
   // --- le plafonnier de la timonerie ---
   const zL = 1.05;

@@ -61,6 +61,7 @@ export default defineConfig({
         atelierGrains: path.resolve('atelier-grains.html'),
         atelierRisees: path.resolve('atelier-risees.html'),
         atelierEclairs: path.resolve('atelier-eclairs.html'),
+        atelierBarometre: path.resolve('atelier-barometre.html'),
       },
     },
   },

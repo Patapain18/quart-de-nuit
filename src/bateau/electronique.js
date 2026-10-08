@@ -85,7 +85,8 @@ export class Electronique {
 
   // dt ; etat : { x, z, cap, vitesse (nds), route (degrés, sur le fond), pilote (null : en
   // veille, ou le cap voulu), panne (le pilote a lâché), barre (-1 → 1), bouees : [{x, z}],
-  // nuit (0 → 1) }
+  // nuit (0 → 1), baro : { p (hPa), dp (hPa en trois heures, ou null), historique : [{ heure,
+  // p }], heure } ou null }
   maj(dt, etat) {
     // (la rose garde le nord : elle tourne dans l'autre sens que le bateau)
     this.rose.quaternion.copy(this.roseQuaternion).multiply(_qRose.setFromAxisAngle(_axeZ, (etat.cap * Math.PI) / 180));
@@ -199,15 +200,22 @@ export class Electronique {
     ctx.font = '600 15px ui-monospace, Menlo, monospace';
     ctx.textAlign = 'left';
     ctx.fillText('VITESSE', 14, hc + 22);
-    ctx.fillText('ROUTE FOND', 150, hc + 22);
-    ctx.fillText('SONDE', 330, hc + 22);
+    ctx.fillText('ROUTE FOND', 134, hc + 22);
+    ctx.fillText('SONDE', 262, hc + 22);
+    if (e.baro) ctx.fillText(e.baro.dp === null ? 'BARO' : `BARO ${e.baro.dp >= 0 ? '+' : '−'}${Math.abs(e.baro.dp).toFixed(1)}/3h`, 378, hc + 22);
     ctx.font = '700 26px ui-monospace, Menlo, monospace';
     ctx.fillStyle = '#ffffff';
     ctx.fillText(`${e.vitesse.toFixed(1)} nd`, 14, hc + 52);
-    ctx.fillText(`${String(Math.round(e.route) % 360).padStart(3, '0')}°`, 150, hc + 52);
+    ctx.fillText(`${String(Math.round(e.route) % 360).padStart(3, '0')}°`, 134, hc + 52);
     const p = e.sonde ?? sonde(e.x, e.z);
     ctx.fillStyle = p < 10 ? '#ff6b5b' : '#ffffff';
-    ctx.fillText(`${p.toFixed(1)} m`, 330, hc + 52);
+    ctx.fillText(`${p.toFixed(1)} m`, 262, hc + 52);
+    if (e.baro) {
+      // (en baisse rapide : en orange, comme une alarme douce)
+      ctx.fillStyle = e.baro.dp !== null && e.baro.dp <= -3.6 ? '#ffb05a' : '#ffffff';
+      ctx.fillText(`${Math.round(e.baro.p)}`, 378, hc + 52);
+      this.dessinerBarographe(ctx, e.baro, L);
+    }
     // l'échelle, en haut à gauche
     ctx.fillStyle = 'rgba(5, 8, 11, 0.7)';
     ctx.fillRect(8, 8, 104, 24);
@@ -215,6 +223,48 @@ export class Electronique {
     ctx.font = '600 14px ui-monospace, Menlo, monospace';
     ctx.fillText(`${this.milles} mn · N↑`, 16, 25);
     texture.needsUpdate = true;
+  }
+
+  // Le barographe : la courbe de la pression des douze dernières heures, dans un coin de la
+  // carte (on y voit la baisse qui s'accélère, le fond quand le front passe, les bonds des
+  // grains, la remontée)
+  dessinerBarographe(ctx, baro, L) {
+    const points = baro.historique.filter((x) => baro.heure === null || x.heure > baro.heure - 12);
+    const l = 150;
+    const h = 64;
+    const x0 = L - l - 8;
+    const y0 = 8;
+    ctx.fillStyle = 'rgba(5, 8, 11, 0.72)';
+    ctx.fillRect(x0, y0, l, h);
+    ctx.fillStyle = '#9fd3ff';
+    ctx.font = '600 12px ui-monospace, Menlo, monospace';
+    ctx.textAlign = 'left';
+    ctx.fillText('BARO 12 h', x0 + 6, y0 + 14);
+    if (points.length < 2) return;
+    let min = Infinity;
+    let max = -Infinity;
+    for (const x of points) {
+      min = Math.min(min, x.p);
+      max = Math.max(max, x.p);
+    }
+    // (au moins 6 hPa de haut : un trait plat ne dit rien)
+    const milieu = (min + max) / 2;
+    const demi = Math.max(3, (max - min) / 2 + 0.5);
+    const debut = baro.heure === null ? points[0].heure : baro.heure - 12;
+    const X = (heure) => x0 + 6 + ((heure - debut) / 12) * (l - 12);
+    const Y = (pr) => y0 + 20 + (1 - (pr - (milieu - demi)) / (2 * demi)) * (h - 26);
+    // (les bornes : en haut à droite, en bas à gauche — la courbe finit souvent en bas à
+    // droite, quand ça baisse)
+    ctx.fillStyle = 'rgba(159, 211, 255, 0.7)';
+    ctx.textAlign = 'right';
+    ctx.fillText(`${Math.round(milieu + demi)}`, x0 + l - 4, y0 + 14);
+    ctx.textAlign = 'left';
+    ctx.fillText(`${Math.round(milieu - demi)}`, x0 + 6, y0 + h - 3);
+    ctx.strokeStyle = '#9fd3ff';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    points.forEach((x, k) => (k ? ctx.lineTo(X(x.heure), Y(x.p)) : ctx.moveTo(X(x.heure), Y(x.p))));
+    ctx.stroke();
   }
 
   dessinerPilote(e) {

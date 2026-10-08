@@ -12,6 +12,7 @@
 //  - bravo : ce qu'il dit quand c'est réussi.
 // ctx : ce que l'on sait du bateau à cet instant (voir journee.js).
 import { etatReglage } from '../physique/regleur.js';
+import { tendance, tendanceEnMots, pressionDuJour } from '../monde/pression.js';
 
 // ---------- Petits outils ----------
 const angleVent = (ctx) => Math.abs(ctx.m.angleVentReel); // 0 : face au vent, 180 : vent arrière
@@ -473,9 +474,12 @@ export const LECONS = [
         id: 'nuit.bulletin',
         emetteur: 'Kervalen Radio',
         canal: 16,
-        dire: [
+        // (la situation générale : la dépression qui arrive, et la pression qui baisse vite)
+        dire: (ctx, j) => [
           'Avis de coup de vent pour la zone du large.',
+          'Situation générale : dépression neuf cent quatre-vingt-cinq hectopascals à l\'ouest de l\'Irlande, se creusant, se déplaçant vers l\'est. Son front froid traversera la zone cette nuit.',
           'Cette nuit, vent de sud-ouest force huit à neuf, rafales à cinquante nœuds. Mer grosse.',
+          `Pression à Kervalen : ${Math.round(pressionDuJour(j.heure))} hectopascals, ${tendanceEnMots(tendance(j.heure))}.`,
           'Avis aux navigateurs : rejoignez un abri, ou préparez-vous.',
         ],
         debut: (ctx, memo, j) => j.ecrire('Avis de coup de vent pour la nuit : force 8 à 9.'),
@@ -483,8 +487,10 @@ export const LECONS = [
       },
       {
         id: 'nuit.jos',
-        dire: [
+        // (le baromètre l'annonçait depuis ce matin : de combien il a baissé, à cette heure)
+        dire: (ctx, j) => [
           'Tu as entendu ? Ça va souffler très fort cette nuit, et tu es trop loin pour rentrer avant.',
+          `Ton baromètre le disait : il baisse depuis ce matin, et de plus en plus vite. ${Math.max(3, Math.round(-tendance(j.heure)))} hectopascals ces trois dernières heures : c'est un coup de vent qui arrive.`,
           'Regarde au sud-ouest, sur l\'horizon : ces grosses tours sombres, avec un toit plat. C\'est le front. Il sera sur nous à la nuit tombée.',
           'Quand le jour baissera, tu verras ses nuages s\'allumer d\'éclairs, sans un bruit : il est encore trop loin pour qu\'on entende le tonnerre.',
           'Alors on prépare le bateau, tant qu\'il fait jour. Voilà la liste. Elle est aussi dans ton carnet de bord, touche L.',
@@ -538,6 +544,12 @@ export const LISTE_NUIT = [
     texte: 'Les feux de navigation (tableau électrique)',
     fait: (ctx) => ctx.aBord.feux,
     rappel: 'Allume tes feux de navigation : le tableau électrique est dans la timonerie, sur la console, à côté de la commande du pilote.',
+  },
+  {
+    id: 'barometre',
+    texte: 'Le baromètre : l\'aiguille témoin calée (timonerie)',
+    fait: (ctx) => ctx.aBord.barometreLu,
+    rappel: 'Va voir ton baromètre, dans la timonerie, sur la paroi tribord : tapote le verre, et cale son aiguille dorée sur la noire. Cette nuit, tu verras de combien il a baissé.',
   },
   {
     id: 'lampe',

@@ -42,7 +42,7 @@ b.placer(0, 0, (meteo.directionVent - 65 + 360) % 360, houle);
 b.vitesse.copy(b.avant).multiplyScalar(2);
 b.deroule = 0.5;
 const etat = {
-  pilote: true, regleurAuto: true, mode: 'barre', feux: false, lampeEssayee: false, gilet: false,
+  pilote: true, regleurAuto: true, mode: 'barre', feux: false, lampeEssayee: false, gilet: false, barometreLu: false,
   descenteOuverte: true, attache: false, dehors: true, zone: 'cockpit', evenements: new Set(),
 };
 const j = new Journee({ radio });
@@ -179,6 +179,8 @@ function eleve(ctx) {
       if (tache.t > 10) etat.dehors = false;
       if (tache.t > 14) etat.gilet = true;
       if (tache.t > 18) etat.feux = true;
+      // (dans la timonerie, aussi : le baromètre, l'aiguille témoin calée)
+      if (tache.t > 19) etat.barometreLu = true;
       if (tache.t > 20) { etat.dehors = true; etat.descenteOuverte = false; }
       if (tache.t > 22) etat.lampeEssayee = true;
       if (tache.t > 24) etat.attache = true;
@@ -196,7 +198,7 @@ function contexte() {
     pilote: etat.pilote, regleurAuto: etat.regleurAuto, mode: etat.mode,
     aBord: {
       feux: etat.feux, lampeEssayee: etat.lampeEssayee, gilet: etat.gilet, descenteOuverte: etat.descenteOuverte,
-      attache: etat.attache, dehors: etat.dehors, zone: etat.mode === 'pied' ? 'passavant' : 'cockpit',
+      attache: etat.attache, dehors: etat.dehors, zone: etat.mode === 'pied' ? 'passavant' : 'cockpit', barometreLu: etat.barometreLu,
     },
     evenements: etat.evenements,
     risee: vent.risees.mesurer(b.position.x, b.position.z, b.vitesse.x, b.vitesse.z, risee),

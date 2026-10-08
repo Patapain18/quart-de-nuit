@@ -1,0 +1,9 @@
+/* Atelier du baromètre : les courbes de la journée et de la nuit (le reste : les ateliers de
+   la mer, de la trombe et des grains) */
+.espace { margin-top: var(--espace-3); }
+#lecture dd { font-variant-numeric: tabular-nums; }
+#courbes .bande { stroke: none; }
+#courbes .bande-texte { fill: var(--texte-doux); font-size: 9px; }
+#courbes .maintenant { stroke: #ffd38a; stroke-width: 1.5; }
+#courbes .repere { stroke: var(--bordure); stroke-width: 1; stroke-dasharray: 2 3; }
+#courbes .repere-texte { fill: var(--texte-doux); font-size: 9px; }
