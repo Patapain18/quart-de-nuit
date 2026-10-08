@@ -181,7 +181,13 @@ const jeu = {
     const dp = h === null ? null : tendance(h);
     const nombre = (x) => `${x >= 0 ? '+' : '−'}${Math.abs(x).toFixed(1).replace('.', ',')}`;
     const depuis = barometre.calee !== null && avant !== null && Math.abs(p - avant) >= 0.5 ? ` ; ${nombre(p - avant)} hPa depuis l'aiguille témoin` : '';
-    afficherMessage(`Baromètre : ${Math.round(p)} hPa${dp === null ? '' : `, ${tendanceEnMots(dp)} (${nombre(dp)} en 3 h)`}${depuis}`);
+    // (juste après le fond, sur trois heures, elle a encore baissé : mais l'aiguille, elle,
+    // remonte — on dit ce qu'elle fait)
+    const recente = h === null ? 0 : tendanceRecente(h);
+    let mots = dp === null ? '' : `, ${tendanceEnMots(dp)} (${nombre(dp)} en 3 h)`;
+    if (dp !== null && dp < 0 && recente > 1.5) mots = `, il remonte depuis peu (${nombre(dp)} en 3 h : le fond est passé)`;
+    else if (dp !== null && dp > 0 && recente < -1.5) mots = `, il redescend depuis peu (${nombre(dp)} en 3 h)`;
+    afficherMessage(`Baromètre : ${Math.round(p)} hPa${mots}${depuis}`);
   },
   titreBarometre() {
     const t = barometre.calee !== null ? ` · aiguille témoin ${Math.round(barometre.temoin)}` : '';
