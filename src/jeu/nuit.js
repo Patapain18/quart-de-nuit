@@ -9,6 +9,9 @@
 //  - une trombe marine au crépuscule, un cargo qui croise la route vers 22 h 30 ;
 //  - des grains : des averses d'orage qui passent, chacune avec sa rafale (monde/grains.js) ;
 //    trois ou quatre passent sur le bateau, Jos les annonce ;
+//  - la foudre, qui part de leurs nuages (monde/foudre.js) : on compte les secondes jusqu'au
+//    tonnerre, le feu de Saint-Elme s'allume en tête de mât, et elle peut tomber tout près —
+//    ou sur le mât ;
 //  - deux ou trois vagues scélérates de 18 à 22 m (annoncées : le grondement, Jos, le
 //    radar) : à prendre droit dans l'arrière, sinon elles couchent le bateau ;
 //  - Jos veille à la radio, depuis son sémaphore, et conseille quand ça va mal.
@@ -26,6 +29,7 @@ import { AMBIANCES, etatMeteo, interpoler, angleVers } from '../monde/meteo.js';
 import { Deferlantes } from '../monde/deferlantes.js';
 import { Scelerates, chocScelerate } from '../monde/scelerates.js';
 import { Grains } from '../monde/grains.js';
+import { Foudre } from '../monde/foudre.js';
 import { Peur } from './peur.js';
 import { directionEnMots } from './radio.js';
 import { NOM_BATEAU, JOS, HEURE_COUCHER, heureEnTexte } from './journee.js';
@@ -264,6 +268,8 @@ export class Nuit {
     this.plansGrains = GRAINS_DE_LA_NUIT.map((g) => ({ ...g, arrivee: g.arrivee + (hg() - 0.5) * 40, ecart: g.ecart * (hg() < 0.5 ? -1 : 1) }));
     this.plansGrains.forEach((g, k) => { this.prevu[`grain${k}`] = heureA(g.arrivee - DANS_GRAIN); });
     this.ici = null; // (ce que font les grains là où est le bateau : la pluie, leur vent…)
+    // la foudre (monde/foudre.js) : elle part de leurs nuages, et de celui de la trombe
+    this.foudre = new Foudre(graine * 6151 + 29);
     // la peur (jeu/peur.js) : la tension, et ce qu'on voit du coin de l'œil
     this.peur = new Peur({ graine });
     this.silence = false; // (Jos ne répond plus)
@@ -275,6 +281,7 @@ export class Nuit {
       deferlantes: 0, coups: 0, giteMax: 0, couche: 0, pompee: 0, distance: 0, vitesseMax: 0, caleMax: 0,
       cargoDistance: Infinity, cargoAppele: false, trombeDistance: Infinity, aLaBarre: 0,
       scelerates: 0, sceleratesCouche: 0, grains: 0, rafaleMax: 0,
+      eclairs: 0, eclairPlusPres: Infinity, frappes: 0, surLeMat: 0,
     };
     this.journal = [];
     this.conseils = {};
@@ -338,6 +345,7 @@ export class Nuit {
     this.suivreEau(dt, ctx);
     this.suivreAvaries(dt, ctx);
     this.suivreTrombe(dt, ctx);
+    this.suivreFoudre(dt, ctx);
     this.suivreCargo(dt, ctx);
     this.suivreEtrange(dt, ctx);
     this.suivrePeur(dt, ctx);
@@ -535,7 +543,8 @@ export class Nuit {
     }
   }
 
-  avarie(nom, ctx, dansLaRafale = false) {
+  // (foudre : c'est la foudre, tombée sur le mât, qui l'a causée)
+  avarie(nom, ctx, dansLaRafale = false, foudre = false) {
     const p = ctx.physique;
     this.avaries[nom] = nom === 'pilote' ? 'panne' : nom === 'ecouteFoc' ? 'cassee' : 'dechiree';
     const textes = {
@@ -551,7 +560,10 @@ export class Nuit {
         journal: 'Le foc s\'est déchiré.',
         dire: ['Ton foc s\'est déchiré ! Roule-le entièrement, il ne servira plus cette nuit.'],
       },
-      pilote: {
+      pilote: foudre ? {
+        journal: 'La foudre est tombée sur le mât : le pilote a disjoncté.',
+        dire: ['La foudre est tombée sur ton mât ! Il l\'a menée jusqu\'à la quille, c\'est fait pour ça : à l\'intérieur, tu ne risques rien.', 'Mais ton pilote a disjoncté. Prends la barre, puis réarme-le au tableau électrique de la timonerie.'],
+      } : {
         journal: 'Le pilote automatique a lâché.',
         dire: ['Ton pilote a lâché ? Dans cette mer, il force trop, ça arrive.', 'Prends la barre d\'abord. Ensuite, tu pourras réarmer son disjoncteur, au tableau électrique de la timonerie.'],
       },
@@ -849,13 +861,73 @@ export class Nuit {
         ? `Dessous, ça soufflera à ${Math.round(rafale / 5) * 5} nœuds dans les rafales, et il pleuvra à verse. Ta toile est bonne : garde les vagues dans l'arrière, et laisse-le passer.`
         : `Dessous, ça soufflera à ${Math.round(rafale / 5) * 5} nœuds dans les rafales. Réduis maintenant, pas quand il sera sur toi : ${rafale >= 34 ? 'la grand-voile affalée, un mouchoir de foc' : 'deux ris, le foc presque roulé'}.`,
     ];
-    if (g.orage > 0.6) phrases.push('Et il est plein d\'éclairs.');
+    if (g.orage > 0.6) phrases.push('Et il est plein d\'éclairs : quand il passera, ne touche ni au mât ni aux haubans.');
     this.dire(phrases, { siLibre: m.distance > 1600, urgent: m.distance <= 1600 });
   }
 
   // Le vent des grains au point (x, z) (m/s, à ajouter au vent, comme celui de la trombe)
   ventGrains(x, z, sortie = new Vector3()) {
     return this.grains.ventEn(x, z, sortie);
+  }
+
+  // ---------- La foudre ----------
+  // Elle part des nuages des grains et de celui de la trombe (monde/foudre.js) ; le jeu en
+  // fait le bruit et la lumière, la nuit en tire les conséquences : le journal, ce que Jos en
+  // dit, et la foudre sur le mât, qui fait disjoncter le pilote.
+  suivreFoudre(dt, ctx) {
+    const p = ctx.physique.position;
+    const f = this.foudre;
+    f.maj(dt, { meteo: this.meteo, grains: this.grains, trombe: this.trombe, x: p.x, z: p.z, ecoute: ctx.ecoute ?? null });
+    for (const ev of f.evenements) {
+      if (ev.type === 'eclair' && ev.eclair.type !== 'front') {
+        this.stats.eclairs++;
+        this.stats.eclairPlusPres = Math.min(this.stats.eclairPlusPres ?? Infinity, ev.distance);
+        // la première fois qu'un éclair tombe à quelques kilomètres : Jos apprend à compter
+        if (!this.faits.has('compter') && ev.distance < 6000 && ev.eclair.visible && this.radio.libre && !this.silence && this.commence) {
+          this.faits.add('compter');
+          this.dire([
+            'Tu as vu cet éclair ? Compte les secondes jusqu\'au tonnerre : trois secondes, un kilomètre.',
+            'S\'il se rapproche d\'un éclair à l\'autre, l\'orage vient sur toi.',
+          ], { siLibre: true });
+        }
+      } else if (ev.type === 'frappe') this.frappeFoudre(ev, ctx);
+    }
+    // le feu de Saint-Elme : sous le cœur d'un nuage d'orage, dans le noir, une lueur
+    // violette s'allume en tête de mât (la première fois : le journal, et Jos s'il peut)
+    if (f.champ > 0.6 && !this.faits.has('saintElme') && this.heure > 20.2 && ctx.aBord?.dehors !== false) {
+      this.faits.add('saintElme');
+      this.ecrire('Une lueur violette en tête de mât : le feu de Saint-Elme.');
+      if (this.radio.libre && !this.silence) {
+        this.dire([
+          'Tu vois une lueur, en haut de ton mât ? C\'est le feu de Saint-Elme : l\'air est chargé d\'électricité.',
+          'Les anciens disaient que c\'était bon signe. Moi je te dis que la foudre n\'est pas loin : ne touche pas aux haubans.',
+        ], { siLibre: true });
+      }
+      this.emettre('saint-elme');
+    }
+  }
+
+  // La foudre tombe tout près du bateau, ou sur lui
+  frappeFoudre(ev, ctx) {
+    this.stats.frappes++;
+    this.emettre('frappe', ev);
+    if (ev.surLeMat) {
+      this.stats.surLeMat++;
+      // (le mât l'a menée jusqu'à la quille ; le courant qui passe fait sauter le disjoncteur
+      // du pilote — et le radar redémarre)
+      if (this.avaries.pilote === 'ok') this.avarie('pilote', ctx, false, true);
+      else {
+        this.ecrire('La foudre est tombée sur le mât !');
+        this.dire(['La foudre est tombée sur ton mât ! Il l\'a menée jusqu\'à la quille, c\'est fait pour ça. Tu n\'as rien ?'], { urgent: true });
+      }
+      return;
+    }
+    this.ecrire(`La foudre est tombée à ${Math.max(10, Math.round(ev.distance / 10) * 10)} m du bateau.`);
+    // (tout près : Jos l'a vue tomber sur son radar… ou l'a entendue dans sa radio)
+    if (ev.distance < 300 && !this.faits.has('frappeProche') && !this.silence) {
+      this.faits.add('frappeProche');
+      this.dire(['Ça va ? Celle-là est tombée tout près de toi. Reste à l\'abri, et ne touche à rien de métallique.'], { siLibre: true });
+    }
   }
 
   // ---------- Le cargo (vers 22 h 30) ----------
@@ -1277,6 +1349,7 @@ export class Nuit {
       ['Les vagues scélérates', s.scelerates ? `${s.scelerates}${s.sceleratesCouche ? ` (dont ${s.sceleratesCouche} qui t'${s.sceleratesCouche > 1 ? 'ont' : 'a'} couché)` : ', passées sans être couché'}` : 'aucune'],
       ['Le cargo', s.cargoDistance === Infinity ? 'pas vu' : `${s.cargoAppele ? 'appelé à la radio, ' : ''}passé à ${metres(s.cargoDistance)}`],
       ['Les grains', s.grains ? `${s.grains}, rafales jusqu'à ${Math.round(s.rafaleMax)} nœuds` : 'aucun sur toi'],
+      ['La foudre', s.surLeMat ? `${s.eclairs} éclairs, et un sur le mât !` : s.eclairs ? `${s.eclairs} éclairs, le plus proche à ${metres(s.eclairPlusPres ?? Infinity)}` : 'pas un éclair'],
       ['À la barre', `${Math.round(s.aLaBarre / 60)} min (le reste au pilote)`],
       ['Distance parcourue', `${milles(s.distance)}, jusqu'à ${virgule(s.vitesseMax)} nœuds dans les surfs`],
     ];
@@ -1296,6 +1369,7 @@ export class Nuit {
     // (les grains : ceux d'avant cette heure sont passés ; les autres naîtront)
     this.plansGrains.forEach((_, k) => { if (this.prevu[`grain${k}`] < this.heure) this.faits.add(`grain${k}`); });
     this.grains.vider();
+    this.foudre.vider();
     this.ici = null;
     this.silence = this.faits.has('silence') && this.heure < this.prevu.silence + 0.55;
     this.retardLumiere = 0;
@@ -1348,7 +1422,10 @@ export class Nuit {
       c: s.c, heure: s.heure, eau: { ...s.eau }, avaries: { ...s.avaries }, fatigue: { ...s.fatigue },
       // (une partie gardée avant les vagues scélérates : elles arrivent quand même)
       prevu: { ...this.prevu, ...s.prevu }, faits: new Set(s.faits),
-      stats: { scelerates: 0, sceleratesCouche: 0, grains: 0, rafaleMax: 0, ...s.stats, trombeDistance: s.stats.trombeDistance ?? Infinity, cargoDistance: s.stats.cargoDistance ?? Infinity },
+      stats: {
+        scelerates: 0, sceleratesCouche: 0, grains: 0, rafaleMax: 0, eclairs: 0, frappes: 0, surLeMat: 0, ...s.stats,
+        trombeDistance: s.stats.trombeDistance ?? Infinity, cargoDistance: s.stats.cargoDistance ?? Infinity, eclairPlusPres: s.stats.eclairPlusPres ?? Infinity,
+      },
       etat: 'nuit', raison: null, cargo: null, trombe: null, suiviCoup: null, renverse: 0, annonceVue: null, commence: true,
     });
     this.sauvegarde = { ...s, faits: new Set(s.faits) };
@@ -1357,6 +1434,7 @@ export class Nuit {
     this.aLancer = null;
     // (les grains : ceux d'alentour renaîtront ; ceux qui venaient sur nous repartent)
     this.grains.vider();
+    this.foudre.vider();
     this.ici = null;
     this.menaceGrain = null;
     for (const r of s.grainsEnRoute ?? []) if (this.plansGrains[r.plan]) this.lancerGrain(this.plansGrains[r.plan], ctx, r.dans, r.plan);

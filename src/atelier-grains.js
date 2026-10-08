@@ -452,10 +452,7 @@ function eclairDans(visible = true) {
   const c = coeur();
   const a = Math.random() * Math.PI * 2;
   const r = (principal?.rayon ?? 700) * 0.5;
-  monde.eclair.flashs.push({
-    centre: new THREE.Vector3(c.x + Math.cos(a) * r, monde.ciel.uniformsNuages.uBaseNuages.value + 300, c.z + Math.sin(a) * r),
-    cle: Math.floor(Math.random() * 1e9), visible, debut: monde.temps + 1 / 60, force: 1.2, proche: true, eclaire: 0.5,
-  });
+  monde.foudre.lancer({ type: visible ? 'mer' : 'nuage', x: c.x + Math.cos(a) * r, z: c.z + Math.sin(a) * r, eclats: 1, force: 1.2 });
 }
 
 // La planche : les moments en colonnes, les points de vue en lignes, un grain posé à la
@@ -482,8 +479,8 @@ async function plancheSansPause(nom, { moments = ['jour', 'coucher', 'crepuscule
     poser();
     for (const [j, v] of vues.entries()) {
       choisirVue(v);
-      monde.eclair.flashs = [];
-      monde.eclair.prochain = 1e9;
+      monde.foudre.vider();
+      monde.foudre.retenir(1e9);
       const nuit = monde.ecl.nuit > 0.6;
       for (let k = 0; k < images; k++) {
         if (eclairLaNuit && nuit && k === images - 4) eclairDans(true);
@@ -518,7 +515,7 @@ async function plancheSansPause(nom, { moments = ['jour', 'coucher', 'crepuscule
   choisirVue(avant.vue);
   Object.assign(regard, avant.regard);
   tempsDesGrains(avant.vitesse);
-  monde.eclair.prochain = 2;
+  monde.foudre.liberer();
   return envoyerCapture(nom, toile.toDataURL('image/jpeg', 0.9));
 }
 

@@ -206,6 +206,10 @@ export class Audio {
     // souffle qui passe sur nous
     this.risee = { filtre: filtre('bandpass', 1900, 0.7), gain: gain() };
     source(this.blanc, 1.07).connect(this.risee.filtre).connect(this.risee.gain).connect(this.bus.dehors);
+    // le feu de Saint-Elme : l'air chargé grésille en tête de mât (un souffle aigu, haché de
+    // petits craquements)
+    this.saintElme = { filtre: filtre('bandpass', 5200, 1.4), hache: gain(0), gain: gain() };
+    source(this.blanc, 1.31).connect(this.saintElme.filtre).connect(this.saintElme.hache).connect(this.saintElme.gain).connect(this.bus.dehors);
     // l'eau le long de la coque
     this.eau = { filtre: filtre('lowpass', 500, 0.5), gain: gain() };
     source(this.rose, 0.8).connect(this.eau.filtre).connect(this.eau.gain).connect(this.bus.dehors);
@@ -408,6 +412,12 @@ export class Audio {
     this.niveaux.risee = risee;
     this.vers(this.risee.gain.gain, 0.2 * risee ** 1.5 * (1 - 0.6 * lisse(28, 40, vent)), 0.6);
     this.vers(this.risee.filtre.frequency, 1500 + 900 * risee, 0.6);
+    // le feu de Saint-Elme : un grésillement en tête de mât (on ne l'entend bien que si l'on
+    // y prête l'oreille)
+    const elme = e.saintElme ?? 0;
+    this.niveaux.saintElme = elme;
+    this.vers(this.saintElme.gain.gain, 0.1 * elme, 0.4);
+    if (elme > 0) this.saintElme.hache.gain.setTargetAtTime(0.2 + 0.8 * Math.random() ** 3, t, 0.012);
     // le gréement : il siffle quand ça forcit, il hurle au plus fort
     this.boucle('greement', 0.45 * lisse(14, 28, vent) * (1 - 0.4 * lisse(32, 42, vent)), 0.5, 0.82 + 0.008 * vent);
     this.boucle('greement-aigu', 0.4 * lisse(27, 42, vent), 0.5, 0.9 + 0.005 * vent);
@@ -611,24 +621,28 @@ export class Audio {
     s.start(t, Math.random() * 3, 1.4);
   }
 
-  // le tonnerre : le craquement puis le grondement, d'autant plus tard et plus sourd
-  // que l'éclair est loin (le son va moins vite que la lumière : 3 s par kilomètre)
-  tonnerre(distance, force = 1) {
+  // le tonnerre : le craquement puis le grondement. Le jeu l'appelle quand son bruit arrive
+  // jusqu'à nous (monde/foudre.js : 3 s par kilomètre, depuis là où l'éclair est passé au
+  // plus près) ; il roule d'autant plus longtemps que le trait est long ; tout près, il
+  // claque ; de loin, il n'en reste que les graves. o : { distance (m), duree (s : combien
+  // de temps il roule), force (0 → 1), pan (−1 : à gauche → 1 : à droite), claque }
+  tonnerre({ distance, duree = 8, force = 1, pan = 0, claque = false }) {
     if (!this.actif()) return;
     const proche = Math.max(0, 1 - distance / 9000);
-    const dans = distance / 340;
-    // proche : un claquement sec (morceaux 0-1) ; loin : un long roulement (4-5)
-    const index = proche > 0.75 ? Math.floor(Math.random() * 2) : proche > 0.45 ? 2 + Math.floor(Math.random() * 2) : 4 + Math.floor(Math.random() * 2);
+    // tout près : un claquement sec (morceau 0) ; à quelques kilomètres, un coup puis un
+    // roulement (1-3) ; loin : un long roulement (4-5)
+    const index = claque && distance < 900 ? 0 : distance < 2300 ? 1 + Math.floor(Math.random() * 2) : distance < 5000 ? 2 + Math.floor(Math.random() * 2) : 4 + Math.floor(Math.random() * 2);
     if (this.jouer('tonnerres', {
-      index, dans, bus: 'dehors',
+      index, bus: 'dehors',
       gain: Math.min(1.3, (0.3 + 0.9 * proche) * force),
       grave: 400 + 9000 * proche * proche,
       vitesse: 0.85 + 0.2 * Math.random(),
-      pan: (Math.random() - 0.5) * 0.8,
+      pan,
+      duree: index === 0 ? undefined : Math.max(5, duree * 1.3 + 2),
     })) return;
     // (pas encore d'enregistrement : le tonnerre calculé)
     const ctx = this.ctx;
-    const t = ctx.currentTime + dans;
+    const t = ctx.currentTime;
     const s = ctx.createBufferSource();
     s.buffer = this.brun;
     s.playbackRate.value = 0.6 + proche * 0.6;
@@ -644,6 +658,87 @@ export class Audio {
     s.connect(f).connect(g).connect(this.bus.dehors);
     s.start(t, Math.random() * 2);
     s.stop(t + 9);
+  }
+
+  // La foudre tombe tout près (pres : 0 → 1 ; 1 : sur le mât) : en même temps que l'éclair,
+  // un claquement sec, énorme, qui déchire tout (dans la cabine, la coque l'étouffe un peu),
+  // et le souffle grave qui suit
+  claquementFoudre(pres = 1, dedans = false) {
+    if (!this.actif()) return;
+    const ctx = this.ctx;
+    const t = ctx.currentTime;
+    const sortie = ctx.createGain();
+    sortie.gain.value = (0.5 + 0.9 * pres) * (dedans ? 0.6 : 1);
+    sortie.connect(this.compresseur);
+    // le claquement : un bruit blanc très court, aigu
+    const s = ctx.createBufferSource();
+    s.buffer = this.blanc;
+    const f = ctx.createBiquadFilter();
+    f.type = 'highpass';
+    f.frequency.value = dedans ? 600 : 1200;
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(0, t);
+    g.gain.linearRampToValueAtTime(1, t + 0.002);
+    g.gain.exponentialRampToValueAtTime(0.25, t + 0.06);
+    g.gain.exponentialRampToValueAtTime(0.001, t + 0.5);
+    s.connect(f).connect(g).connect(sortie);
+    s.start(t, Math.random() * 2, 0.6);
+    // le souffle : un coup grave qui fait vibrer la coque
+    const o = ctx.createOscillator();
+    o.type = 'sine';
+    o.frequency.setValueAtTime(70, t);
+    o.frequency.exponentialRampToValueAtTime(32, t + 0.8);
+    const go = ctx.createGain();
+    go.gain.setValueAtTime(0, t);
+    go.gain.linearRampToValueAtTime(0.9 * pres, t + 0.01);
+    go.gain.exponentialRampToValueAtTime(0.001, t + 1.2);
+    o.connect(go).connect(sortie);
+    o.start(t);
+    o.stop(t + 1.3);
+    // et le tonnerre, aussitôt : il roule au-dessus de nous
+    this.jouer('tonnerres', { index: 0, gain: 1.2 * (0.6 + 0.4 * pres), bus: 'dehors', vitesse: 0.9 + 0.1 * Math.random() });
+  }
+
+  // Après un coup de tonnerre tout près, les oreilles sifflent un moment (force 0 → 1)
+  acouphene(duree = 6, force = 1) {
+    if (!this.actif()) return;
+    const ctx = this.ctx;
+    const t = ctx.currentTime;
+    const o = ctx.createOscillator();
+    o.type = 'sine';
+    o.frequency.value = 5400 + Math.random() * 1400;
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(0, t);
+    g.gain.linearRampToValueAtTime(0.035 * force, t + 0.15);
+    g.gain.setTargetAtTime(0, t + duree * 0.3, duree * 0.3);
+    o.connect(g).connect(this.sortie);
+    o.start(t);
+    o.stop(t + duree * 1.6);
+  }
+
+  // Un éclair, même lointain, claque dans la radio : un « crac » de parasites (un, deux ou
+  // trois petits coups), plus fort s'il est près (force 0 → 1)
+  parasiteEclair(force = 0.5) {
+    if (!this.actif()) return;
+    const ctx = this.ctx;
+    const t0 = ctx.currentTime;
+    const n = 1 + Math.floor(Math.random() * 3);
+    for (let i = 0; i < n; i++) {
+      const t = t0 + i * (0.025 + Math.random() * 0.07);
+      const d = 0.03 + Math.random() * 0.12;
+      const s = ctx.createBufferSource();
+      s.buffer = this.blanc;
+      const f = ctx.createBiquadFilter();
+      f.type = 'bandpass';
+      f.frequency.value = 1500 + Math.random() * 2000;
+      f.Q.value = 0.9;
+      const g = ctx.createGain();
+      g.gain.setValueAtTime(0, t);
+      g.gain.linearRampToValueAtTime((0.05 + 0.25 * force) * (i === 0 ? 1 : 0.55), t + 0.003);
+      g.gain.exponentialRampToValueAtTime(0.001, t + d);
+      s.connect(f).connect(g).connect(this.bus.radio);
+      s.start(t, Math.random() * 2, d + 0.02);
+    }
   }
 
   // en bas, dans la cabine : la tempête n'arrive plus qu'étouffée par la coque ; ce qui est

@@ -18,7 +18,7 @@ import { GLSL_OUTILS, PassePleinEcran, SOMMET_PLEIN_ECRAN } from './outils.js';
 import { creerBruitNuages } from './bruit-nuages.js';
 import { glslGrains } from './glsl/grains.js';
 import { GrainsRendu } from './grains.js';
-import { INTENSITE_SOLEIL, geometrieFront } from '../monde/meteo.js';
+import { INTENSITE_SOLEIL, geometrieFront, couchesNuages } from '../monde/meteo.js';
 
 // Correspondance direction ↔ carte du ciel : la hauteur est « étirée » près de
 // l'horizon, là où les couleurs changent le plus vite.
@@ -368,6 +368,8 @@ export class Ciel {
     u.uDeriveNuages.value = new THREE.Vector2();
     for (const nom of ['uDirSoleil', 'uSoleilNuages', 'uDirLune', 'uLuneNuages', 'uAmbHaut', 'uAmbBas']) u[nom].value = v3();
     u.uEclair.value = new THREE.Vector4();
+    u.uEclairA.value = new THREE.Vector4();
+    u.uEclairB.value = new THREE.Vector4(0, 0, 0, 900);
     u.uTrombeCiel.value = new THREE.Vector4();
     // Le front orageux (glsl/front.js), partagé par le fond, le cube et la mer
     this.uniformsFront = {
@@ -492,6 +494,8 @@ export class Ciel {
     this.materiauCube = new THREE.ShaderMaterial({
       uniforms: { ...u, ...this.uniformsFront, ...this.grains.uniforms, uCarteCiel: { value: this.carte.texture }, uPositionCamera: { value: v3() } },
       vertexShader: SOMMET_CUBE, fragmentShader: FRAGMENT_CUBE, side: THREE.BackSide, depthWrite: false, depthTest: false,
+      // (la lumière d'un éclair dans les nuages du reflet : sans mesurer l'épaisseur traversée)
+      defines: { ECLAIR_SIMPLE: '' },
     });
     this.sceneCube.add(new THREE.Mesh(new THREE.BoxGeometry(2, 2, 2), this.materiauCube));
     this.faceCube = 0;
@@ -532,8 +536,9 @@ export class Ciel {
     u.uCouverture.value = meteo.nuages;
     u.uCirrus.value = meteo.cirrus ?? 0.3;
     u.uOrage.value = meteo.orage;
-    u.uBaseNuages.value = THREE.MathUtils.lerp(1350, 650, meteo.orage);
-    u.uEpaisseurNuages.value = THREE.MathUtils.lerp(1700, 3600, meteo.orage);
+    const couches = couchesNuages(meteo);
+    u.uBaseNuages.value = couches.base;
+    u.uEpaisseurNuages.value = couches.epaisseur;
     this.passeCarte.materiau.uniforms.uIntensiteLune.value = INTENSITE_SOLEIL * ecl.intensiteLune * 0.05;
     const f = this.fond.material.uniforms;
     f.uNuit.value = ecl.nuit;
@@ -563,8 +568,19 @@ export class Ciel {
     d.y -= Math.sin(angle) * vitesse * dt;
   }
 
-  eclair(position, intensite) {
-    this.uniformsNuages.uEclair.value.set(position.x, position.y, position.z, intensite);
+  // Un éclair dans les nuages : son trajet dans le nuage (deux points, m), son intensité, et
+  // la distance où sa lumière a baissé de moitié (m)
+  eclair(a, b, intensite, portee = 900) {
+    const u = this.uniformsNuages;
+    if (!a || intensite <= 0) {
+      u.uEclair.value.w = 0;
+      u.uEclairA.value.w = 0;
+      this.fond.material.uniforms.uEclairCiel.value = 0;
+      return;
+    }
+    u.uEclair.value.set((a.x + b.x) / 2, (a.y + b.y) / 2, (a.z + b.z) / 2, intensite);
+    u.uEclairA.value.set(a.x, a.y, a.z, intensite);
+    u.uEclairB.value.set(b.x, b.y, b.z, portee);
     this.fond.material.uniforms.uEclairCiel.value = intensite * 0.02;
   }
 

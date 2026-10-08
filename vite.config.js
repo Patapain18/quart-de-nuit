@@ -60,6 +60,7 @@ export default defineConfig({
         atelierTrombe: path.resolve('atelier-trombe.html'),
         atelierGrains: path.resolve('atelier-grains.html'),
         atelierRisees: path.resolve('atelier-risees.html'),
+        atelierEclairs: path.resolve('atelier-eclairs.html'),
       },
     },
   },

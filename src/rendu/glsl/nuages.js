@@ -21,7 +21,9 @@ export const UNIFORMS_NUAGES = {
   uLuneNuages: { value: null },
   uAmbHaut: { value: null }, // lumière du ciel au-dessus des nuages
   uAmbBas: { value: null }, // lumière renvoyée par la mer, sous les nuages
-  uEclair: { value: null }, // position (m) et intensité d'un éclair
+  uEclair: { value: null }, // position (m) et intensité d'un éclair (le milieu de son trajet)
+  uEclairA: { value: null }, // son trajet dans le nuage : d'où il part (m), son intensité…
+  uEclairB: { value: null }, // … où il va (m), et la distance où sa lumière a baissé de moitié (m)
   uCirrus: { value: 0.3 }, // voile de cirrus très haut (0 → 1)
   uTrombeCiel: { value: null }, // le nuage d'orage qui porte la trombe : x, z, rayon (m), force (0 : pas de trombe)
   uCarteGrains: { value: null }, // le ciel bouché au-dessus des grains, vu d'en haut (rendu/grains.js)
@@ -43,6 +45,8 @@ uniform vec3 uLuneNuages;
 uniform vec3 uAmbHaut;
 uniform vec3 uAmbBas;
 uniform vec4 uEclair;
+uniform vec4 uEclairA;
+uniform vec4 uEclairB;
 uniform float uCirrus;
 uniform vec4 uTrombeCiel;
 ${GLSL_CARTE_GRAINS}
@@ -117,6 +121,22 @@ float epaisseurVers(vec3 p, vec3 l) {
   return somme;
 }
 
+// L'épaisseur de nuage entre un point et l'éclair (direction l) : trois pas, sans le détail
+// (sa lumière se diffuse dans le nuage : la forme d'ensemble suffit)
+float epaisseurVersEclair(vec3 p, vec3 l) {
+  float somme = 0.0;
+  float pas = 120.0;
+  float t = 0.0;
+  for (int j = 0; j < 3; j++) {
+    t += pas;
+    vec3 q = p + l * t;
+    float h = (altitudeDe(q) - uBaseNuages) / uEpaisseurNuages;
+    somme += densiteNuage(q, h, false) * pas;
+    pas *= 2.6;
+  }
+  return somme;
+}
+
 // Diffusion multiple approchée (4 « rebonds » de plus en plus doux et de moins en
 // moins orientés) : sans elle, l'intérieur des nuages serait noir. Le facteur final
 // règle l'éclat des sommets au soleil (blancs, plus lumineux que le ciel bleu).
@@ -172,9 +192,29 @@ vec4 nuagesVolume(vec3 origine, vec3 d, int pasMax, float decalage) {
       // lumière du ciel : le haut du nuage voit le ciel, le bas voit la mer (sombre)
       vec3 ambiance = mix(uAmbBas, uAmbHaut, smoothstep(0.0, 1.0, h)) * (1.0 - 0.35 * dens);
       lum += ambiance;
-      if (uEclair.w > 0.0) {
-        float r = length(p - uEclair.xyz);
-        lum += vec3(0.75, 0.82, 1.0) * uEclair.w * exp(-r / 1600.0) * 6.0;
+      // l'éclair : il court dans le nuage, qui s'allume de l'intérieur tout le long de son
+      // trajet. Sa lumière vient du point du trajet le plus proche ; elle traverse le nuage en
+      // s'y diffusant (après des dizaines de rebonds dans les gouttes, il en ressort encore
+      // une bonne part, de tous côtés : le nuage s'allume comme un abat-jour) ; là où il est
+      // mince, elle passe tout droit (ses bords s'illuminent)
+      if (uEclairA.w > 0.0) {
+        vec3 ab = uEclairB.xyz - uEclairA.xyz;
+        float s = clamp(dot(p - uEclairA.xyz, ab) / max(dot(ab, ab), 1.0), 0.0, 1.0);
+        vec3 versEclair = uEclairA.xyz + ab * s - p;
+        float r = length(versEclair);
+        vec3 l = versEclair / max(r, 1.0);
+#ifdef ECLAIR_SIMPLE
+        // (le reflet du ciel sur la mer, flou : une épaisseur moyenne suffit)
+        float traverse = 6.0 * smoothstep(0.0, 400.0, r);
+#else
+        float traverse = epaisseurVersEclair(p, l) * extinctionParDensite * smoothstep(0.0, 400.0, r);
+#endif
+        float diffuse = 1.0 / (1.0 + 0.11 * traverse);
+        float droit = exp(-traverse) * phaseHG(dot(d, l), 0.6) * 4.0;
+        // (comme une lampe : la lumière baisse avec le carré de la distance, au-delà de
+        // quelques centaines de mètres)
+        float portee = r / uEclairB.w;
+        lum += vec3(0.75, 0.82, 1.0) * uEclairA.w / (1.0 + portee * portee) * (diffuse + droit) * 4.0;
       }
       // intégration qui conserve l'énergie (Hillaire 2015)
       float tr = exp(-sigma * ds);

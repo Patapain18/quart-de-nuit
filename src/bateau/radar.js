@@ -90,6 +90,30 @@ export class Radar {
 
   get milles() { return PORTEES[this.portee]; }
 
+  // La foudre est tombée sur le mât : le courant a fait sauter l'électronique ; le radar
+  // redémarre (duree : s)
+  redemarrer(duree = 25) {
+    this.redemarrage = duree;
+    this.intensites.fill(0);
+    this.ageEcran = 1;
+  }
+
+  dessinerRedemarrage() {
+    const g = this.cx;
+    g.fillStyle = '#05080b';
+    g.fillRect(0, 0, TAILLE, TAILLE);
+    // (les premières secondes, l'écran reste noir ; puis il compte)
+    if (this.redemarrage < 22) {
+      g.fillStyle = 'rgba(150, 215, 255, 0.85)';
+      g.font = `bold ${Math.round(TAILLE * 0.07)}px sans-serif`;
+      g.textAlign = 'center';
+      g.fillText('PRÉCHAUFFAGE', TAILLE / 2, TAILLE * 0.47);
+      g.font = `${Math.round(TAILLE * 0.06)}px sans-serif`;
+      g.fillText(`${Math.max(0, Math.ceil(this.redemarrage))} s`, TAILLE / 2, TAILLE * 0.58);
+    }
+    this.texture.needsUpdate = true;
+  }
+
   changerPortee(sens = 1) {
     this.portee = (this.portee + sens + PORTEES.length) % PORTEES.length;
     // (à la nouvelle échelle, les vieux échos n'ont plus de sens : on efface)
@@ -105,6 +129,18 @@ export class Radar {
   //     l'écho faiblit vers les bouts — la crête d'une vague scélérate) }
   // nuit : 0 → 1 (l'écran baisse son éclat)
   maj(dt, m, monde, nuit = 0) {
+    // (la foudre est tombée sur le mât : le radar redémarre — l'écran noir, puis le
+    // préchauffage du magnétron, puis l'antenne reprend ses tours)
+    if (this.redemarrage > 0) {
+      this.redemarrage -= dt;
+      this.ageEcran += dt;
+      if (this.ageEcran >= 0.25) {
+        this.ageEcran = 0;
+        this.dessinerRedemarrage();
+      }
+      this.materiau.emissiveIntensity = (1.1 - 0.6 * nuit) * (this.vacille ?? 1);
+      return;
+    }
     const R = this.milles * MILLE;
     const c = ECHOS / 2;
     const rayonEcran = ECHOS * 0.46;

@@ -399,7 +399,7 @@ async function enTournage(f) {
 }
 function uneImage(dt) {
   majEtat(dt);
-  if (!reglage.eclairs) monde.eclair.prochain = Math.max(monde.eclair.prochain, 5);
+  if (!reglage.eclairs) monde.foudre.retenir(5);
   if (variante === 'ancienne') {
     monde.etatTrombe = null;
     ancienne.maj(dt, etat, { temps: monde.temps + dt, directionVent: angleVers(meteo.directionVent), camera: monde.camera });
@@ -480,8 +480,8 @@ async function plancheSansPause(nom, { variantes = Object.keys(VARIANTES), situa
       regard.site = s.site ?? 0;
       reglage.eclairs = !s.sansEclairs;
       placerTrombe();
-      monde.eclair.flashs = [];
-      monde.eclair.prochain = 1e9;
+      monde.foudre.vider();
+      monde.foudre.retenir(1e9);
       // (un éclair au bon moment : il tombe juste avant la photo)
       const n = images;
       for (let k = 0; k < n; k++) {
@@ -489,7 +489,7 @@ async function plancheSansPause(nom, { variantes = Object.keys(VARIANTES), situa
           // (dans le nuage, derrière elle : elle se découpe sur la lueur)
           const c = monde.camera.position;
           const vers = new THREE.Vector3(etat.x - c.x, 0, etat.z - c.z).normalize();
-          monde.eclair.flashs.push({ centre: new THREE.Vector3(etat.x + vers.x * 600, monde.ciel.uniformsNuages.uBaseNuages.value + 350, etat.z + vers.z * 600), cle: 7, visible: false, debut: monde.temps + 1 / 60, force: 1.2, proche: true, eclaire: 0.35 });
+          monde.foudre.lancer({ type: 'nuage', x: etat.x + vers.x * 600, z: etat.z + vers.z * 600, eclats: 1, force: 1.2 });
         }
         uneImage(1 / 60);
         if (k % 20 === 19) await new Promise((r) => setTimeout(r, 0));
@@ -522,7 +522,7 @@ async function plancheSansPause(nom, { variantes = Object.keys(VARIANTES), situa
   reglage.vit = avant.vit;
   reglage.eclairs = avant.eclairs;
   Object.assign(regard, avant.regard);
-  monde.eclair.prochain = 2;
+  monde.foudre.liberer();
   placerTrombe();
   return envoyerCapture(nom, toile.toDataURL('image/jpeg', 0.9));
 }
@@ -535,12 +535,7 @@ function eclairDerriere(visible) {
   const c = monde.camera.position;
   const vers = new THREE.Vector3(etat.x - c.x, 0, etat.z - c.z).normalize();
   const cote = new THREE.Vector3(-vers.z, 0, vers.x).multiplyScalar((Math.random() - 0.5) * 900);
-  const centre = new THREE.Vector3(etat.x + vers.x * 500 + cote.x, monde.ciel.uniformsNuages.uBaseNuages.value + 300, etat.z + vers.z * 500 + cote.z);
-  const cle = Math.floor(Math.random() * 1e9);
-  const n = 2 + Math.floor(Math.random() * 2);
-  for (let i = 0; i < n; i++) {
-    monde.eclair.flashs.push({ centre, cle, visible, debut: monde.temps + 1 / 60 + i * (0.36 + Math.random() * 0.15), force: 1.0 + Math.random() * 0.5, proche: true, eclaire: 0.4 });
-  }
+  monde.foudre.lancer({ type: visible ? 'mer' : 'nuage', x: etat.x + vers.x * 500 + cote.x, z: etat.z + vers.z * 500 + cote.z, eclats: 2 + Math.floor(Math.random() * 2), force: 1.0 + Math.random() * 0.5 });
 }
 async function film(nom, options) {
   return enTournage(() => filmSansPause(nom, options));
@@ -758,8 +753,9 @@ async function filmer(liste) {
     montrerBateau(f.bateau ?? true);
     etat.age = f.age ?? 120;
     reglage.eclairs = f.eclairs ?? false;
-    monde.eclair.flashs = [];
-    monde.eclair.prochain = reglage.eclairs ? 3 : 1e9;
+    monde.foudre.vider();
+    if (reglage.eclairs) monde.foudre.liberer();
+    else monde.foudre.retenir(1e9);
     vivre(!!f.vitesseVie, f.vitesseVie ?? 1);
     const n = await film(f.nom, { secondes: f.secondes ?? 8, ips: f.ips ?? 30, eclairsA: f.eclairsA ?? [] });
     vivre(false);

@@ -116,6 +116,14 @@ const lisse = (a, b, x) => {
   return t * t * (3 - 2 * t);
 };
 
+// La couche de nuages : la hauteur de leur base et leur épaisseur (m). Par beau temps, des
+// cumulus à 1 350 m ; à l'orage, la base descend (650 m) et les tours montent (3,6 km de
+// nuage). Le ciel les dessine ainsi ; la foudre y prend ses éclairs.
+export function couchesNuages(meteo) {
+  const orage = meteo.orage ?? 0;
+  return { base: 1350 + (650 - 1350) * orage, epaisseur: 1700 + (3600 - 1700) * orage };
+}
+
 // Le front orageux vu d'ici (rendu/glsl/front.js le dessine) : d'où on le voit (azimut,
 // en radians, sens du compas), sa demi-largeur, la hauteur de ses sommets au-dessus de
 // l'horizon (radians) et sa visibilité. Ses sommets sont à 11 km d'altitude ; il est à

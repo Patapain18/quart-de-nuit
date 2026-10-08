@@ -1,0 +1,17 @@
+/* Atelier des éclairs : la carte vue d'en haut (le reste : l'atelier de la mer, celui de la
+   trombe et celui des grains) */
+#carte {
+  display: block;
+  width: 100%;
+  max-width: 256px;
+  aspect-ratio: 1;
+  margin: 0 auto;
+  border-radius: var(--rayon);
+  border: 1px solid var(--bordure);
+  background: #070d12;
+}
+
+#son[aria-pressed="true"] { opacity: 0.6; }
+
+.espace { margin-top: var(--espace-3); }
+#dernier dd { font-variant-numeric: tabular-nums; }

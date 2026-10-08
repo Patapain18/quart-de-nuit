@@ -140,6 +140,8 @@ uniform float uTemps;
 uniform float uHs;
 uniform float uEclair;
 uniform vec3 uDirEclair; // (vers l'éclair : sa lumière vient de là)
+uniform vec4 uEclairTrait; // le trait d'un éclair qui tombe : x, z de son pied (m), hauteur de la base des nuages (m), éclat
+uniform vec4 uEclairImpact; // là où il touche la mer (m), et son éclat
 uniform vec3 uCouleurFond;
 uniform vec3 uCouleurTranslucide;
 uniform float uForceEcume;
@@ -502,6 +504,28 @@ ${cascades.map((_, i) => `  p = texture(uPentes${i}, vSource / uGrille${i}.x);
       lumiereBord += e * max(dot(n, l), 0.0);
       eclats += e * eclat(n, v, l, max(a, 0.08)) * 1.6;
     }
+    // l'éclair qui tombe : la mer autour de son pied s'allume, d'un blanc bleuté (chaque ride
+    // tournée vers lui renvoie un éclat) ; et son trait se reflète dans les pentes tournées
+    // vers lui et vers nous — une colonne d'éclats sous lui, jusqu'au bateau. (Pour une
+    // lumière en forme de trait, l'éclat d'une ride vient du point du trait le plus proche
+    // du regard réfléchi : Karis, 2013)
+    if (uEclairImpact.w > 0.0) {
+      vec3 l;
+      float k = eclairement(uEclairImpact.xyz, 0.0, 2.0, l);
+      vec3 e = vec3(0.78, 0.84, 1.0) * uEclairImpact.w * k;
+      lumiereBord += e * max(dot(n, l), 0.0);
+      eclats += e * eclat(n, v, l, max(a, 0.08)) * 1.6;
+    }
+    if (uEclairTrait.w > 0.0) {
+      vec3 rr = reflect(-v, n);
+      vec3 A = vec3(uEclairTrait.x, 0.0, uEclairTrait.y) - vMonde;
+      vec3 AB = vec3(0.0, uEclairTrait.z, 0.0);
+      float rAB = dot(rr, AB);
+      float s = clamp((dot(rr, A) * rAB - dot(A, AB)) / max(dot(AB, AB) - rAB * rAB, 1e-3), 0.0, 1.0);
+      vec3 L = A + AB * s;
+      float dl = length(L);
+      eclats += vec3(0.8, 0.85, 1.0) * uEclairTrait.w * eclat(n, v, L / dl, max(a, 0.04)) * (400.0 / max(dl, 60.0));
+    }
     for (int i = 0; i < 4; i++) {
       if (uFeux[i].w <= 0.0) continue;
       vec3 l;
@@ -746,6 +770,8 @@ export class Eau {
       uHs: { value: 1 },
       uEclair: { value: 0 },
       uDirEclair: { value: new THREE.Vector3(0, 1, 0) },
+      uEclairTrait: { value: new THREE.Vector4() },
+      uEclairImpact: { value: new THREE.Vector4() },
       uCouleurFond: { value: new THREE.Vector3(0.0028, 0.0125, 0.024) },
       uCouleurTranslucide: { value: new THREE.Vector3(0.025, 0.16, 0.13) },
       uForceEcume: { value: 1 },

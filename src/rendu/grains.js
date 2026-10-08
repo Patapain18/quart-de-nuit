@@ -29,6 +29,7 @@ export class GrainsRendu {
       uRideauxSoleil: { value: new THREE.Vector3() },
       uRideauxDirSoleil: { value: new THREE.Vector3(0, 1, 0) },
       uRideauxEclair: { value: new THREE.Vector4() },
+      uRideauxEclairB: { value: new THREE.Vector4() },
       uGrainsVent: { value: v4(N_GRAINS) },
       uGrainsDir: { value: v4(N_GRAINS) },
       uGrainsN: { value: 0 },
@@ -50,7 +51,8 @@ export class GrainsRendu {
   }
 
   // grains : monde/grains.js (ou null) ; base : la base des nuages (m) ; ecl : l'éclairage
-  // (monde/meteo.js) ; eclair : { centre, intensite } (l'éclair du moment)
+  // (monde/meteo.js) ; eclair : { trait: [a, b] (le trait qui traverse la pluie, m),
+  // intensite } (l'éclair du moment)
   maj(dt, grains, camera, { base, temps, ecl, eclair }) {
     const u = this.uniforms;
     const cx = camera.position.x;
@@ -66,8 +68,11 @@ export class GrainsRendu {
     u.uRideauxLumiere.value.set(a[0], a[1], a[2]).multiplyScalar(0.3 / Math.PI);
     u.uRideauxSoleil.value.fromArray(ecl.soleil).multiplyScalar(0.3);
     u.uRideauxDirSoleil.value.fromArray(ecl.dirSoleil);
-    if (eclair?.centre && eclair.intensite > 0) u.uRideauxEclair.value.set(eclair.centre.x, eclair.centre.y, eclair.centre.z, eclair.intensite);
-    else u.uRideauxEclair.value.w = 0;
+    if (eclair?.trait && eclair.intensite > 0) {
+      const [a, b] = eclair.trait;
+      u.uRideauxEclair.value.set(a.x, a.y, a.z, eclair.intensite);
+      u.uRideauxEclairB.value.set(b.x, b.y, b.z, 0);
+    } else u.uRideauxEclair.value.w = 0;
 
     // les colonnes de pluie et les rafales, des plus proches aux plus lointaines
     const colonnes = this.colonnes;

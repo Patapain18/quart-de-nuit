@@ -26,7 +26,8 @@ export const UNIFORMS_GRAINS = {
   uRideauxLumiere: { value: null }, // la lumière du ciel sur la pluie
   uRideauxSoleil: { value: null }, // le soleil qui arrive jusqu'à elle
   uRideauxDirSoleil: { value: null },
-  uRideauxEclair: { value: null }, // l'éclair : position (m), intensité
+  uRideauxEclair: { value: null }, // l'éclair : le début de son trait (m), intensité…
+  uRideauxEclairB: { value: null }, // … et sa fin (m)
   uGrainsVent: { value: null }, // [x, z du cœur dense, rayon (m), intensité]
   uGrainsDir: { value: null }, // [direction de sa route x, z, 0, 0]
   uGrainsN: { value: 0 },
@@ -43,6 +44,7 @@ uniform vec3 uRideauxLumiere;
 uniform vec3 uRideauxSoleil;
 uniform vec3 uRideauxDirSoleil;
 uniform vec4 uRideauxEclair;
+uniform vec4 uRideauxEclairB;
 uniform vec4 uGrainsVent[${N_GRAINS}];
 uniform vec4 uGrainsDir[${N_GRAINS}];
 uniform int uGrainsN;
@@ -126,7 +128,12 @@ vec4 rideaux(vec3 o, vec3 d, float sMax, float brume, vec3 couleurBrume) {
     // l'ombre : plus claire en bas, où la pluie rejaillit, sombre en haut) ; le soleil bas
     // derrière elle (la pluie s'illumine à contre-jour) ; l'éclair tout près
     vec3 L = uRideauxLumiere * mix(1.5, 0.35, h) + soleil;
-    if (uRideauxEclair.w > 0.0) L += vec3(0.75, 0.82, 1.0) * uRideauxEclair.w * exp(-length(q - uRideauxEclair.xyz) / 1400.0) * 1.6;
+    // (l'éclair : la pluie s'allume tout le long de son trait, qui la traverse)
+    if (uRideauxEclair.w > 0.0) {
+      vec3 ab = uRideauxEclairB.xyz - uRideauxEclair.xyz;
+      float se = clamp(dot(q - uRideauxEclair.xyz, ab) / max(dot(ab, ab), 1.0), 0.0, 1.0);
+      L += vec3(0.75, 0.82, 1.0) * uRideauxEclair.w * exp(-length(q - uRideauxEclair.xyz - ab * se) / 1400.0) * 1.6;
+    }
     // au loin, dans la brume (un peu moins que la mer : le rideau monte au-dessus d'elle)
     L = mix(L, couleurBrume, 1.0 - exp(-sp * brume * 0.7));
     float tr = exp(-tau);

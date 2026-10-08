@@ -16,6 +16,7 @@ import { Monde3D, QUALITES } from './rendu/monde3d.js';
 import { AMBIANCES, etatMeteo } from './monde/meteo.js';
 import { Vent } from './monde/vent.js';
 import { Grains } from './monde/grains.js';
+import { Foudre, REGLAGES_FOUDRE } from './monde/foudre.js';
 import { PhysiqueVoilier } from './physique/voilier.js';
 import { reglerAutomatiquement, etatReglage } from './physique/regleur.js';
 import { Commandes, TOUCHES } from './jeu/commandes.js';
@@ -58,6 +59,10 @@ const grainsActifs = () => nuit?.grains ?? grainsDuDecor;
 const _grains = new THREE.Vector3();
 // (ce que les grains font là où est le bateau : la pluie, leur vent, l'ombre de leur nuage…)
 let ici = grainsDuDecor.mesurer(0, 0, {});
+// la foudre (monde/foudre.js) : elle part des nuages des grains — la nuit, ceux de la nuit ;
+// le jour et sur l'écran d'accueil, ceux du décor
+const foudreDuDecor = new Foudre(17);
+const foudreActive = () => nuit?.foudre ?? foudreDuDecor;
 const commandes = new Commandes(canvas);
 const audio = new Audio();
 // (les vrais enregistrements se chargent en arrière-plan dès maintenant ; le son ne
@@ -81,9 +86,6 @@ let nuit = null; // la nuit de tempête
 let journeeFaite = null; // la journée, une fois finie (pour le carnet : ses réflexes, son journal)
 let options = lireOptions();
 let difficulte = options.difficulte;
-monde.surEclair = (distance, versLaMer) => audio.tonnerre(distance, versLaMer ? 1 : 0.7);
-// (les éclairs du front orageux, au loin : un grondement sourd, à peine)
-monde.surEclairLointain = (distance) => audio.tonnerre(distance, 0.3);
 
 function mettreALeau() {
   physique.placer(0, 0, (meteo.directionVent + 60) % 360, monde.houle);
@@ -563,6 +565,7 @@ function simuler(dt) {
     grainsDuDecor.renfort = etat.mode === 'accueil' ? 2 : 0;
     grainsDuDecor.maj(dt, meteo, p.x, p.z, physique.vitesse.x, physique.vitesse.z);
     ici = grainsDuDecor.mesurer(p.x, p.z, ici);
+    foudreDuDecor.maj(dt, { meteo, grains: grainsDuDecor, x: p.x, z: p.z, ecoute: monde.camera.position });
   } else if (nuit.ici) ici = nuit.ici;
   // le vent : le vent du moment, et ses risées (elles vivent autour du bateau ; on les voit
   // venir sur l'eau ; sous un grain, il y en a bien plus), et l'air froid qui tombe des
@@ -645,8 +648,10 @@ function simuler(dt) {
   bouees.maj(journee?.bouees, monde.temps, monde.ecl.nuit);
   if (enJeu) surveillerLaCote(dt);
 
-  // (les lumières du bord vacillent quand l'étrange arrive)
-  const vacille = facteurVacille(dt);
+  // (les lumières du bord vacillent quand l'étrange arrive, ou quand la foudre tombe tout
+  // près ; sur le mât, les écrans s'éteignent quelques secondes)
+  etat.coupure = Math.max(0, (etat.coupure ?? 0) - dt);
+  const vacille = etat.coupure > 0 ? 0 : facteurVacille(dt);
   bateau.radar.vacille = vacille;
   // le modèle 3D suit la physique
   physique.origine(_origine);
@@ -751,6 +756,8 @@ function simuler(dt) {
   monde.etatCargo = nuit?.cargo ?? null;
   monde.etatTrombe = nuit?.trombe ?? null;
   monde.etatGrains = grainsActifs();
+  monde.etatFoudre = foudreActive();
+  entendreLaFoudre(foudreActive(), dedans);
 
   // le son du bord
   // (le bateau secoué : la vitesse de rotation qui change d'un coup, lissée ; le vérin du
@@ -788,6 +795,8 @@ function simuler(dt) {
     // la vague scélérate : on l'entend gronder dès un kilomètre ; sa crête rugit en s'écroulant
     ...sonScelerate(),
     tension: nuit?.peur?.tension ?? 0,
+    // (le feu de Saint-Elme : l'air chargé grésille en tête de mât)
+    saintElme: dedans ? 0 : THREE.MathUtils.smoothstep(foudreActive().champ, 0.55, 0.85),
   });
   etat.attenteClaque = Math.max(0, etat.attenteClaque - dt);
   if (m.impactEtrave > 0.05 && etat.attenteClaque === 0) {
@@ -978,6 +987,8 @@ function contexteNuit(dt) {
       zone: marin.zone,
     },
     evenements: etat.evenements,
+    // (là où l'on entend : le tonnerre arrive d'autant plus tard que l'éclair est loin d'ici)
+    ecoute: monde.camera.position,
   };
 }
 
@@ -1218,6 +1229,51 @@ function facteurVacille(dt) {
     etat.valeurVacille = Math.random() < 0.4 ? 0.05 + 0.3 * Math.random() : 0.75 + 0.25 * Math.random();
   }
   return etat.valeurVacille;
+}
+
+// La foudre (monde/foudre.js) : ce qu'on en entend et ce qu'on en sent. La radio claque à
+// chaque éclair, même lointain ; le tonnerre arrive quand son bruit a fait le chemin (trois
+// secondes par kilomètre), de là où l'éclair est passé au plus près — à droite ou à gauche
+// de là où l'on regarde ; une frappe tout près éblouit, assourdit, fait sauter les écrans.
+// (La nuit en tire le reste : le journal, Jos, le pilote qui disjoncte.)
+function entendreLaFoudre(foudre, dedans) {
+  // (une seule fois chaque événement : en pause, la foudre ne bouge plus, ses derniers
+  // événements restent là)
+  if (foudre.t === etat.foudreLue) return;
+  etat.foudreLue = foudre.t;
+  for (const ev of foudre.evenements) {
+    if (ev.type === 'eclair') {
+      const f = 1 - THREE.MathUtils.smoothstep(ev.distance, 1500, REGLAGES_FOUDRE.parasites);
+      if (f > 0.03) audio.parasiteEclair?.(f);
+    } else if (ev.type === 'tonnerre') {
+      const cam = monde.camera;
+      const dx = ev.x - cam.position.x;
+      const dz = ev.z - cam.position.z;
+      const droite = _droite.setFromMatrixColumn(cam.matrixWorld, 0);
+      const pan = THREE.MathUtils.clamp((dx * droite.x + dz * droite.z) / Math.max(1, Math.hypot(dx, dz)), -1, 1) * 0.85;
+      audio.tonnerre({ distance: ev.distance, duree: ev.duree, force: ev.force, pan, claque: ev.claque });
+    } else if (ev.type === 'frappe') frappeProche(ev, dedans);
+  }
+}
+const _droite = new THREE.Vector3();
+
+// La foudre tombe tout près (ou sur le mât) : le claquement en même temps que l'éclair, le
+// souffle qui secoue, les oreilles qui sifflent (le monde s'étouffe), les écrans qui
+// hésitent ; sur le mât, ils s'éteignent, et le radar redémarre
+function frappeProche(ev, dedans) {
+  const pres = ev.surLeMat ? 1 : 1 - THREE.MathUtils.smoothstep(ev.distance, 60, REGLAGES_FOUDRE.proche);
+  audio.claquementFoudre?.(pres, dedans);
+  if (pres > 0.35) {
+    audio.etouffer?.(1.5 + 3 * pres, 0.45 + 0.4 * pres);
+    audio.acouphene?.(3 + 5 * pres, pres);
+  }
+  secousse(0.15 + 0.5 * pres);
+  etat.vacille = Math.max(etat.vacille ?? 0, 0.5 + 0.8 * pres);
+  if (ev.surLeMat) {
+    etat.coupure = 2.5;
+    bateau.radar.redemarrer?.(25);
+    afficherMessage('La foudre est tombée sur le mât !');
+  } else if (pres > 0.5) afficherMessage(`La foudre est tombée à ${Math.max(10, Math.round(ev.distance / 10) * 10)} m !`);
 }
 
 // D'où vient une déferlante, vue du bateau (« par le travers tribord »…)

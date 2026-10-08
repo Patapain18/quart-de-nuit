@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Atelier des éclairs · Quart de nuit</title>
+  <meta name="description" content="La foudre part des nuages d'orage : un grain orageux à la distance voulue, des éclairs dans le nuage, jusqu'à la mer, en araignée, tout près ou sur le mât ; le tonnerre qu'on entend arriver, le feu de Saint-Elme.">
+  <link rel="stylesheet" href="./src/atelier-mer.css">
+  <link rel="stylesheet" href="./src/atelier-trombe.css">
+  <link rel="stylesheet" href="./src/atelier-grains.css">
+  <link rel="stylesheet" href="./src/atelier-eclairs.css">
+</head>
+<body>
+  <canvas id="scene" aria-label="La mer, le ciel d'orage et ses éclairs, vus depuis le voilier"></canvas>
+  <p id="legende" aria-live="polite"></p>
+  <aside id="panneau" aria-label="Réglages de l'atelier">
+    <header>
+      <h1>Atelier des éclairs</h1>
+      <button type="button" id="replier" aria-expanded="true" aria-controls="contenu">Replier</button>
+    </header>
+    <div id="contenu">
+      <section aria-labelledby="titre-eclairs">
+        <h2 id="titre-eclairs">Un éclair, là où l'on regarde</h2>
+        <div class="grille-boutons">
+          <button type="button" data-eclair="nuage">Dans le nuage</button>
+          <button type="button" data-eclair="mer">Jusqu'à la mer</button>
+          <button type="button" data-eclair="araignee">En araignée</button>
+          <button type="button" data-eclair="proche">Tout près</button>
+          <button type="button" data-eclair="mat">Sur le mât</button>
+        </div>
+        <div class="curseur espace">
+          <label for="lancer-a">À quelle distance</label><output for="lancer-a" id="lancer-a-texte"></output>
+          <input type="range" id="lancer-a" min="300" max="12000" step="100" value="2000">
+        </div>
+        <label class="case"><input type="checkbox" id="naturels" checked> Ceux des nuages d'orage, tout seuls</label>
+        <label class="case"><input type="checkbox" id="saint-elme"> Le feu de Saint-Elme (l'air chargé)</label>
+        <div class="grille-boutons espace">
+          <button type="button" id="temps-pause" aria-pressed="false">Le temps s'arrête</button>
+          <button type="button" id="temps-ralenti" aria-pressed="false">Au ralenti (× 0,1)</button>
+          <button type="button" id="temps-x1" aria-pressed="true">Il passe</button>
+        </div>
+        <button type="button" id="son" class="espace">Entendre (le tonnerre, la radio)</button>
+      </section>
+      <section aria-labelledby="titre-dernier">
+        <h2 id="titre-dernier">Le dernier éclair</h2>
+        <dl id="dernier"></dl>
+        <p class="aide">Le tonnerre part de là où l'éclair est passé au plus près, et va à 340 m par seconde : trois secondes par kilomètre.</p>
+      </section>
+      <section aria-labelledby="titre-grain">
+        <h2 id="titre-grain">Le nuage d'orage</h2>
+        <div class="grille-boutons">
+          <button type="button" id="poser">Un grain posé là</button>
+          <button type="button" id="venir">Un grain qui passe sur nous</button>
+          <button type="button" id="aucun">Aucun grain</button>
+        </div>
+        <div class="curseur espace">
+          <label for="distance">À quelle distance</label><output for="distance" id="distance-texte"></output>
+          <input type="range" id="distance" min="1000" max="14000" step="250" value="4000">
+        </div>
+        <div class="curseur">
+          <label for="orage">Combien il est orageux</label><output for="orage" id="orage-texte"></output>
+          <input type="range" id="orage" min="0" max="1" step="0.05" value="1">
+        </div>
+        <label class="case"><input type="checkbox" id="alentour"> Et les grains d'alentour, comme dans la nuit</label>
+        <p class="aide" id="resume" aria-live="polite"></p>
+      </section>
+      <section aria-labelledby="titre-carte">
+        <h2 id="titre-carte">Vue d'en haut</h2>
+        <canvas id="carte" width="256" height="256" aria-label="La carte des nuages d'orage autour du bateau, et les éclairs de la dernière minute"></canvas>
+        <p class="aide">32 km de côté ; le bateau au milieu. Les nuages d'orage (plus clairs : plus chargés) ; les éclairs de la dernière minute : blancs jusqu'à la mer, bleus dans le nuage, violets en araignée.</p>
+      </section>
+      <section aria-labelledby="titre-moment">
+        <h2 id="titre-moment">Le moment</h2>
+        <div id="moments" class="grille-boutons"></div>
+      </section>
+      <section aria-labelledby="titre-vue">
+        <h2 id="titre-vue">Point de vue</h2>
+        <div id="vues" class="grille-boutons"></div>
+        <p class="aide">Glisse sur l'image pour regarder autour de toi.</p>
+      </section>
+      <section aria-labelledby="titre-mesures">
+        <h2 id="titre-mesures">Mesures</h2>
+        <dl id="mesures"></dl>
+        <div class="grille-boutons">
+          <button type="button" id="mesurer">Mesurer la carte graphique</button>
+          <button type="button" id="photo">Photo</button>
+        </div>
+        <p id="etat" class="aide" role="status"></p>
+      </section>
+    </div>
+  </aside>
+  <script type="module" src="./src/atelier-eclairs.js"></script>
+</body>
+</html>

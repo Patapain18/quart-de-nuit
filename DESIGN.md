@@ -852,7 +852,7 @@ l'annoncer. Son choix, dans cet ordre :
 
 27. ✅ **Les grains**, qui existent vraiment, et dont tout dépend.
 28. ✅ **Les rafales qu'on voit venir** : une tache sombre qui court sur l'eau, la risée.
-29. ⬜ **Les éclairs qui partent des nuages d'orage**, et plus de n'importe où.
+29. ✅ **Les éclairs qui partent des nuages d'orage**, et plus de n'importe où.
 30. ⬜ **Le baromètre qui annonce le temps**, au lieu de le suivre.
 31. ⬜ **La bête, née d'un des grains** qu'on a vus arriver au radar.
 
@@ -1031,6 +1031,102 @@ l'annoncer. Son choix, dans cet ordre :
     (le vent, la gîte, la vitesse, ce qu'on entend) ; la carte vue d'en haut ;
     `__risees.planche()`, `film()`, `couts()`, `statistiques()`).
     Images : `docs/etape28-les-risees.jpg`, `docs/etape28-une-risee-arrive.jpg`.
+
+29. ✅ **Les éclairs** (`src/monde/foudre.js`, `src/rendu/eclairs.js`, `src/rendu/saint-elme.js`,
+    `atelier-eclairs.html`) — Les éclairs étaient tirés au hasard autour de la caméra, entre
+    1 et 11 km, même là où le ciel n'avait pas de nuage d'orage ; seuls ceux des grains et
+    de la bête venaient d'un vrai nuage. Maintenant, ils partent tous des nuages d'orage, et
+    de nulle part ailleurs :
+    - *les grains orageux* : chacun se charge et se décharge à son rythme, jusqu'à huit
+      éclairs par minute pour le plus fort (orage 1, force 0,9), quatre fois moins pour un
+      grain deux fois moins électrique (comme les vrais : le nombre d'éclairs monte très
+      vite avec la force d'un orage) ; ses premiers éclairs quand sa tour a fini de monter,
+      les derniers un peu avant la fin de sa pluie ; et quand l'orage s'en va (l'accalmie),
+      ceux qui restent n'en font plus guère ;
+    - *le nuage de la bête*, au crépuscule ;
+    - *le front*, au loin, au coucher du soleil : ses nuages s'allument sur l'horizon, sans
+      tonnerre (à 25-40 km, trop loin pour l'entendre : les « éclairs de chaleur ») ;
+    - *un décor sans grains* (les ateliers) : des cellules d'orage invisibles, qui existent
+      quelque part et avancent avec le vent — les éclairs viennent toujours des mêmes
+      endroits.
+    Trois sortes, comme les vrais : *dans le nuage* (six sur dix) : on ne voit pas le trait,
+    le nuage s'allume de l'intérieur tout le long de l'éclair ; *jusqu'à la mer* (trois sur
+    dix) : sous le cœur de pluie, surtout sous son avant (là où l'air chaud monte), et
+    parfois loin devant le grain, sous son enclume — la foudre tombe avant la pluie — ; un à
+    quatre éclats sur le même trait, le premier avec toutes ses branches, les suivants le
+    tronc seul ; *en araignée* (un sur dix) : un trait qui court sous la base des nuages sur
+    3 à 10 km, en poussant ses branches devant lui pendant un quart de seconde, et qui finit
+    une fois sur trois dans la mer.
+    **Ce qui en dépend** :
+    - *le trait* (`rendu/eclairs.js`) : une marche au hasard qui garde le cap sur son point
+      d'impact, brisée encore à trois échelles (un vrai éclair est tortueux à toutes les
+      échelles : de près, chaque morceau droit se révèle brisé) ; ses branches partent de
+      côté en descendant, et s'arrêtent en l'air ; on ne le voit pas dans le nuage (il sort
+      de sa base) ; la brume et la pluie traversée entre lui et nous l'effacent (derrière un
+      rideau, il n'en reste qu'une lueur) ; plus il est près, plus il est épais (de 1,6 à 9
+      pixels) ; il reste un instant lumineux entre deux éclats ;
+    - *le nuage* s'allume de l'intérieur, le long du trajet de l'éclair : la lumière vient
+      du point du trajet le plus proche, baisse comme celle d'une lampe (avec le carré de la
+      distance), et se diffuse dans le nuage (après des dizaines de rebonds dans les
+      gouttes, il en ressort encore une bonne part : le nuage s'allume comme un abat-jour ;
+      les tours épaisses entre lui et nous font écran) ;
+    - *la pluie* s'allume le long du trait qui la traverse ; *la mer* : le trait s'y reflète
+      en une colonne d'éclats jusqu'au bateau (pour une lumière en forme de trait, l'éclat
+      de chaque ride vient du point du trait le plus proche du regard réfléchi : Karis,
+      2013), et son pied l'allume tout autour ; *le bateau* est éclairé de son côté ;
+    - *le son* : le tonnerre part du point du trait le plus proche de nous (trois secondes
+      par kilomètre) et roule tant qu'arrive le son des parties lointaines ; il vient de la
+      bonne direction (à droite, à gauche de là où l'on regarde) ; tout près, il claque ; à
+      plus de 15 km, on ne l'entend plus dans la tempête ; il voyage dans le temps du jeu
+      (en pause, il attend) ; *la radio* crépite à chaque éclair, jusqu'à 25 km ;
+    - *l'air chargé* : sous le cœur d'un nuage d'orage (et sous son enclume, devant lui),
+      l'électricité de l'air monte ; dans le noir, le *feu de Saint-Elme* s'allume en tête
+      de mât : une lueur violette, des aigrettes qui tremblent, un grésillement
+      (`rendu/saint-elme.js`) ;
+    - *la foudre près du bateau* : le mât, seul point haut à des milles, attire celle qui
+      tombe près de lui. Un éclair choisit son point d'impact à la fin de sa descente, à sa
+      « distance d'amorçage » (90 m pour 30 000 ampères) : tout ce qui tomberait dans ce
+      rayon autour du mât tombe sur lui (30 à 70 m pour un mât de 14,5 m, selon l'éclair).
+      Une frappe à moins de 600 m éblouit, claque en même temps que l'éclair, assourdit (le
+      monde s'étouffe, les oreilles sifflent), secoue, fait hésiter les écrans ; sur le mât,
+      les écrans s'éteignent, le radar redémarre (25 s de préchauffage) et le pilote
+      disjoncte (à réarmer au tableau, comme quand il lâche) ;
+    - *Jos* : le soir, il annonce les éclairs muets du front ; la nuit, au premier éclair à
+      quelques kilomètres, il apprend à compter (« trois secondes, un kilomètre ; s'il se
+      rapproche d'un éclair à l'autre, l'orage vient sur toi ») ; d'un grain plein
+      d'éclairs : « ne touche ni au mât ni aux haubans » ; il explique le feu de
+      Saint-Elme ; il s'inquiète d'une frappe tout près ; et la foudre sur le mât : « il l'a
+      menée jusqu'à la quille, c'est fait pour ça » ;
+    - *le journal et le bilan* : les frappes proches, le feu de Saint-Elme, la foudre sur le
+      mât ; au bilan, le nombre d'éclairs et le plus proche ;
+    - *les marins automatiques* (l'atelier de la tempête, `test-nuit`) vivent la même
+      foudre : quand elle fait disjoncter le pilote, ils le réarment.
+    **Mesuré** (`npm run test-eclairs`) : un grain d'orage au plus fort lance 7,8 éclairs par
+    minute (8,1 prévus), tous de son nuage ; 59 % dans le nuage, 29 % jusqu'à la mer, 12 % en
+    araignée ; la moitié de la foudre tombe à moins de 0,45 rayon de l'avant de son cœur,
+    8 % loin devant lui ; jamais deux éclats à moins de 0,36 s ; sans grain orageux, pas un
+    éclair ; un grain qui naît : son premier éclair à 92 s (il se forme en 90 s) ; le
+    tonnerre arrive à trois secondes par kilomètre du point le plus proche ; plus de
+    tonnerre au-delà de 15 km ; sous un grain posé à 250 m, en deux heures : 336 éclairs
+    jusqu'à la mer, aucun dans le rayon où le mât l'aurait attiré, 7 sur le mât. Une nuit,
+    le bateau immobile : 1,6 éclair par minute au crépuscule (et quinze dans le front, au
+    loin), 7,6 quand le vent monte, 10,7 au cœur de la tempête, 3,1 à l'accalmie ; le feu de
+    Saint-Elme, 2 min 20. Cent passages du grain le plus fort : la foudre tombe à moins de
+    600 m 89 fois, à moins de 300 m 55 fois, sur le mât 4 fois. La foudre, 1 µs par image.
+    **Ce que ça coûte** : 1,5 ms de plus par image (sur 6,4), le temps d'un éclair : les
+    nuages allumés de l'intérieur, et le cube des reflets redessiné en entier (pour ne pas
+    revoir la couture du 8 octobre). L'épaisseur traversée vers l'éclair se mesure en trois
+    pas, sans le détail ; dans le reflet, une épaisseur moyenne suffit (la première version
+    coûtait 3,6 ms).
+    **Les outils** : l'atelier des éclairs (`atelier-eclairs.html` : six moments, de
+    l'après-midi d'orage au plus fort de la nuit ; un grain orageux posé à la distance
+    voulue, ou qui passe sur nous ; un éclair là où l'on regarde — dans le nuage, jusqu'à la
+    mer, en araignée, tout près, sur le mât ; le feu de Saint-Elme ; le temps ralenti
+    (× 0,1) ; le dernier éclair et son tonnerre, qu'on compte ; la carte vue d'en haut, avec
+    les nuages d'orage et les éclairs de la dernière minute ; cinq points de vue, dont la
+    tête de mât ; le son, le tonnerre et la radio ; `__eclairs.planche()`, `film()`,
+    `figer()` (un éclair figé à son plus fort), `couts()`).
+    Images : `docs/etape29-les-eclairs.jpg`.
 
 ## 4. Pistes graphiques notées pour plus tard
 
