@@ -34,6 +34,36 @@ export const REGLAGES_GRAINS = {
   bondPression: 2.5, // hPa : le bond du baromètre sous un grain de force 1, quand arrive sa rafale
 };
 
+// Le grain qui porte une trombe (celui de la bête : jeu/nuit.js). Pas un grain comme les
+// autres : il traîne. Il avance moins vite que les autres, droit sous le vent (eux dérivent à
+// sa droite) : il se nourrit de l'air chaud qu'il aspire devant lui, et ses nouvelles tours
+// poussent à l'arrière des anciennes — les orages qui font des trombes sont souvent de ceux-là.
+// Elle naît sous son avant, là où l'air chaud monte dans le nuage, et avance avec lui ; sa
+// pluie s'enroule autour d'elle (le « crochet » que montrent les radars)
+export const PORTEUR = {
+  vitesse: 8, // m/s (les autres : 80 % du vent, 10 à 12 m/s au coucher du soleil)
+  derive: 0, // ° à droite du vent (les autres : 10°)
+  avant: 1.05, // la trombe : à 1,05 rayon devant son centre (son cœur dense est à 0,25)…
+  cote: 0.55, // … et à moins de 0,55 rayon de son axe, d'un côté ou de l'autre
+  // (son air froid s'étale derrière lui et sur ses côtés, mais guère devant : devant lui,
+  // l'air chaud monte dans son nuage. Le bord de sa rafale passe à 0,85 rayon devant son
+  // cœur — là où naît sa trombe, entre l'air froid qui tombe et l'air chaud qui monte —, au
+  // lieu de 1,9 pour les autres grains)
+  bord: 0.85,
+};
+// (le crochet : une bande de pluie qui part du flanc droit du cœur du grain, derrière elle,
+// s'écarte sur sa droite et s'enroule devant elle — dans le sens où elle tourne, comme un
+// « 6 » dont elle occupe la boucle, au sec. Des paquets de pluie : a, devant elle (m), b, à
+// sa droite (m), s, leur taille (m), w, leur pluie)
+const CROCHET = [
+  { a: -560, b: 160, s: 200, w: 1 },
+  { a: -360, b: 330, s: 170, w: 1.1 },
+  { a: -110, b: 390, s: 150, w: 1.05 },
+  { a: 150, b: 340, s: 135, w: 1 },
+  { a: 330, b: 170, s: 120, w: 0.9 },
+  { a: 370, b: -60, s: 100, w: 0.7 },
+];
+
 const lisse = (a, b, x) => {
   const t = Math.min(1, Math.max(0, (x - a) / (b - a)));
   return t * t * (3 - 2 * t);
@@ -48,6 +78,41 @@ export function activiteDesGrains(meteo) {
 // La force d'un grain à son âge (0 → 1) : il se forme, vit, puis se dissipe
 export function vieDuGrain(g) {
   return lisse(0, g.naissance, g.age) * (1 - lisse(g.duree - REGLAGES_GRAINS.mort, g.duree, g.age));
+}
+
+// Où est le bord de la rafale d'un grain (m, depuis son cœur dense), dans cette direction
+// (devant : +1 devant lui, −1 derrière) : loin devant lui, plus près derrière — sauf pour un
+// porteur (PORTEUR.bord)
+export function bordDeLaRafale(g, devant) {
+  const loin = g.porteur ? PORTEUR.bord : 1.9;
+  return g.rayon * (1.05 + (loin - 1.05) * (0.5 + 0.5 * devant));
+}
+
+// Les paquets de pluie du crochet, dans le monde : [{ x, z, s, w, rideau }] — rideau : on le
+// dessine aussi en rideau de pluie (rendu/grains.js), sauf ceux qui passent devant elle : ils
+// la cacheraient à ceux qu'elle vient chercher (le radar, lui, les voit tous)
+const _paquets = CROCHET.map(() => ({}));
+export function paquetsDuCrochet(c) {
+  CROCHET.forEach((m, k) => Object.assign(_paquets[k], {
+    x: c.x + m.a * c.ux - m.b * c.uz, z: c.z + m.a * c.uz + m.b * c.ux, s: m.s, w: m.w, rideau: m.a < 100, a: m.a,
+  }));
+  return _paquets;
+}
+
+// La pluie du crochet au point (x, z) (sans la force du grain) ; c : { x, z (la trombe),
+// ux, uz (sa route) }
+export function pluieDuCrochet(c, x, z) {
+  const dx = x - c.x;
+  const dz = z - c.z;
+  if (dx * dx + dz * dz > 1100 * 1100) return 0;
+  let p = 0;
+  for (const m of CROCHET) {
+    // (devant : ux, uz ; sa droite : −uz, ux)
+    const px = c.x + m.a * c.ux - m.b * c.uz;
+    const pz = c.z + m.a * c.uz + m.b * c.ux;
+    p += m.w * Math.exp(-((x - px) ** 2 + (z - pz) ** 2) / (m.s * m.s));
+  }
+  return p;
 }
 
 export class Grains {
@@ -86,13 +151,16 @@ export class Grains {
       this.peupler(meteo, x, z, vbx, vbz);
       this.peuple = true;
     }
-    // (le vent tourne doucement : les grains suivent en une minute environ)
+    // (le vent tourne doucement : les grains suivent en une minute environ — sauf celui qui
+    // a sa propre route : celui qui porte une trombe)
     const k = Math.min(1, dt / 60);
     for (const g of this.liste) {
-      g.vx += (this.ux * this.vitesse - g.vx) * k;
-      g.vz += (this.uz * this.vitesse - g.vz) * k;
-      g.x += g.vx * dt;
-      g.z += g.vz * dt;
+      g.vx += ((g.route ? g.route.x : this.ux * this.vitesse) - g.vx) * k;
+      g.vz += ((g.route ? g.route.z : this.uz * this.vitesse) - g.vz) * k;
+      // (glisse : un petit écart à sa route, sans qu'il tourne — jeu/nuit.js s'en sert pour
+      // amener le grain de la bête là où elle doit naître)
+      g.x += (g.vx + (g.glisse?.x ?? 0)) * dt;
+      g.z += (g.vz + (g.glisse?.z ?? 0)) * dt;
       g.age += dt;
     }
     const portee = REGLAGES_GRAINS.portee * 1.3;
@@ -185,6 +253,36 @@ export class Grains {
     });
   }
 
+  // Un grain qui porte une trombe (PORTEUR) : (x, z) là où elle est, sous son avant ; (ux,
+  // uz) sa route ; cote : où elle est sur son avant (−1 → 1, de sa gauche à sa droite). Il
+  // est déjà formé (âge), et vit jusqu'à « duree »
+  porteur({ x, z, ux, uz, cote = 0, force = 0.6, orage = 1, age = 150, duree = 700 }) {
+    const P = PORTEUR;
+    const R = 650 + force * 450;
+    const b = cote * P.cote;
+    const g = this.creer({
+      x: x - (P.avant * ux - b * uz) * R,
+      z: z - (P.avant * uz + b * ux) * R,
+      rayon: R, force, orage, duree, age, prevu: true,
+    });
+    g.vx = ux * P.vitesse;
+    g.vz = uz * P.vitesse;
+    g.route = { x: g.vx, z: g.vz };
+    g.porteur = true;
+    return g;
+  }
+
+  // Un point de l'avant d'un grain (là où naît la trombe d'un porteur) : b, en rayons, de sa
+  // gauche (−) à sa droite (+)
+  avant(g, b = 0, sortie = {}) {
+    const v = Math.hypot(g.vx, g.vz) || 1;
+    const ux = g.vx / v;
+    const uz = g.vz / v;
+    sortie.x = g.x + (PORTEUR.avant * ux - b * uz) * g.rayon;
+    sortie.z = g.z + (PORTEUR.avant * uz + b * ux) * g.rayon;
+    return sortie;
+  }
+
   creer({ x, z, rayon, force, orage, duree, age = 0, naissance = REGLAGES_GRAINS.naissance, prevu = false }) {
     const h = () => this.hasard();
     const g = {
@@ -236,6 +334,9 @@ export class Grains {
       this.noyau(g, n, q);
       p += n.w * Math.exp(-((x - q.x) ** 2 + (z - q.z) ** 2) / (q.s * q.s));
     }
+    // (sous l'avant d'un porteur, la pluie qui s'enroule autour de sa trombe)
+    const c = g.crochet;
+    if (c && c.force > 0) p += c.force * pluieDuCrochet(c, x, z);
     return I * p;
   }
 
@@ -270,7 +371,7 @@ export class Grains {
     if (r > R * 2.4) return 0;
     const v = Math.hypot(g.vx, g.vz) || 1;
     const devant = r > 1 ? (dx * g.vx + dz * g.vz) / (r * v) : 0; // +1 : devant lui, −1 : derrière
-    const bord = R * (1.05 + 0.85 * (0.5 + 0.5 * devant));
+    const bord = bordDeLaRafale(g, devant);
     const dedans = 1 - lisse(bord - 0.15 * R, bord + 0.2 * R, r);
     if (dedans <= 0) return 0;
     const U = I * REGLAGES_GRAINS.rafale * dedans * (0.3 + 0.7 * lisse(0, 0.6 * R, r)) * (0.4 + 0.6 * (0.5 + 0.5 * devant));
@@ -295,7 +396,7 @@ export class Grains {
     if (r > R * 4) return 0;
     const v = Math.hypot(g.vx, g.vz) || 1;
     const devant = r > 1 ? (dx * g.vx + dz * g.vz) / (r * v) : 0;
-    const bord = R * (1.05 + 0.85 * (0.5 + 0.5 * devant));
+    const bord = bordDeLaRafale(g, devant);
     const dedans = 1 - lisse(bord - 0.15 * R, bord + 0.2 * R, r);
     const haute = REGLAGES_GRAINS.bondPression * I * dedans * (0.55 + 0.45 * Math.exp(-((r / R) ** 2)));
     const derriere = lisse(-0.2, -0.8, devant) * (1 - dedans) * (1 - lisse(2 * R, 4 * R, r));
@@ -391,7 +492,7 @@ export class Grains {
   instantane() {
     return {
       etatHasard: this.etatHasard, t: this.t, attente: this.attente, prochainId: this.prochainId, peuple: this.peuple,
-      liste: this.liste.map((g) => ({ ...g, noyaux: g.noyaux.map((n) => ({ ...n })), faits: { ...g.faits } })),
+      liste: this.liste.map(copieGrain),
     };
   }
 
@@ -399,7 +500,14 @@ export class Grains {
     if (!s) return;
     Object.assign(this, {
       etatHasard: s.etatHasard, t: s.t, attente: s.attente, prochainId: s.prochainId, peuple: s.peuple,
-      liste: s.liste.map((g) => ({ ...g, noyaux: g.noyaux.map((n) => ({ ...n })), faits: { ...g.faits } })),
+      liste: s.liste.map(copieGrain),
     });
   }
+}
+
+function copieGrain(g) {
+  return {
+    ...g, noyaux: g.noyaux.map((n) => ({ ...n })), faits: { ...g.faits },
+    route: g.route && { ...g.route }, crochet: g.crochet && { ...g.crochet }, glisse: g.glisse && { ...g.glisse },
+  };
 }

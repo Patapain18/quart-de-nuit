@@ -21,6 +21,7 @@
     "test-risees": "node scripts/test-risees.js",
     "test-eclairs": "node scripts/test-eclairs.js",
     "test-barometre": "node scripts/test-barometre.js",
+    "test-bete": "node scripts/test-bete.js",
     "sons": "node scripts/preparer-sons.mjs"
   },
   "dependencies": {

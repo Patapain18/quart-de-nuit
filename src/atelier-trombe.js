@@ -3,11 +3,13 @@
 // loin, d'en haut.
 //
 // Adresse : atelier-trombe.html?variante=bete&moment=jeu&vue=cockpit&distance=900&age=120
-// Dans la console : __trombe (voir en bas : photo, planche, film).
+// (&grain=0 : sans son grain)
+// Dans la console : __trombe (voir en bas : photo, planche, film, naissance).
 import * as THREE from 'three';
 import { Monde3D } from './rendu/monde3d.js';
 import { AMBIANCES, etatMeteo, angleVers } from './monde/meteo.js';
-import { meteoDeLaNuit } from './jeu/nuit.js';
+import { meteoDeLaNuit, BETE } from './jeu/nuit.js';
+import { Grains, PORTEUR } from './monde/grains.js';
 import { Bateau } from './bateau/bateau.js';
 import { VARIANTES, VARIANTE_DU_JEU, vieDeLaTrombe } from './rendu/trombe.js';
 import { TrombeAncienne } from './rendu/trombe-ancienne.js';
@@ -41,8 +43,9 @@ const reglage = {
   cap: null, // d'où on la voit (le cap du bateau vers elle) : par défaut, au vent, comme dans le jeu
   vit: false, // son âge avance
   vitesseVie: 1,
-  avance: false, // elle se déplace avec le vent
+  avance: false, // elle se déplace (avec son grain)
   eclairs: true,
+  grain: parametres.get('grain') !== '0', // sous son grain, comme dans le jeu
 };
 function capTrombe() {
   return reglage.cap ?? (meteo.directionVent + 8) % 360;
@@ -53,6 +56,7 @@ function placerTrombe() {
   const c = bateau.groupe.position;
   etat.x = c.x + Math.sin(r) * reglage.distance;
   etat.z = c.z - Math.cos(r) * reglage.distance;
+  placerGrain();
 }
 function majEtat(dt) {
   if (reglage.vit) {
@@ -61,16 +65,54 @@ function majEtat(dt) {
     afficherAge();
   }
   if (reglage.avance) {
-    const a = angleVers(meteo.directionVent);
-    etat.x += Math.cos(a) * 7 * dt;
-    etat.z += Math.sin(a) * 7 * dt;
+    const a = angleVers(meteo.directionVent + (grain ? PORTEUR.derive : 0));
+    const v = grain ? PORTEUR.vitesse : 7;
+    etat.x += Math.cos(a) * v * dt;
+    etat.z += Math.sin(a) * v * dt;
+    if (grain) {
+      grain.x += grain.vx * dt;
+      grain.z += grain.vz * dt;
+    }
   }
   etat.force = lisse(etat.age, 0, 15) * (1 - lisse(etat.age, DUREE - 30, DUREE));
   etat.distance = Math.hypot(etat.x - bateau.groupe.position.x, etat.z - bateau.groupe.position.z);
+  majGrain();
+}
+
+// ---------- Son grain ----------
+// Comme dans le jeu (jeu/nuit.js) : elle naît sous l'avant d'un grain d'orage (un
+// « porteur » : monde/grains.js), qui avance avec elle ; sa pluie s'enroule autour d'elle.
+// Ici, il ne vit pas : il est là, formé, et on ne fait pas naître de grains alentour.
+const grains = new Grains(7);
+let grain = null;
+function placerGrain() {
+  grains.vider();
+  grains.peuple = true;
+  // (toujours le même grain : d'une image à l'autre d'une planche, il ne change pas de forme)
+  grains.etatHasard = 1234567;
+  grains.meteo = meteo;
+  grain = null;
+  etat.grain = null;
+  if (!reglage.grain || variante === 'ancienne') {
+    monde.etatGrains = null;
+    return;
+  }
+  const a = angleVers(meteo.directionVent + PORTEUR.derive);
+  grain = grains.porteur({ x: etat.x, z: etat.z, ux: Math.cos(a), uz: Math.sin(a), force: BETE.force, orage: BETE.orage, age: 400, duree: 1e9 });
+  etat.grain = grain;
+  monde.etatGrains = grains;
+  majGrain();
+}
+function majGrain() {
+  if (!grain) return;
+  const v = Math.hypot(grain.vx, grain.vz);
+  // (le crochet se forme à mesure que son tourbillon s'organise : jeu/nuit.js)
+  grain.crochet = { x: etat.x, z: etat.z, ux: grain.vx / v, uz: grain.vz / v, force: etat.force * lisse(etat.age, 5, 45) };
 }
 function choisirVariante(nom) {
   variante = nom;
   if (nom !== 'ancienne') monde.trombe.choisirVariante(nom);
+  placerTrombe();
   for (const [id, b] of boutonsVariante) b.setAttribute('aria-pressed', String(id === nom));
   document.getElementById('resume').textContent = nom === 'ancienne'
     ? 'Celle d\'avant (étape 10) : un tube, des voiles d\'embruns, une soucoupe de nuage.'
@@ -303,6 +345,13 @@ document.getElementById('avance').addEventListener('change', (e) => {
   reglage.avance = e.currentTarget.checked;
   if (!reglage.avance) placerTrombe();
 });
+const caseGrain = document.getElementById('sous-grain');
+caseGrain.checked = reglage.grain;
+caseGrain.addEventListener('change', () => {
+  reglage.grain = caseGrain.checked;
+  placerTrombe();
+  legende();
+});
 document.getElementById('eclair').addEventListener('click', () => {
   const v = monde.trombe.variante;
   const a = Math.random() * Math.PI * 2;
@@ -324,7 +373,7 @@ document.getElementById('replier').addEventListener('click', (e) => {
 const zoneLegende = document.getElementById('legende');
 function legende() {
   const nom = variante === 'ancienne' ? 'L\'ancienne trombe' : VARIANTES[variante].nom;
-  zoneLegende.textContent = `${nom} · ${MOMENTS[moment].nom} · ${VUES[vue]} · à ${Math.round(etat.distance || reglage.distance)} m`;
+  zoneLegende.textContent = `${nom}${grain ? ' sous son grain' : ''} · ${MOMENTS[moment].nom} · ${VUES[vue]} · à ${Math.round(etat.distance || reglage.distance)} m`;
 }
 
 // ---------- Les mesures ----------
@@ -525,6 +574,149 @@ async function plancheSansPause(nom, { variantes = Object.keys(VARIANTES), situa
   monde.foudre.liberer();
   placerTrombe();
   return envoyerCapture(nom, toile.toDataURL('image/jpeg', 0.9));
+}
+
+// La naissance de la bête sous son grain, en quelques images (une planche de « colonnes »
+// colonnes) : etapes : [{ age, titre }] ; vue, distance, moment, cap, site : d'où on la voit
+const ETAPES_NAISSANCE = [
+  { age: 4, titre: '0 s — sous l\'avant du grain, une tache sombre sur l\'eau' },
+  { age: 15, titre: '15 s — le nuage s\'abaisse, l\'eau tourne' },
+  { age: 26, titre: '25 s — l\'anneau d\'embruns se lève' },
+  { age: 38, titre: '40 s — l\'entonnoir descend' },
+  { age: 50, titre: '50 s — il touche la mer' },
+  { age: 120, titre: '2 min — devant la pluie de son grain' },
+];
+async function naissance(nom = `naissance-${Date.now()}`, options) {
+  return enTournage(() => naissanceSansPause(nom, options));
+}
+async function naissanceSansPause(nom, { etapes = ETAPES_NAISSANCE, colonnes = 3, largeur = 640, vue: v = 'fixe', distance = 1100, moment: m = 'jeu', cap = 0, site = 0, images = 60 } = {}) {
+  const hauteurCase = Math.round((largeur * 9) / 16);
+  const toile = document.createElement('canvas');
+  toile.width = largeur * colonnes;
+  toile.height = hauteurCase * Math.ceil(etapes.length / colonnes);
+  const ctx = toile.getContext('2d');
+  const avant = { variante, moment, vue, distance: reglage.distance, age: etat.age, vit: reglage.vit, regard: { ...regard }, eclairs: reglage.eclairs, grain: reglage.grain };
+  reglage.vit = false;
+  reglage.grain = true;
+  choisirVariante('bete');
+  choisirMoment(m);
+  choisirVue(v);
+  reglage.distance = distance;
+  regard.cap = cap;
+  regard.site = site;
+  for (const [k, e] of etapes.entries()) {
+    etat.age = e.age;
+    placerTrombe();
+    monde.foudre.vider();
+    monde.foudre.retenir(1e9);
+    for (let i = 0; i < images; i++) {
+      uneImage(1 / 60);
+      if (i % 20 === 19) await new Promise((r) => setTimeout(r, 0));
+    }
+    // (une image de plus juste avant de la copier : après une attente, la toile est vide)
+    uneImage(1 / 60);
+    const image = new Image();
+    image.src = monde.photo();
+    await image.decode();
+    const x = (k % colonnes) * largeur;
+    const y = Math.floor(k / colonnes) * hauteurCase;
+    let sl = image.width;
+    let sh = image.height;
+    if (sl / sh > 16 / 9) sl = sh * (16 / 9); else sh = sl / (16 / 9);
+    ctx.drawImage(image, (image.width - sl) / 2, (image.height - sh) / 2, sl, sh, x, y, largeur, hauteurCase);
+    ctx.font = '15px system-ui, sans-serif';
+    ctx.fillStyle = 'rgba(0,0,0,0.6)';
+    ctx.fillRect(x, y + hauteurCase - 26, Math.min(largeur, ctx.measureText(e.titre).width + 20), 26);
+    ctx.fillStyle = '#fff';
+    ctx.fillText(e.titre, x + 10, y + hauteurCase - 8);
+  }
+  reglage.grain = avant.grain;
+  choisirVariante(avant.variante);
+  choisirMoment(avant.moment);
+  choisirVue(avant.vue);
+  reglage.distance = avant.distance;
+  etat.age = avant.age;
+  reglage.vit = avant.vit;
+  reglage.eclairs = avant.eclairs;
+  Object.assign(regard, avant.regard);
+  monde.foudre.liberer();
+  placerTrombe();
+  return envoyerCapture(nom, toile.toDataURL('image/jpeg', 0.9));
+}
+
+// La carte vue d'en haut : la pluie autour d'elle et de son grain comme la voit le radar
+// (l'écho commence à 0,12 de pluie ; ses couleurs), le nord en haut, à plusieurs âges : le
+// crochet qui se forme. ages : [s] ; cote : la largeur de chaque carte (m)
+async function carte(nom = `carte-${Date.now()}`, { ages = [10, 45, 120], cote = 4000, taille = 440 } = {}) {
+  const avant = { age: etat.age, grain: reglage.grain };
+  if (!grain) {
+    reglage.grain = true;
+    placerTrombe();
+  }
+  const bandeau = 54;
+  const toile = document.createElement('canvas');
+  toile.width = taille * ages.length;
+  toile.height = taille + bandeau;
+  const ctx = toile.getContext('2d');
+  ctx.fillStyle = '#05080b';
+  ctx.fillRect(0, 0, toile.width, toile.height);
+  for (const [k, age] of ages.entries()) {
+    etat.age = age;
+    etat.force = lisse(age, 0, 15) * (1 - lisse(age, DUREE - 30, DUREE));
+    majGrain();
+    const img = ctx.createImageData(taille, taille);
+    for (let py = 0; py < taille; py++) {
+      for (let px = 0; px < taille; px++) {
+        const x = etat.x + (px / taille - 0.5) * cote;
+        const z = etat.z + (py / taille - 0.5) * cote;
+        const p = grains.pluieDesGrains(x, z);
+        const v = p > 0.12 ? Math.min(1, 0.95 * (p - 0.12) ** 1.1) : 0;
+        const i = (py * taille + px) * 4;
+        const a = Math.min(1, v * 1.6);
+        img.data[i] = 5 + a * (255 * Math.min(1, 0.45 + v) - 5);
+        img.data[i + 1] = 8 + a * (70 + 150 * v - 8);
+        img.data[i + 2] = 11 + a * (20 * v - 11);
+        img.data[i + 3] = 255;
+      }
+    }
+    const x0 = k * taille;
+    ctx.putImageData(img, x0, 0);
+    // (elle : un point clair, et sa route ; l'échelle : 500 m)
+    const c = taille / 2;
+    const v = Math.hypot(grain.vx, grain.vz);
+    ctx.strokeStyle = '#9fd8ff';
+    ctx.fillStyle = '#9fd8ff';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.arc(x0 + c, c, 4, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.moveTo(x0 + c, c);
+    ctx.lineTo(x0 + c + (grain.vx / v) * 40, c + (grain.vz / v) * 40);
+    ctx.stroke();
+    const m500 = (500 / cote) * taille;
+    ctx.fillStyle = '#c8d6dc';
+    ctx.fillRect(x0 + 14, taille - 18, m500, 2);
+    ctx.font = '12px system-ui, sans-serif';
+    ctx.fillText('500 m', x0 + 14, taille - 24);
+    ctx.font = '600 15px system-ui, sans-serif';
+    ctx.fillStyle = '#e6eef0';
+    ctx.fillText(`${age} s`, x0 + 14, taille + 22);
+    ctx.font = '13px system-ui, sans-serif';
+    ctx.fillStyle = '#9fb0b6';
+    ctx.fillText(age < 30 ? 'elle naît sous l\'avant du grain' : age < 90 ? 'la pluie s\'enroule autour d\'elle' : 'le crochet : elle est dans son creux', x0 + 14, taille + 42);
+    if (k) {
+      ctx.fillStyle = '#0c1418';
+      ctx.fillRect(x0 - 1, 0, 2, toile.height);
+    }
+  }
+  etat.age = avant.age;
+  if (!avant.grain) {
+    reglage.grain = false;
+    placerTrombe();
+  }
+  majEtat(0);
+  return envoyerCapture(nom, toile.toDataURL('image/png'));
 }
 
 // Le film : des images enregistrées une à une (captures/film-<nom>-0001.jpg…), à
@@ -797,7 +989,8 @@ window.__trombe = {
   variante: choisirVariante, moment: choisirMoment, vue: choisirVue, heure: choisirHeure,
   age: (a) => { etat.age = a; afficherAge(); },
   distance: distanceTrombe,
-  vivre, mesurer, photo, planche, film, uneImage,
+  vivre, mesurer, photo, planche, film, naissance, carte, uneImage, grains,
+  grain: (oui) => { reglage.grain = oui; caseGrain.checked = oui; placerTrombe(); legende(); },
   get nomVariante() { return variante; },
 };
 

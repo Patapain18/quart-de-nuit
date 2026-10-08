@@ -854,7 +854,10 @@ l'annoncer. Son choix, dans cet ordre :
 28. ✅ **Les rafales qu'on voit venir** : une tache sombre qui court sur l'eau, la risée.
 29. ✅ **Les éclairs qui partent des nuages d'orage**, et plus de n'importe où.
 30. ✅ **Le baromètre qui annonce le temps**, au lieu de le suivre.
-31. ⬜ **La bête, née d'un des grains** qu'on a vus arriver au radar.
+31. ✅ **La bête, née d'un des grains** qu'on a vus arriver au radar.
+
+Le chantier est fini (le 8 octobre 2026) : les grains, les risées, les éclairs, le baromètre et
+la bête existent quelque part, et tout ce qui les entoure en dépend.
 
 27. ✅ **Les grains** (`src/monde/grains.js`, `src/rendu/glsl/grains.js`, `src/rendu/grains.js`,
     `atelier-grains.html`) — Un grain, comme les vrais vus d'un bateau : un **cœur de
@@ -1193,6 +1196,84 @@ l'annoncer. Son choix, dans cet ordre :
     que montre le baromètre et ce qu'il annonce ; trois courbes : la pression, sa tendance
     avec les bandes des bulletins, le vent ; `__barometre.planche()`).
     Images : `docs/etape30-le-barometre.jpg`, `docs/etape30-la-pression.png`.
+
+31. ✅ **La bête, née d'un grain** (`src/jeu/nuit.js`, `PORTEUR` dans `src/monde/grains.js`,
+    `atelier-trombe.html`) — La trombe naissait de nulle part, au vent du bateau, à l'heure
+    dite. Elle naît maintenant d'un grain qu'on a vu arriver :
+    - *son grain* : dès le coucher du soleil, un grain arrive au vent, à un mille. C'est le
+      premier des grains de la nuit (il remplace celui qui passait de côté juste après la
+      trombe : on prend encore le bord de sa rafale, quand son cœur passe derrière elle). Pas
+      un grain comme les autres : il **traîne** — 8 m/s, droit sous le vent, quand les autres
+      vont à 12 m/s et dérivent de 10° à sa droite (il se nourrit de l'air chaud qu'il aspire
+      devant lui, ses nouvelles tours poussent à l'arrière des anciennes : les orages qui font
+      des trombes sont souvent de ceux-là) ; plein d'éclairs (orage 1, force 0,6). On le voit
+      au radar et à l'œil (un rideau de pluie noire sous un gros nuage) ; l'écran et le journal
+      le notent ; et Jos, dès qu'il a fini de parler : « Celui-là, je n'aime pas sa tête. Sur
+      mon radar, il traîne : il avance moins vite que les autres. C'est sous ces grains-là que
+      naissent les trombes. Garde un œil dessus. » ;
+    - *le saut d'éclairs* : dans les 45 secondes avant qu'elle naisse, ses éclairs se
+      multiplient (son électricité × 1,6 : de 2,3 éclairs par minute à 8) — le signe que
+      guettent les météorologues avant les tornades ;
+    - *sa naissance* : à son heure (de 19 h 24 à 19 h 31), sous l'avant du nuage, là où l'air
+      chaud monte, **sur le bord de la rafale** du grain : son air froid s'étale derrière lui
+      et sur ses côtés, mais pas devant (le bord de sa rafale passe sous elle, à 0,85 rayon
+      devant son cœur, au lieu de 1,9 pour les autres grains) — devant elle, le grain ne
+      souffle pas. Elle naît à l'endroit de cet avant d'où, avançant avec lui, elle passera
+      derrière le bateau à 250 m s'il garde sa route : on vise dans le repère du bateau (elle
+      y avance à sa vitesse moins celle du bateau), si bien que, qu'elle le rattrape ou qu'elle
+      croise sa route, elle passe au plus près deux minutes après sa naissance, en pleine force
+      (viser l'endroit où il était à mi-chemin, comme avant, donnait de 100 à 450 m et parfois
+      à la fin de sa vie, selon sa route). Avant qu'elle naisse, son grain glisse, sans qu'on le
+      voie (1,5 m/s au plus, sans tourner), vers là où il doit être pour cela ; puis Jos : « Le
+      grain, devant, sur tribord : regarde sous l'avant de son nuage, l'eau tourne… Une
+      trombe ! Elle va avancer avec lui, vers toi. » ;
+    - *elle avance avec lui*, en serpentant de ±22 m sous son avant (de part et d'autre de sa
+      route, maintenant : elle dérivait toujours du même côté) ; derrière elle, le cœur du
+      grain : elle se découpe sur sa pluie. Son propre rideau de pluie (étape 26), une brume
+      uniforme qui cachait la vraie, n'est plus dessiné quand elle a un grain ;
+    - *le crochet* : la pluie du grain s'enroule autour d'elle à mesure que son tourbillon
+      s'organise — une bande qui part du flanc droit du cœur, s'écarte sur sa droite et
+      s'enroule devant elle, comme un « 6 » dont elle occupe la boucle, au sec (l'« écho en
+      crochet » des radars météo). On le voit sur le radar du bord (à 0,75 mille, l'écho rond
+      de la bête au creux d'un arc d'échos ; son écho à elle se resserre : 80 m au lieu de
+      170), et à l'œil : les paquets de pluie de derrière et de sa droite tombent en vrais
+      rideaux (pas ceux de devant, qui la cacheraient au bateau qu'elle vient chercher) ;
+    - *le baromètre* : un tourbillon tient par la dépression qu'il a en son cœur (c'est elle
+      qui retient l'air qui tourne). Pour celui de la bête (un tourbillon de Rankine, 38 m/s
+      au bord d'un cœur de 50 m) : 17 hPa de moins en son centre, 2,4 à 95 m, un hectopascal à
+      150 m, presque rien au-delà de 300 m — l'aiguille saute quand elle passe tout près ;
+    - *ses éclairs* s'ajoutent à ceux de son grain (les siens un peu moins nombreux, 64 % :
+      9,3 éclairs par minute à eux deux, quand elle seule en faisait 8) ;
+    - *Jos et les marins* : le conseil « le grain est presque sur toi, réduis » ne vaut pas
+      pour ce grain-là (il faut sa toile pour s'écarter d'elle) ; le marin prudent ne réduit
+      pas pour lui non plus ;
+    - *les reprises* : une reprise au début du crépuscule, un saut dans le temps avant elle,
+      une partie gardée avant cette étape : son grain revient au vent, et elle naît sous lui ;
+      après elle, ni elle ni lui.
+    **Corrigé en passant** : le journal écrivait « un grain au ouest-sud-ouest », et Jos
+    appelait le cargo « faisant route au est » (« à l'ouest-sud-ouest », « à l'est »).
+    **Mesuré** (`npm run test-bete`, trois nuits × trois marins) : son grain est là dès
+    18 h 45, à 1,9 km (sa pluie, 0,69 en son cœur : un écho franc) ; la bête naît à 760-910 m
+    du bateau, sous l'avant du grain, son cœur 0,8 rayon derrière elle ; jamais à plus de
+    26 m de sa place sous lui ; elle passe derrière le moyen, qui garde sa route, à 251-284 m
+    (visé : 250), 163 à 168 s après sa naissance ; le prudent s'écarte (234-309 m) ;
+    l'imprudent, de 106 à 401 m ; le crochet : à 300 m d'elle, 0,58 de pluie sur sa droite,
+    0,17 sur sa gauche, 0,15 sur elle (le radar voit à partir de 0,12) ; à 300 m devant elle, son grain ne souffle pas (un
+    grain ordinaire : 4,5 m/s) ; le bord de sa rafale vient après elle, quand le cœur passe
+    (3,7 à 4,3 m/s sur le moyen) ; la pression : −0,3 hPa à 280 m, −1,9 à 106 m. La nuit
+    entière (`test-nuit`) : elle passe à 233 m du prudent, 286 du moyen, 202 de l'imprudent
+    (avant : 231, 300 et 167). Les 14 essais passent.
+    **Ce que ça coûte** : moins qu'avant. Sous son grain, la passe du volume de la bête prend
+    3,9 ms au lieu de 5,7 (son rideau de brume n'est plus calculé), et l'image entière 16,2 ms
+    au lieu de 17,8, les rideaux de pluie du crochet compris (dans l'atelier, à 900 m,
+    1600 × 900).
+    **Les outils** : l'atelier de la trombe a une case « Sous son grain » (cochée : comme dans
+    le jeu) ; `__trombe.naissance()` (sa naissance en six images, avec la pluie de son
+    grain), `carte()` (la pluie vue d'en haut, comme la voit le radar, à plusieurs âges : le
+    crochet qui se forme), `grain(false)` ; `jouerLaNuit` (`src/jeu/marins.js`) s'arrête à
+    une heure (`heureMax`), regarde chaque image (`surImage`) et prend une radio par marin
+    (`radio`).
+    Images : `docs/etape31-la-bete-nait-de-son-grain.jpg`, `docs/etape31-le-crochet.png`.
 
 ## 4. Pistes graphiques notées pour plus tard
 

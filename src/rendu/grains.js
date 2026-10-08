@@ -4,6 +4,7 @@
 // d'eux (lue par les nuages).
 import * as THREE from 'three';
 import { N_RIDEAUX, N_GRAINS } from './glsl/grains.js';
+import { bordDeLaRafale, paquetsDuCrochet } from '../monde/grains.js';
 
 // La pluie au cœur d'un grain de force 1 éteint la lumière à 0,6 % par mètre : on n'y voit
 // pas à plus de 500 m (et de loin, le rideau est presque opaque)
@@ -114,9 +115,20 @@ export class GrainsRendu {
             distance: Math.hypot(q.x - cx, q.z - cz) - 2 * q.s,
           });
         }
+        // (sous un porteur, la pluie qui s'enroule autour de sa trombe : monde/grains.js)
+        const k = g.crochet?.force ?? 0;
+        if (k > 0.05) {
+          for (const m of paquetsDuCrochet(g.crochet)) {
+            if (!m.rideau) continue;
+            colonnes.push({
+              x: m.x, z: m.z, s: m.s, densite: DENSITE_PLUIE * I * m.w * k, px, pz, graine: (g.graine + m.a * 0.0011 + 2) % 1,
+              distance: Math.hypot(m.x - cx, m.z - cz) - 2 * m.s,
+            });
+          }
+        }
       }
       const c = grains.noyau(g, g.noyaux[0], this._q);
-      vents.push({ x: c.x, z: c.z, R: g.rayon, I, ux, uz, distance: Math.hypot(c.x - cx, c.z - cz) - 2.4 * g.rayon });
+      vents.push({ x: c.x, z: c.z, R: g.rayon, I, ux, uz, loin: bordDeLaRafale(g, 1) / g.rayon, distance: Math.hypot(c.x - cx, c.z - cz) - 2.4 * g.rayon });
     }
     colonnes.sort((p, q) => p.distance - q.distance);
     vents.sort((p, q) => p.distance - q.distance);
@@ -131,7 +143,7 @@ export class GrainsRendu {
     for (let i = 0; i < nv; i++) {
       const w = vents[i];
       u.uGrainsVent.value[i].set(w.x, w.z, w.R, w.I);
-      u.uGrainsDir.value[i].set(w.ux, w.uz, 0, 0);
+      u.uGrainsDir.value[i].set(w.ux, w.uz, w.loin, 0);
     }
     u.uGrainsN.value = this.masque.rafales ? nv : 0;
 

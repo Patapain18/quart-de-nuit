@@ -785,7 +785,7 @@ export class Trombe3D {
     this.uniformsComposition.uTailleEcran.value.set(largeur, hauteur);
   }
 
-  // trombe : { x, z, force, age, duree } (jeu/nuit.js), ou null ; directionVent : vers où
+  // trombe : { x, z, force, age, duree, grain } (jeu/nuit.js), ou null ; directionVent : vers où
   // va le vent (radians, dans le plan) ; temps : l'horloge du monde ; nuit : 0 → 1 ;
   // eclaire : l'éclair autour de nous (monde3d)
   maj(dt, trombe, { temps, directionVent, camera = null, nuit = 0, noir = 0, eclaire = 0 }) {
@@ -835,8 +835,12 @@ export class Trombe3D {
     u.uEmb2.value.set(g.rotation, g.montee, g.bouillon, g.plancton);
     const r = V.rideau;
     // (le rideau de pluie est derrière elle, du côté d'où elle vient : elle s'en détache,
-    // et le bateau, qu'elle vient chercher sous le vent, n'est pas dedans)
-    u.uRideau.value.set(directionVent + Math.PI + r.angle, r.ouverture, r.rayon, r.densite * vie.mur * k.pluie);
+    // et le bateau, qu'elle vient chercher sous le vent, n'est pas dedans. Sous son grain
+    // — jeu/nuit.js —, c'est la pluie du grain qui fait ce rideau : la vraie, en colonnes, et
+    // le crochet qui s'enroule autour d'elle — rendu/grains.js — ; on ne dessine pas le sien,
+    // qui la cacherait)
+    const densitePluie = trombe.grain ? 0 : r.densite * k.pluie;
+    u.uRideau.value.set(directionVent + Math.PI + r.angle, r.ouverture, r.rayon, densitePluie * vie.mur);
     this.majSoeurs(temps, vie);
     this.majProfil(temps, vie.corde, hautEntonnoir);
     u.uExt.value.set(V.ext.ent, V.ext.emb, V.ext.mur, V.ext.pluie);
@@ -857,7 +861,7 @@ export class Trombe3D {
     u.uDisque.value.set(haut.x, haut.y, V.mur.rayon * 1.18 * 1.15 + 10, 0);
     u.uDisqueY.value.set(baseNuages - V.mur.abaissement * 1.2 - (V.mur.lambeaux > 0 ? 270 : 100), baseNuages + 75);
     // (la boîte du rideau : le cercle qui contient son secteur d'anneau)
-    if (r.densite * k.pluie > 0) {
+    if (densitePluie > 0) {
       const a0 = directionVent + Math.PI + r.angle;
       const points = [];
       for (let i = 0; i <= 8; i++) {

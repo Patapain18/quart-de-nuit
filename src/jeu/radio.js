@@ -23,6 +23,12 @@ export function directionEnMots(degres) {
   return noms[Math.round((((degres % 360) + 360) % 360) / 22.5) % 16];
 }
 
+// Vers où, avec son article : « au nord », « à l'est », « à l'ouest-sud-ouest »
+export function aLaDirection(degres) {
+  const d = directionEnMots(degres);
+  return /^[eo]/.test(d) ? `à l'${d}` : `au ${d}`;
+}
+
 // État de la mer selon la hauteur des vagues (échelle de Douglas)
 export function etatMerEnMots(hs) {
   if (hs < 0.1) return 'calme';

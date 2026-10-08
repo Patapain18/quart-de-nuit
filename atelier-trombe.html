@@ -38,6 +38,11 @@
         </div>
         <p class="aide" id="etape-vie" aria-live="polite"></p>
       </section>
+      <section aria-labelledby="titre-grain">
+        <h2 id="titre-grain">Son grain</h2>
+        <label class="case"><input type="checkbox" id="sous-grain" checked> Sous son grain</label>
+        <p class="aide">Comme dans le jeu : elle naît sous l'avant d'un grain d'orage qui traîne (8 m/s, droit sous le vent), et avance avec lui ; derrière elle, le cœur de sa pluie ; autour d'elle, le crochet.</p>
+      </section>
       <section aria-labelledby="titre-moment">
         <h2 id="titre-moment">Le moment</h2>
         <div id="moments" class="grille-boutons"></div>
@@ -53,7 +58,7 @@
           <label for="distance">Distance</label><output for="distance" id="distance-texte"></output>
           <input type="range" id="distance" min="60" max="4000" step="10" value="900">
         </div>
-        <label class="case"><input type="checkbox" id="avance"> Elle avance avec le vent (7 m/s)</label>
+        <label class="case"><input type="checkbox" id="avance"> Elle avance (avec son grain, 8 m/s)</label>
         <p class="aide">Glisse sur l'image pour regarder autour de toi.</p>
       </section>
       <section aria-labelledby="titre-mesures">

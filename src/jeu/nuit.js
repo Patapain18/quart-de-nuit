@@ -6,7 +6,8 @@
 //    l'eau si la descente est ouverte, le bateau « travaille » et suinte ; on pompe ;
 //  - des avaries : l'écoute de foc qui casse (usée contre le hauban), une voile qui se
 //    déchire quand on en garde trop, le pilote automatique qui lâche ;
-//  - une trombe marine au crépuscule, un cargo qui croise la route vers 22 h 30 ;
+//  - une trombe marine au crépuscule — la bête, née d'un grain qu'on a vu arriver au
+//    radar —, un cargo qui croise la route vers 22 h 30 ;
 //  - des grains : des averses d'orage qui passent, chacune avec sa rafale (monde/grains.js) ;
 //    trois ou quatre passent sur le bateau, Jos les annonce ;
 //  - la foudre, qui part de leurs nuages (monde/foudre.js) : on compte les secondes jusqu'au
@@ -28,11 +29,11 @@ import { Vector3 } from 'three';
 import { AMBIANCES, etatMeteo, interpoler, angleVers } from '../monde/meteo.js';
 import { Deferlantes } from '../monde/deferlantes.js';
 import { Scelerates, chocScelerate } from '../monde/scelerates.js';
-import { Grains } from '../monde/grains.js';
+import { Grains, PORTEUR } from '../monde/grains.js';
 import { Foudre } from '../monde/foudre.js';
 import { pressionDuJour, tendance, tendanceEnMots } from '../monde/pression.js';
 import { Peur } from './peur.js';
-import { directionEnMots } from './radio.js';
+import { directionEnMots, aLaDirection } from './radio.js';
 import { NOM_BATEAU, JOS, HEURE_COUCHER, heureEnTexte } from './journee.js';
 import { LISTE_NUIT } from './lecons.js';
 
@@ -147,13 +148,13 @@ export function heureA(t) {
 // Les autres naissent et passent au loin, au gré du temps (monde/grains.js). Ceux-ci sont
 // lancés exprès, quatre minutes avant d'arriver (on les voit venir au radar, Jos les
 // annonce) ; chacun quand rien d'autre n'arrive, pour qu'on le vive pour lui-même : le
-// premier passe de côté juste après la trombe (on ne prend que le bord de sa rafale, et on
-// le voit à ses éclairs) ; le plus fort au cœur de la tempête ; le dernier, plus faible,
-// quand elle s'en va. (arrivee : s de nuit, quand son cœur passe ; force, orage : 0 → 1 ;
-// ecart : m, au plus près ; annonce : Jos le dit)
+// premier porte la bête (il est là dès le coucher du soleil : voir lancerGrainBete) ; le
+// plus fort au cœur de la tempête ; le dernier, plus faible, quand elle s'en va.
+// (arrivee : s de nuit, quand son cœur passe ; force, orage : 0 → 1 ; ecart : m, au plus
+// près ; annonce : Jos le dit)
 export const DANS_GRAIN = 240;
 const GRAINS_DE_LA_NUIT = [
-  { arrivee: 360, force: 0.6, orage: 0.75, ecart: 1100, annonce: false },
+  { bete: true, arrivee: 360, force: 0.6, orage: 1, ecart: 1100 },
   { arrivee: 650, force: 0.8, orage: 0.6, ecart: 250 },
   { arrivee: 820, force: 0.9, orage: 1, ecart: 120 },
   { arrivee: 1010, force: 0.55, orage: 0.3, ecart: 450 },
@@ -162,6 +163,35 @@ const GRAINS_DE_LA_NUIT = [
 // La trombe touche le bateau à moins de RAYON_TOUCHE mètres de son axe : dans le plus
 // épais de sa gerbe d'embruns (celle de la bête, rendu/trombe.js, a 52 m de cœur)
 export const RAYON_TOUCHE = 95;
+
+// La bête (la trombe du crépuscule) : elle vit 260 s ; quand elle naît, elle est à moins
+// d'un kilomètre du bateau, et s'il garde sa route, elle passe derrière lui à 250 m, une
+// minute trois quarts à deux minutes et demie plus tard (selon qu'elle le rattrape ou
+// qu'elle croise sa route) ; son tourbillon (de Rankine) : un cœur de 50 m (son entonnoir
+// fait 100 m de large au pied), 38 m/s à son bord (74 nœuds). Son grain : force 0,6, plein
+// d'éclairs.
+export const BETE = { duree: 260, loin: 850, passe: [100, 150], ecart: 250, coeur: 50, vmax: 38, force: 0.6, orage: 1 };
+
+// Où doit naître la bête pour passer derrière le bateau, à « ecart » mètres, s'il garde sa
+// route : on se place dans le repère du bateau (elle y avance à w = sa vitesse − celle du
+// bateau) ; elle doit y passer au plus près à « ecart » mètres, du côté opposé à sa marche
+// (derrière lui), dans T secondes (le temps de venir de 850 m, entre une minute quarante et
+// deux minutes et demie). Rend la position où elle sera à sa naissance, depuis le bateau
+// (m), la perpendiculaire n, et T
+function placeDeLaBete(ux, uz, V, v, ecart) {
+  const wx = V * ux - v.x;
+  const wz = V * uz - v.z;
+  const w = Math.hypot(wx, wz) || 1;
+  // (la perpendiculaire à sa route relative, du côté opposé à la marche du bateau)
+  let nx = -wz / w;
+  let nz = wx / w;
+  if (nx * v.x + nz * v.z > 0) {
+    nx = -nx;
+    nz = -nz;
+  }
+  const T = Math.min(BETE.passe[1], Math.max(BETE.passe[0], BETE.loin / w));
+  return { x: ecart * nx - wx * T, z: ecart * nz - wz * T, nx, nz, T };
+}
 
 // ---------- L'eau à bord ----------
 export const EAU = {
@@ -277,7 +307,12 @@ export class Nuit {
     this.grains = new Grains(graine * 31337 + 7);
     this.hasardGrains = hg;
     this.plansGrains = GRAINS_DE_LA_NUIT.map((g) => ({ ...g, arrivee: g.arrivee + (hg() - 0.5) * 40, ecart: g.ecart * (hg() < 0.5 ? -1 : 1) }));
-    this.plansGrains.forEach((g, k) => { this.prevu[`grain${k}`] = heureA(g.arrivee - DANS_GRAIN); });
+    // (celui de la bête : dès le coucher du soleil)
+    this.plansGrains.forEach((g, k) => { this.prevu[`grain${k}`] = g.bete ? HEURE_COUCHER : heureA(g.arrivee - DANS_GRAIN); });
+    this.grainBete = null;
+    this.hasardBete = generateur(graine * 92821 + 3);
+    // (la vitesse du bateau, lissée sur vingt secondes : pour prévoir où il sera)
+    this.vitesseLissee = null;
     this.ici = null; // (ce que font les grains là où est le bateau : la pluie, leur vent…)
     // la pression ici (monde/pression.js : celle de la dépression qui arrive, et le bond des
     // grains quand arrive leur rafale)
@@ -354,6 +389,7 @@ export class Nuit {
     this.retarderLumiere(dt);
     this.meteo = this.meteoIci();
     ctx.meteo = this.meteo;
+    this.lisserVitesse(dt, ctx);
     this.suivreGrains(dt, ctx);
     this.suivreBarometre(dt, ctx);
     this.suivreScelerates(dt, ctx);
@@ -395,6 +431,28 @@ export class Nuit {
     const vitesse = (ch.a - ch.de) / ch.duree; // (heures de jeu par seconde)
     if (this.trombe && this.trombe.force > 0.05) this.retardLumiere = Math.min(3, this.retardLumiere + dt * vitesse * 0.9);
     else if (this.retardLumiere > 0) this.retardLumiere = Math.max(0, this.retardLumiere - dt * vitesse * 1.6);
+  }
+
+  lisserVitesse(dt, ctx) {
+    const v = ctx.physique.vitesse;
+    const l = (this.vitesseLissee ??= { x: v.x, z: v.z });
+    const k = Math.min(1, dt / 20);
+    l.x += (v.x - l.x) * k;
+    l.z += (v.z - l.z) * k;
+  }
+
+  // Combien de secondes de nuit d'ici à cette heure du jeu (l'heure n'avance pas au même pas
+  // dans chaque chapitre)
+  secondesJusqua(heure) {
+    let s = 0;
+    let h = this.heure;
+    for (let c = this.c; c < CHAPITRES.length && h < heure; c++) {
+      const ch = CHAPITRES[c];
+      const fin = Math.min(heure, ch.a);
+      if (fin > h) s += ((fin - h) * ch.duree) / (ch.a - ch.de);
+      h = Math.max(h, fin);
+    }
+    return s;
   }
 
   avancerHeure(dt, ctx) {
@@ -702,41 +760,68 @@ export class Nuit {
     }
   }
 
-  // ---------- La trombe marine (au crépuscule) ----------
+  // ---------- La bête : la trombe marine du crépuscule ----------
+  // Elle naît de son grain (lancerGrainBete), à son heure : sous l'avant de son nuage, là où
+  // l'air chaud monte, sur le bord de sa rafale — à l'endroit de cet avant d'où, avançant
+  // avec lui, elle passera derrière le bateau deux minutes plus tard s'il ne change rien (à
+  // 250 m : on la sent passer), et sur lui s'il ralentit ou part du mauvais côté. Il faut
+  // lofer et filer de travers au vent, sur le même bord, pour la laisser loin.
   suivreTrombe(dt, ctx) {
     const p = ctx.physique.position;
+    // (avant qu'elle naisse, son grain se charge : ses éclairs se multiplient — le « saut
+    // d'éclairs », que les météorologues guettent avant les trombes)
+    const gb = this.grainBete;
+    if (gb && !this.trombe && !this.faits.has('trombe') && this.grains.liste.includes(gb)) {
+      const dans = this.secondesJusqua(this.prevu.trombe);
+      gb.saut = 1 + 0.6 * lisse(45, 5, dans);
+      // (et il glisse, sans qu'on le voie, vers là où il doit être quand elle naîtra — selon
+      // la route que le bateau a maintenant —, à 1,5 m/s au plus)
+      const ici = this.placeDuGrainBete(ctx, dans, gb.rayon);
+      const ex = ici.x - (gb.x + gb.vx * dans);
+      const ez = ici.z - (gb.z + gb.vz * dans);
+      const e = Math.hypot(ex, ez) || 1;
+      const vitesse = Math.min(1.5, e / Math.max(dans, 15));
+      gb.glisse = dans > 3 ? { x: (ex / e) * vitesse, z: (ez / e) * vitesse } : null;
+    }
     if (!this.trombe && !this.faits.has('trombe') && this.heure >= this.prevu.trombe) {
       this.faits.add('trombe');
-      // elle naît au vent du bateau et descend avec le vent, sur une route qui croise la
-      // sienne : dans 2 min 30, elle passera juste derrière lui s'il ne change rien (à
-      // ~150 m : on la sent passer), et sur lui s'il ralentit ou part du mauvais côté. Il
-      // faut lofer et filer de travers au vent, sur le même bord, pour la laisser loin.
-      const a = angleVers(this.meteo.directionVent); // direction où va le vent
-      const vitesse = 7;
-      const T = 150;
-      const v = ctx.physique.vitesse;
-      const decale = (this.hasard() - 0.5) * 40;
-      this.trombe = {
-        x: p.x + v.x * T * 0.5 - Math.cos(a) * vitesse * T - Math.sin(a) * decale,
-        z: p.z + v.z * T * 0.5 - Math.sin(a) * vitesse * T + Math.cos(a) * decale,
-        vitesse, age: 0, duree: 260, force: 0, distance: Infinity, touche: false,
-      };
-      const relatif = ecartAngle((this.meteo.directionVent), ctx.m.cap);
-      this.ecrire('Une trombe marine au vent !');
-      this.dire([
-        `${NOM_BATEAU} ! Regarde ${directionRelative(relatif)} : une trombe marine ! Elle descend vers toi avec le vent.`,
-        'N\'essaie pas de la distancer, elle va plus vite que toi. Écarte-toi de sa route : lofe, file de travers au vent, sans changer de bord !',
-      ], { urgent: true });
-      this.emettre('trombe', this.trombe);
+      this.naitreBete(ctx);
     }
     const t = this.trombe;
     if (!t) return;
     t.age += dt;
-    const a = angleVers(this.meteo.directionVent + Math.sin(t.age * 0.045) * 8);
-    t.x += Math.cos(a) * t.vitesse * dt;
-    t.z += Math.sin(a) * t.vitesse * dt;
+    // elle avance avec son grain (sans lui, avec le vent), en serpentant un peu sous lui
+    if (t.grain && !this.grains.liste.includes(t.grain)) t.grain = null; // (un saut dans le temps l'a emporté)
+    const g = t.grain;
+    let ux;
+    let uz;
+    let V = t.vitesse;
+    if (g) {
+      V = Math.hypot(g.vx, g.vz) || 1;
+      ux = g.vx / V;
+      uz = g.vz / V;
+    } else {
+      const a = angleVers(this.meteo.directionVent);
+      ux = Math.cos(a);
+      uz = Math.sin(a);
+    }
+    // (de part et d'autre de sa route : ±22 m, en deux minutes et demie)
+    const w = (Math.cos(t.age * 0.045) * 8 * Math.PI) / 180;
+    t.vx = (ux * Math.cos(w) - uz * Math.sin(w)) * V;
+    t.vz = (uz * Math.cos(w) + ux * Math.sin(w)) * V;
+    t.x += t.vx * dt;
+    t.z += t.vz * dt;
     t.force = lisse(0, 15, t.age) * (1 - lisse(t.duree - 30, t.duree, t.age));
     t.distance = Math.hypot(p.x - t.x, p.z - t.z);
+    if (g) {
+      // la pluie de son grain s'enroule autour d'elle, à mesure que son tourbillon
+      // s'organise (le crochet : sur le radar, et en rideaux de pluie sur sa droite) ;
+      // derrière elle, le cœur du grain, sur lequel elle se découpe
+      g.crochet ??= {};
+      Object.assign(g.crochet, { x: t.x, z: t.z, ux, uz, force: t.force * lisse(5, 45, t.age) });
+      // (ses éclairs à elle prennent le relais du saut d'éclairs de son grain)
+      g.saut = 1 + 0.6 * (1 - lisse(10, 70, t.age));
+    }
     this.stats.trombeDistance = Math.min(this.stats.trombeDistance, t.distance);
     // elle approche : Jos crie (une fois), puis elle frappe, ou elle passe
     if (t.distance < 450 && t.force > 0.5 && !t.alerte) {
@@ -761,8 +846,93 @@ export class Nuit {
     }
     if (t.age > t.duree) {
       this.trombe = null;
+      if (g) g.crochet = null;
       this.ecrire('La trombe s\'est dissipée.');
     }
+  }
+
+  // La bête naît, sous l'avant de son grain
+  naitreBete(ctx) {
+    const p = ctx.physique.position;
+    const v = this.vitesseLissee ?? ctx.physique.vitesse;
+    const decale = (this.hasard() - 0.5) * 40;
+    // (son grain — si l'on a sauté dans le temps, ou s'il est parti : il est là, maintenant)
+    const g = this.grainBete && this.grains.liste.includes(this.grainBete) ? this.grainBete : this.lancerGrainBete(ctx);
+    g.glisse = null;
+    const V = Math.hypot(g.vx, g.vz) || 1;
+    const ux = g.vx / V;
+    const uz = g.vz / V;
+    // où, sur l'avant du grain (b, de sa gauche à sa droite), pour qu'elle passe derrière le
+    // bateau à « ecart » mètres (à « decale » près) s'il garde sa route : là où, sur la
+    // perpendiculaire n à sa route relative, elle est à « ecart » mètres de lui
+    const { nx, nz } = placeDeLaBete(ux, uz, V, v, 0);
+    const F = this.grains.avant(g, 0, {});
+    const rn = -uz * nx + ux * nz;
+    const fn = (F.x - p.x) * nx + (F.z - p.z) * nz;
+    const b = Math.abs(rn) < 0.05 ? 0 : Math.max(-PORTEUR.cote, Math.min(PORTEUR.cote, (BETE.ecart + decale - fn) / (g.rayon * rn)));
+    const s = this.grains.avant(g, b, {});
+    this.trombe = {
+      x: s.x, z: s.z, vx: g.vx, vz: g.vz, vitesse: V, age: 0, duree: BETE.duree, force: 0, distance: Infinity, touche: false,
+      grain: g, cote: b,
+    };
+    // (Jos parle d'elle : son grain n'a plus besoin d'être annoncé)
+    g.faits.vu = true;
+    g.faits.annonce = true;
+    const relatif = ecartAngle(this.releveDe(s.x, s.z, ctx), ctx.m.cap);
+    this.ecrire('Une trombe marine naît sous le grain, au vent !');
+    this.dire([
+      `${NOM_BATEAU} ! Le grain, ${directionRelative(relatif)} : regarde sous l'avant de son nuage, l'eau tourne… Une trombe ! Elle va avancer avec lui, vers toi.`,
+      'N\'essaie pas de la distancer, elle va plus vite que toi. Écarte-toi de sa route : lofe, file de travers au vent, sans changer de bord !',
+    ], { urgent: true });
+    this.emettre('trombe', this.trombe);
+  }
+
+  // La route du grain de la bête (avec le vent qu'il fera quand elle naîtra)
+  routeDuGrainBete() {
+    const m = meteoDeLaNuit(Math.max(this.heure, this.prevu.trombe), this.niveau);
+    const a = angleVers(m.directionVent + PORTEUR.derive);
+    return { ux: Math.cos(a), uz: Math.sin(a) };
+  }
+
+  // Où doit être le centre du grain de la bête quand elle naîtra (dans « dans » secondes),
+  // pour qu'elle naisse sous son avant à la bonne place (placeDeLaBete) — si le bateau garde
+  // la route qu'il a maintenant
+  placeDuGrainBete(ctx, dans, rayon) {
+    const p = ctx.physique.position;
+    const v = this.vitesseLissee ?? ctx.physique.vitesse;
+    const { ux, uz } = this.routeDuGrainBete();
+    const q = placeDeLaBete(ux, uz, PORTEUR.vitesse, v, BETE.ecart);
+    return {
+      x: p.x + v.x * dans + q.x - ux * PORTEUR.avant * rayon,
+      z: p.z + v.z * dans + q.z - uz * PORTEUR.avant * rayon,
+      rayon,
+    };
+  }
+
+  // Le grain de la bête : on le découvre au coucher du soleil, au vent, déjà formé. Il est là
+  // où il faut pour qu'à l'heure de la trombe, l'avant de son nuage soit à moins d'un
+  // kilomètre du bateau (là d'où elle passera derrière lui s'il garde sa route :
+  // naitreBete). Il traîne : moins vite que les autres grains, droit sous le vent
+  // (monde/grains.js : PORTEUR)
+  lancerGrainBete(ctx) {
+    const dans = this.faits.has('trombe') ? 0 : Math.max(0, this.secondesJusqua(this.prevu.trombe));
+    const { ux, uz } = this.routeDuGrainBete();
+    const force = BETE.force * (this.niveau.grains ?? 1);
+    const ici = this.placeDuGrainBete(ctx, dans, 650 + force * 450);
+    const age = 150 + this.hasardBete() * 60;
+    const g = this.grains.porteur({
+      // (porteur() veut la place de la trombe, sous son avant : on la lui donne)
+      x: ici.x - ux * PORTEUR.vitesse * dans + ux * PORTEUR.avant * ici.rayon,
+      z: ici.z - uz * PORTEUR.vitesse * dans + uz * PORTEUR.avant * ici.rayon,
+      ux, uz, force, orage: BETE.orage,
+      age, duree: age + dans + BETE.duree + 160,
+    });
+    g.plan = this.plansGrains.findIndex((x) => x.bete);
+    g.bete = true;
+    g.faits.annoncer = true;
+    g.faits.depuis = this.t;
+    this.grainBete = g;
+    return g;
   }
 
   // Le vent tourbillonnant de la trombe au point (x, z) du monde (m/s, à ajouter au vent) :
@@ -775,26 +945,50 @@ export class Nuit {
     const dx = x - t.x;
     const dz = z - t.z;
     const d = Math.max(1, Math.hypot(dx, dz));
-    // (le cœur : l'entonnoir de la trombe du jeu, la bête, fait 100 m de large au pied)
-    const coeur = 50;
-    const vmax = 38 * t.force; // ~74 nœuds au bord du cœur
+    const coeur = BETE.coeur;
+    const vmax = BETE.vmax * t.force; // ~74 nœuds au bord du cœur
     const v = (d < coeur ? (vmax * d) / coeur : (vmax * coeur) / d) * (1 - lisse(300, 600, d));
     return sortie.set((dz / d) * v - (dx / d) * v * 0.3, 0, (-dx / d) * v - (dz / d) * v * 0.3);
+  }
+
+  // La pression de la trombe au point (x, z) (hPa, à ajouter) : l'air qui tourne vite autour
+  // d'elle est retenu par la dépression qu'elle a en son cœur (la force qui le ramène vers le
+  // centre, c'est elle). Pour ce tourbillon : 17 hPa de moins en son centre ; à 150 m, un
+  // hectopascal ; au-delà de 300 m, presque rien
+  pressionTrombe(x, z) {
+    const t = this.trombe;
+    if (!t || t.force <= 0) return 0;
+    const d = Math.hypot(x - t.x, z - t.z);
+    if (d > 600) return 0;
+    const c = BETE.coeur;
+    const v = BETE.vmax * t.force;
+    const k = d < c ? 1 - (d * d) / (2 * c * c) : (c * c) / (2 * d * d);
+    // (ρ v², en pascals : l'air pèse 1,2 kg le mètre cube ; 100 Pa = 1 hPa)
+    return (-1.2 * v * v * k * (1 - lisse(300, 600, d))) / 100;
   }
 
   // ---------- Les grains ----------
   suivreGrains(dt, ctx) {
     const p = ctx.physique.position;
     const v = ctx.physique.vitesse;
-    // ceux qui viendront sur nous : lancés à leur heure
+    // ceux qui viendront sur nous : lancés à leur heure (celui de la bête, s'il n'est pas
+    // trop tard : elle n'est pas encore née)
     this.plansGrains.forEach((plan, k) => {
       const id = `grain${k}`;
       if (this.faits.has(id) || this.heure < this.prevu[id]) return;
       this.faits.add(id);
-      this.lancerGrain(plan, ctx, DANS_GRAIN, k);
+      if (!plan.bete) this.lancerGrain(plan, ctx, DANS_GRAIN, k);
+      else if (!this.trombe && !this.faits.has('trombe')) this.lancerGrainBete(ctx);
     });
     this.grains.maj(dt, this.meteo, p.x, p.z, v.x, v.z);
     const ici = (this.ici = this.grains.mesurer(p.x, p.z, this.ici ?? {}));
+    // celui de la bête : on le voit dès que Jos a fini de parler (au radar, et à l'œil : un
+    // rideau noir au vent), et Jos l'annonce
+    const gb = this.grainBete;
+    if (gb && !this.trombe && this.grains.liste.includes(gb) && (this.radio.libre || this.t - gb.faits.depuis > 20)) {
+      if (!gb.faits.vu) this.voirGrainBete(gb, ctx);
+      if (!gb.faits.annonce) this.annoncerGrainBete(gb, ctx);
+    }
     // celui qui vient sur nous : à moins de 3,3 km, on le voit (le radar, l'écran, le
     // journal) ; Jos l'annonce dès que la radio est libre, ou en coupant la parole s'il est
     // déjà près
@@ -848,26 +1042,56 @@ export class Nuit {
     return g;
   }
 
+  // Où est le point (x, z), vu du bateau (degrés compas)
+  releveDe(x, z, ctx) {
+    const p = ctx.physique.position;
+    return ((Math.atan2(x - p.x, -(z - p.z)) * 180) / Math.PI + 360) % 360;
+  }
+
   // D'où vient le grain, vu du bateau (degrés compas)
   releveGrain(g, ctx) {
-    const p = ctx.physique.position;
     const c = this.grains.noyau(g, g.noyaux[0], {});
-    return ((Math.atan2(c.x - p.x, -(c.z - p.z)) * 180) / Math.PI + 360) % 360;
+    return this.releveDe(c.x, c.z, ctx);
   }
 
   // Un grain vient sur nous : on le voit au radar (l'écran le dit, le journal le note)
   voirGrain(m, ctx) {
     const g = m.grain;
+    if (g.bete) return this.voirGrainBete(g, ctx);
     g.faits.vu = true;
     const releve = this.releveGrain(g, ctx);
     this.emettre('grain', { grain: g, releve, relatif: ecartAngle(releve, ctx.m.cap), distance: m.distance, dans: m.dans, cpa: m.cpa });
-    this.ecrire(`Un grain au ${directionEnMots(releve)}, à ${millesEnMots(m.distance)} : il vient sur nous.`);
+    this.ecrire(`Un grain ${aLaDirection(releve)}, à ${millesEnMots(m.distance)} : il vient sur nous.`);
+  }
+
+  // Le grain de la bête : on le voit (l'écran le dit, le journal le note)
+  voirGrainBete(g, ctx) {
+    g.faits.vu = true;
+    const p = ctx.physique.position;
+    const c = this.grains.noyau(g, g.noyaux[0], {});
+    const distance = Math.hypot(c.x - p.x, c.z - p.z);
+    const releve = this.releveDe(c.x, c.z, ctx);
+    this.emettre('grain', { grain: g, bete: true, releve, relatif: ecartAngle(releve, ctx.m.cap), distance, dans: null, cpa: null });
+    this.ecrire(`Un grain ${aLaDirection(releve)}, à ${millesEnMots(distance)}, plein d'éclairs : il avance moins vite que les autres.`);
+  }
+
+  // Jos le voit sur son radar, et il n'aime pas ça
+  annoncerGrainBete(g, ctx) {
+    g.faits.annonce = true;
+    if (this.silence) return;
+    const p = ctx.physique.position;
+    const c = this.grains.noyau(g, g.noyaux[0], {});
+    this.dire([
+      `${NOM_BATEAU}, regarde dans ton ${directionEnMots(this.releveDe(c.x, c.z, ctx))}, à ${millesEnMots(Math.hypot(c.x - p.x, c.z - p.z))} : un grain. Tu dois le voir d'où tu es : un rideau de pluie noire, sous un gros nuage plein d'éclairs.`,
+      'Celui-là, je n\'aime pas sa tête. Sur mon radar, il traîne : il avance moins vite que les autres. C\'est sous ces grains-là que naissent les trombes. Garde un œil dessus.',
+    ]);
   }
 
   // Jos le voit sur son radar : d'où il vient, à quelle distance, ce qu'il y aura dessous,
   // et ce qu'il faut faire
   annoncerGrain(m, ctx) {
     const g = m.grain;
+    if (g.bete) return this.annoncerGrainBete(g, ctx);
     g.faits.annonce = true;
     const releve = this.releveGrain(g, ctx);
     if (!g.faits.annoncer || this.silence) return;
@@ -891,11 +1115,12 @@ export class Nuit {
   // ---------- Le baromètre ----------
   // La pression ici : celle de la dépression qui arrive (elle baisse bien avant que le vent
   // forcisse, touche le fond quand le front passe, puis remonte d'un coup), la marée
-  // barométrique, et le bond des grains, quand arrive leur rafale (monde/pression.js,
-  // monde/grains.js). Le baromètre du bord la montre (jeu.js) ; Jos s'en sert.
+  // barométrique, le bond des grains, quand arrive leur rafale (monde/pression.js,
+  // monde/grains.js), et le creux de la trombe, quand elle passe tout près (pressionTrombe).
+  // Le baromètre du bord la montre (jeu.js) ; Jos s'en sert.
   suivreBarometre(dt, ctx) {
     const p = ctx.physique.position;
-    this.pression = pressionDuJour(this.heure) + this.grains.pressionEn(p.x, p.z);
+    this.pression = pressionDuJour(this.heure) + this.grains.pressionEn(p.x, p.z) + this.pressionTrombe(p.x, p.z);
     if (this.pression < (this.stats.pressionMin ?? Infinity)) {
       this.stats.pressionMin = this.pression;
       this.stats.heurePressionMin = this.heure;
@@ -1035,7 +1260,7 @@ export class Nuit {
     const milles = Math.hypot(c.x - p.x, c.z - p.z) / 1852;
     this.ecrire('Un cargo en route de collision.');
     this.dire([
-      `${NOM_BATEAU}, ici ${JOS}. Je vois sur mon radar un cargo à ${milles < 1.3 ? 'un mille' : `${Math.round(milles)} milles`} de toi, ${directionRelative(ecartAngle(releve, ctx.m.cap))}. Il fait route au ${directionEnMots(cap)}, droit sur toi.`,
+      `${NOM_BATEAU}, ici ${JOS}. Je vois sur mon radar un cargo à ${milles < 1.3 ? 'un mille' : `${Math.round(milles)} milles`} de toi, ${directionRelative(ecartAngle(releve, ctx.m.cap))}. Il fait route ${aLaDirection(cap)}, droit sur toi.`,
       'Dans cette mer, il ne t\'a sûrement pas vu. Appelle-le sur le canal seize : la radio, dans la timonerie, à droite du siège ! Tu le verras aussi sur ton radar.',
     ], { urgent: true });
     this.emettre('cargo', c);
@@ -1061,7 +1286,7 @@ export class Nuit {
     const releve = (Math.atan2(p.x - c.x, -(p.z - c.z)) * 180) / Math.PI;
     const cote = ecartAngle(releve, c.cap) >= 0 ? 'tribord' : 'bâbord';
     this.radio.taire?.();
-    this.dire([`Cargo faisant route au ${directionEnMots(c.cap)}, ici le voilier ${NOM_BATEAU}, à un mille sur votre ${cote}. Me recevez-vous ?`], { emetteur: `Toi (${NOM_BATEAU})`, canal: 16 }).then(() => {
+    this.dire([`Cargo faisant route ${aLaDirection(c.cap)}, ici le voilier ${NOM_BATEAU}, à un mille sur votre ${cote}. Me recevez-vous ?`], { emetteur: `Toi (${NOM_BATEAU})`, canal: 16 }).then(() => {
       if (this.cargo !== c || this.etat !== 'nuit') return;
       const sens = this.cotePourPasserDerriere(c, ctx);
       c.capVise = c.cap + 50 * sens;
@@ -1259,7 +1484,8 @@ export class Nuit {
     return [
       { id: 'pilote', apres: 3, repos: 30, si: (ctx) => this.avaries.pilote === 'panne' && ctx.mode !== 'barre', dire: 'Personne à la barre ! Prends-la, sinon le bateau va se mettre en travers des vagues.' },
       // (un grain annoncé arrive, et la toile n'est pas réduite)
-      { id: 'grain', apres: 2, repos: 35, si: (ctx) => { const m = this.menaceGrain; return !!m && m.distance < 2000 && m.grain.faits.annoncer && !toilePrete(ctx.physique, this.meteo.vent + m.grain.force * 15); }, dire: 'Le grain est presque sur toi, et tu as encore trop de toile ! Réduis, vite.' },
+      // (pas celui de la bête : il ne souffle guère devant lui, et il faut sa toile pour s'écarter d'elle)
+      { id: 'grain', apres: 2, repos: 35, si: (ctx) => { const m = this.menaceGrain; return !!m && m.distance < 2000 && m.grain.faits.annoncer && !m.grain.bete && !toilePrete(ctx.physique, this.meteo.vent + m.grain.force * 15); }, dire: 'Le grain est presque sur toi, et tu as encore trop de toile ! Réduis, vite.' },
       // (une vague scélérate arrive, et le bateau ne lui tourne pas le dos)
       { id: 'scelerate', apres: 3, repos: 14, si: (ctx) => { const w = this.scelerates?.vague; return !!w && w.faites.has('annonce') && w.distance > 150 && w.distance < 760 && Math.abs(ecartAngle(w.depuis, ctx.m.cap)) < 140; }, dire: 'Elle va te prendre par le travers ! Abats, mets-la droit dans ton arrière, vite !' },
       { id: 'harnais', apres: 4, repos: 40, si: (ctx) => this.meteo.vent >= 25 && ctx.aBord.dehors && !ctx.aBord.attache, dire: 'Accroche ton harnais, touche X ! Une déferlante peut t\'emporter.' },
@@ -1399,9 +1625,14 @@ export class Nuit {
     MOMENTS.forEach((mo, k) => { if (mo.heure <= this.heure) this.faits.add(`moment-${k}`); });
     for (const nom of ['trombe', 'cargo', 'lumiere', 'voix16', 'silence', 'coups', 'scelerate0', 'scelerate1', 'scelerate2']) if (this.prevu[nom] < this.heure) this.faits.add(nom);
     for (const nom of ['ecouteFoc', 'pilote']) if (this.prevu[nom] < this.heure) this.prevu[nom] = Infinity;
-    // (les grains : ceux d'avant cette heure sont passés ; les autres naîtront)
-    this.plansGrains.forEach((_, k) => { if (this.prevu[`grain${k}`] < this.heure) this.faits.add(`grain${k}`); });
+    // (les grains : ceux d'avant cette heure sont passés ; les autres naîtront — celui de la
+    // bête aussi, tant qu'elle n'est pas née)
+    this.plansGrains.forEach((plan, k) => {
+      if (plan.bete ? this.faits.has('trombe') : this.prevu[`grain${k}`] < this.heure) this.faits.add(`grain${k}`);
+      else if (plan.bete) this.faits.delete(`grain${k}`);
+    });
     this.grains.vider();
+    this.grainBete = null;
     this.foudre.vider();
     this.ici = null;
     this.silence = this.faits.has('silence') && this.heure < this.prevu.silence + 0.55;
@@ -1432,7 +1663,7 @@ export class Nuit {
       peur: this.peur.instantane(),
       voiles: { ris: p.ris, deroule: p.deroule, ecouteFocLibre: p.ecouteFocLibre, grandVoileDechiree: p.grandVoileDechiree, focDechire: p.focDechire },
       // (les grains en route vers nous : on les relance à la reprise, d'où sera le bateau)
-      grainsEnRoute: this.grains.liste.filter((g) => g.prevu && !g.faits.rafale && g.plan !== undefined)
+      grainsEnRoute: this.grains.liste.filter((g) => g.prevu && !g.faits.rafale && g.plan !== undefined && !g.bete)
         .map((g) => ({ plan: g.plan, dans: Math.max(90, (g.dans ?? DANS_GRAIN) - g.age) })),
     };
   }
@@ -1464,6 +1695,8 @@ export class Nuit {
     });
     this.sauvegarde = { ...s, faits: new Set(s.faits) };
     for (const nom of ['trombe', 'cargo', 'ecouteFoc', 'pilote', 'lumiere', 'voix16', 'silence', 'coups', 'scelerate0', 'scelerate1', 'scelerate2', 'grain0', 'grain1', 'grain2', 'grain3']) this.prevu[nom] ??= Infinity; // (JSON : Infinity devient null)
+    // (le grain de la bête : dès le coucher du soleil, même dans une partie gardée avant lui)
+    this.plansGrains.forEach((plan, k) => { if (plan.bete) this.prevu[`grain${k}`] = HEURE_COUCHER; });
     this.scelerates?.finir();
     this.aLancer = null;
     // (les grains : ceux d'alentour renaîtront ; ceux qui venaient sur nous repartent)
@@ -1471,6 +1704,8 @@ export class Nuit {
     this.foudre.vider();
     this.ici = null;
     this.menaceGrain = null;
+    this.grainBete = null;
+    this.vitesseLissee = null;
     for (const r of s.grainsEnRoute ?? []) if (this.plansGrains[r.plan]) this.lancerGrain(this.plansGrains[r.plan], ctx, r.dans, r.plan);
     this.peur.restaurer(s.peur);
     this.silence = this.faits.has('silence') && this.heure < this.prevu.silence + 0.55;

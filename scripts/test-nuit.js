@@ -52,7 +52,7 @@ verifier(prudent.scelerates.length === 3, 'trois vagues scélérates sont passé
 verifier(prudent.scelerates.every((v) => v.angle > 140), 'le prudent les a toutes prises par l\'arrière (à plus de 140°)');
 verifier(prudent.stats.sceleratesCouche <= 1, 'elles ne l\'ont pas couché (une fois au plus)');
 verifier(prudent.heureFin >= HEURE_AUBE, 'la nuit va jusqu\'à 6 h');
-const annonces = prudent.journal.filter((j) => j.texte.startsWith('Un grain au')).length;
+const annonces = prudent.journal.filter((j) => /^Un grain (au |à l')/.test(j.texte)).length;
 verifier(prudent.stats.grains >= 3 && annonces >= 3, `des grains sont passés sur le prudent (${prudent.stats.grains}), annoncés par Jos (${annonces})`);
 verifier(prudent.stats.rafaleMax > 45, `leurs rafales soufflent fort (jusqu'à ${Math.round(prudent.stats.rafaleMax)} nœuds)`);
 // (« à verse » : la pluie de partout fait la moitié ; sous le cœur d'un grain, tout le reste.

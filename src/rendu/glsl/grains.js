@@ -29,7 +29,7 @@ export const UNIFORMS_GRAINS = {
   uRideauxEclair: { value: null }, // l'éclair : le début de son trait (m), intensité…
   uRideauxEclairB: { value: null }, // … et sa fin (m)
   uGrainsVent: { value: null }, // [x, z du cœur dense, rayon (m), intensité]
-  uGrainsDir: { value: null }, // [direction de sa route x, z, 0, 0]
+  uGrainsDir: { value: null }, // [direction de sa route x, z, bord de sa rafale devant lui (en rayons), 0]
   uGrainsN: { value: 0 },
 };
 
@@ -156,7 +156,9 @@ vec2 rafaleGrains(vec2 p) {
     float R = g.z;
     if (r > 2.4 * R) continue;
     float devant = r > 1.0 ? dot(dp / r, uGrainsDir[i].xy) : 0.0;
-    float bord = R * (1.05 + 0.85 * (0.5 + 0.5 * devant));
+    // (le bord de sa rafale, devant lui : à 1,9 rayon — moins pour celui qui porte la
+    // trombe : monde/grains.js, bordDeLaRafale)
+    float bord = R * (1.05 + (uGrainsDir[i].z - 1.05) * (0.5 + 0.5 * devant));
     float dedans = 1.0 - smoothstep(bord - 0.15 * R, bord + 0.2 * R, r);
     rafale = max(rafale, g.w * dedans * (0.3 + 0.7 * smoothstep(0.0, 0.6 * R, r)) * (0.4 + 0.6 * (0.5 + 0.5 * devant)));
     front = max(front, g.w * smoothstep(0.0, 0.6, devant) * smoothstep(bord + 0.2 * R, bord, r) * smoothstep(bord - 0.5 * R, bord - 0.12 * R, r));

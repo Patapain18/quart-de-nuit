@@ -38,9 +38,11 @@ export const MARINS = {
       return nuit.meteo.vent >= 28 ? 165 : 140;
     },
     voiles(nuit, b, e, dt) {
-      // (un grain qui vient sur lui, ou sa rafale : il réduit comme pour le vent qu'il fera dessous)
+      // (un grain qui vient sur lui, ou sa rafale : il réduit comme pour le vent qu'il fera
+      // dessous — sauf pour celui de la bête : Jos dit de le surveiller, et il lui faut sa
+      // toile pour s'écarter d'elle)
       const m = nuit.menaceGrain;
-      const grain = m && m.distance < 2600 ? m.grain.force * 15 : (nuit.ici?.agitation ?? 0) > 0.15 ? 13 : 0;
+      const grain = m && m.distance < 2600 && !m.grain.bete ? m.grain.force * 15 : (nuit.ici?.agitation ?? 0) > 0.15 ? 13 : 0;
       const vent = nuit.meteo.vent + grain;
       if (nuit.avaries.grandVoile === 'dechiree' || vent >= 34) b.ris = 3;
       else b.ris = 2;
@@ -88,17 +90,20 @@ const radioMuette = { libre: true, parler: () => ({ then: (f) => f(true) }), tai
 //   pas : la durée d'une image simulée (s)
 //   echantillon : toutes les combien de secondes on note l'état de chacun (pour les courbes)
 //   surProgres(nuit, t) : appelé toutes les 10 s simulées
+//   heureMax : on s'arrête à cette heure du jeu (sa fin : 'arret')
+//   radio(cle) : la radio de chaque marin (par défaut, une radio muette, toujours libre)
+//   surImage(e, t) : appelé à chaque image, pour chaque marin (e : { nuit, b (le bateau), ctx… })
 // Renvoie, pour chaque marin : sa fin ('aube', ou la raison du naufrage), ses chiffres
 // (nuit.stats), son journal, ses avaries, et ses courbes.
 export function jouerLaNuit({
   difficulte = 'marin', niveau = null, graine = 3, marins = Object.keys(MARINS), fine = false,
-  pas = 1 / 60, echantillon = 2, surProgres = null,
+  pas = 1 / 60, echantillon = 2, surProgres = null, heureMax = Infinity, surImage = null, radio = null,
 } = {}) {
   const houle = new Houle({ graine: 4 + graine * 17, cascades: CASCADES.filter((c) => c.physique).map((c) => ({ ...c, n: fine ? c.n : 64 })) });
   const sousPas = Math.max(2, Math.round(pas * 240));
   const equipages = marins.map((cle, k) => {
     const marin = MARINS[cle];
-    const nuit = new Nuit({ radio: radioMuette, difficulte, graine });
+    const nuit = new Nuit({ radio: radio?.(cle) ?? radioMuette, difficulte, graine });
     if (niveau) nuit.niveau = { ...nuit.niveau, ...niveau };
     const b = new PhysiqueVoilier();
     // au coucher du soleil, à 6 milles au sud de Kervalen (à 2,5 km les uns des autres :
@@ -146,6 +151,10 @@ export function jouerLaNuit({
       e.ctx = ctx;
       nuit.maj(pas, ctx);
       if (nuit.etat !== 'nuit') continue;
+      if (nuit.heure >= heureMax) {
+        e.fin = 'arret';
+        continue;
+      }
       // le pilote a lâché : le marin barre, puis réarme le disjoncteur
       if (nuit.avaries.pilote === 'panne' && e.pilote) {
         e.pilote = false;
@@ -183,6 +192,7 @@ export function jouerLaNuit({
       v.add(trombe).add(grain);
       b.avancer(pas, houle, v, sousPas);
       if (b.reprises) e.fin = 'instable';
+      surImage?.(e, t);
       // la gîte après chaque déferlante
       for (const d of [...e.deferlantes, ...e.scelerates]) {
         if (d.suivi <= 0) continue;

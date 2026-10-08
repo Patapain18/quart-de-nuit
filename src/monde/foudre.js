@@ -31,7 +31,8 @@ import { REGLAGES_GRAINS } from './grains.js';
 
 export const REGLAGES_FOUDRE = {
   parMinute: 10, // éclairs par minute d'un grain d'orage au plus fort (orage 1, force 1)
-  trombe: 8, // ceux du nuage qui porte la bête, quand elle est au plus fort
+  trombe: 8, // ceux du nuage qui porte la bête, quand elle est au plus fort…
+  sousSonGrain: 0.8, // … qui sont moins nombreux (0,8² : 64 %) quand ce nuage est celui d'un grain, qui a les siens
   exposant: 2, // (un grain deux fois moins actif lance quatre fois moins d'éclairs)
   mer: 0.3, // la part des éclairs qui descendent jusqu'à la mer…
   araignee: 0.12, // … et de ceux qui courent sous la base des nuages (les autres : dans le nuage)
@@ -53,12 +54,13 @@ const lisse = (a, b, x) => {
 // L'électricité d'un grain (0 → 1) : orageux ou pas, sa force, et son âge — ses premiers
 // éclairs viennent quand sa tour a fini de monter, les derniers un peu avant la fin de sa
 // pluie ; et l'air qu'il traverse : quand l'orage s'en va (orage du moment, 0 → 1), les
-// grains qui restent ne font plus guère d'éclairs
+// grains qui restent ne font plus guère d'éclairs. (g.saut : le « saut d'éclairs » d'un
+// grain qui va faire naître une trombe — ses éclairs se multiplient juste avant : jeu/nuit.js)
 export function activiteDuGrain(g, orage = 1) {
   if (!g.orage) return 0;
   const mur = lisse(0.5 * g.naissance, 1.3 * g.naissance, g.age);
   const fin = 1 - lisse(g.duree - REGLAGES_GRAINS.mort, g.duree - 0.3 * REGLAGES_GRAINS.mort, g.age);
-  return g.orage * g.force * mur * fin * (0.4 + 0.6 * lisse(0.3, 0.8, orage));
+  return g.orage * g.force * mur * fin * (0.4 + 0.6 * lisse(0.3, 0.8, orage)) * (g.saut ?? 1);
 }
 
 // Le nombre moyen d'éclairs par seconde d'une cellule d'orage de cette activité
@@ -232,8 +234,11 @@ export class Foudre {
         if (a > 0.005) liste.push({ type: 'grain', grain: g, grains, x: g.x, z: g.z, rayon: g.rayon, activite: a, vx: g.vx, vz: g.vz, parMinute: REGLAGES_FOUDRE.parMinute });
       }
     } else this.majFond(dt, meteo, liste);
+    // (le nuage de la bête : celui du grain qui la porte — ses éclairs à elle, tout autour
+    // d'elle, s'ajoutent à ceux de son grain)
     if (trombe && trombe.force > 0.3) {
-      liste.push({ type: 'trombe', x: trombe.x, z: trombe.z, rayon: 1400, activite: trombe.force, vx: 0, vz: 0, parMinute: REGLAGES_FOUDRE.trombe });
+      const k = trombe.grain ? REGLAGES_FOUDRE.sousSonGrain : 1;
+      liste.push({ type: 'trombe', x: trombe.x, z: trombe.z, rayon: 1400, activite: trombe.force * k, vx: trombe.vx ?? 0, vz: trombe.vz ?? 0, parMinute: REGLAGES_FOUDRE.trombe });
     }
     return liste;
   }

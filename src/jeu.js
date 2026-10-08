@@ -1202,7 +1202,9 @@ function majRadar(dt) {
   r.cibles.length = 0;
   for (const b of journee?.bouees?.values() ?? []) r.cibles.push({ x: b.x, z: b.z, rayon: 6, force: 0.75 });
   if (nuit?.cargo) r.cibles.push({ x: nuit.cargo.x, z: nuit.cargo.z, rayon: 90, force: 1 });
-  if (nuit?.trombe?.force > 0.1) r.cibles.push({ x: nuit.trombe.x, z: nuit.trombe.z, rayon: 170, force: 0.4 + 0.45 * nuit.trombe.force });
+  // (la trombe : sous son grain, un écho serré au bout du crochet de pluie qui s'enroule
+  // autour d'elle — monde/grains.js)
+  if (nuit?.trombe?.force > 0.1) r.cibles.push({ x: nuit.trombe.x, z: nuit.trombe.z, rayon: nuit.trombe.grain ? 80 : 170, force: 0.4 + 0.45 * nuit.trombe.force });
   // la crête d'une vague scélérate : une longue ligne qui avance (elle renvoie l'onde)
   const v = monde.houle.scelerates[0];
   if (v && v.force > 0.05) {
@@ -1481,12 +1483,13 @@ function commencerNuit({ depuisJournee = false, bateau: bateauGarde = null, repr
       }
     })
     .on('grain', (g) => {
-      if (g.grain.faits.annoncer) afficherMessage(`Un grain arrive ${directionRelative(g.relatif)}, à ${(g.distance / 1852).toFixed(1).replace('.', ',')} mille : réduis la toile avant sa rafale`);
+      if (g.bete) afficherMessage(`Un grain ${directionRelative(g.relatif)}, à ${(g.distance / 1852).toFixed(1).replace('.', ',')} mille : il avance moins vite que les autres. Garde un œil dessus`);
+      else if (g.grain.faits.annoncer) afficherMessage(`Un grain arrive ${directionRelative(g.relatif)}, à ${(g.distance / 1852).toFixed(1).replace('.', ',')} mille : réduis la toile avant sa rafale`);
     })
     .on('grain-rafale', (g) => afficherMessage(g.faits.annoncer ? 'La rafale du grain ! Tiens ta barre, les vagues dans l\'arrière' : 'La rafale d\'un grain qui passe tout près ! Tiens ta barre'))
     .on('cargo', () => afficherMessage('Un cargo en route de collision ! Appelle-le à la radio (canal 16), dans la timonerie'))
     .on('cargo-klaxon', () => audio.corne?.(5))
-    .on('trombe', () => afficherMessage('Une trombe marine ! Écarte-toi de sa route : lofe et file de travers au vent'))
+    .on('trombe', () => afficherMessage('Une trombe naît sous le grain ! Écarte-toi de sa route : lofe et file de travers au vent'))
     .on('trombe-proche', () => afficherMessage('La trombe arrive sur toi ! Harnais (X), et tiens-toi (Maj)'))
     .on('trombe-touche', ({ force }) => {
       // le tourbillon passe sur le bateau : il le couche et le fait tourner sur lui-même,
