@@ -13,7 +13,7 @@ npm install
 npm run dev
 ```
 
-Puis ouvrir http://localhost:5190/jeu.html. Les ateliers (les coulisses) : `atelier-mer.html` (la mer, le ciel et la lumière), `atelier-bateau.html` (la polaire du voilier), `atelier-tempete.html` (la nuit rejouée en accéléré par des marins automatiques), `atelier-son.html` (écouter et mesurer le son de chaque situation), `atelier-trombe.html` (comparer les trombes marines : leur caractère, leur vie de la naissance à la corde, au crépuscule ou dans la nuit, sous les éclairs, de près, de loin, d'en haut), `atelier-grains.html` (faire passer un grain sur le bateau : son rideau de pluie, sa rafale sur la mer, ses éclairs, ce qu'il fait au bateau en courbes, et le radar).
+Puis ouvrir http://localhost:5190/jeu.html. Les ateliers (les coulisses) : `atelier-mer.html` (la mer, le ciel et la lumière), `atelier-bateau.html` (la polaire du voilier), `atelier-tempete.html` (la nuit rejouée en accéléré par des marins automatiques), `atelier-son.html` (écouter et mesurer le son de chaque situation), `atelier-trombe.html` (comparer les trombes marines : leur caractère, leur vie de la naissance à la corde, au crépuscule ou dans la nuit, sous les éclairs, de près, de loin, d'en haut), `atelier-grains.html` (faire passer un grain sur le bateau : son rideau de pluie, sa rafale sur la mer, ses éclairs, ce qu'il fait au bateau en courbes, et le radar), `atelier-risees.html` (les risées : les voir venir sur l'eau, du matin calme au coup de vent, et ce qu'elles font au bateau quand elles arrivent sur lui).
 
 Dans le jeu, des outils de vérification, à lancer dans la console du navigateur : `__jeu.inspecterPont()` (le plan où l'on marche colle-t-il au modèle 3D ? une carte du pont et de la cabine, tous les 4 cm), `__jeu.essayerLaMarche()` (un marin automatique fait le tour du bord et manie chaque chose), `__jeu.essayerLesEntrees()` (trente marins qui visent à peu près la porte de la timonerie ou l'escalier, de partout : combien passent ?), `__jeu.carteDesPassages()` (le bord vu de dessus, là où le corps passe, frôle ou bute, avec le chemin de chaque essai) et `__jeu.carteDesGestes()` (d'où atteint-on chaque chose ? jamais à travers une paroi).
 
@@ -28,6 +28,8 @@ Au clavier (français) et à la souris. La souris tourne la tête.
 **La timonerie** : un étage vitré sur l'arrière du rouf, avec la vue tout autour. On y entre par la porte du cockpit, et trois marches descendent au carré (le ciré et le gilet sont pendus en bas). Sur la console : le radar, le traceur de cartes (E et Maj + E : l'échelle), la commande du pilote, le **tableau électrique** (les feux de navigation, l'éclairage, le disjoncteur du pilote : on l'atteint assis) et les répétiteurs ; sur la paroi tribord, la VHF, le baromètre et la pendule. Assis au poste (E sur le siège), on tient le cap au pilote : Q / D pour 1°, Maj + Q / D pour 10°, Espace pour se lever. Les choses s'attrapent à portée de main, jamais à travers une paroi, une vitre ou la porte fermée.
 
 **Le radar** : l'écran est sur la console de la timonerie, et un petit répétiteur dans le cockpit, au-dessus du compas. Regarde-le et appuie sur E pour changer de portée (0,75 à 6 milles), Maj + E pour le filtre de mer. Il montre la côte, les bouées, les grains (les vrais : ceux qui passent sur la mer), le cargo, la trombe, la crête des vagues scélérates… et parfois ce qui n'est pas là : un écho qui te suit, quoi que tu fasses ; l'alarme de la zone de garde, pour un écho à cent mètres de ton sillage.
+
+**Les risées** : les taches plus sombres qui courent sur l'eau, au vent, sont des risées : du vent plus fort, qui arrive sur toi avec le vent. On les voit venir (et on entend l'eau froissée chuinter juste avant) ; quand une risée est sur toi, le bateau gîte, accélère, et le vent tourne un peu : choque un peu, ou lofe. Les taches plus claires, plus lisses, sont des molles : le vent y faiblit.
 
 **La nuit noire** : au cœur de la tempête, il fait noir d'encre. Tu ne vois que ce qu'éclairent ta frontale (F) et les feux du bord, le plancton qui s'allume dans ton sillage et dans les vagues qui brisent autour de toi, et, le temps d'un éclair, toute la mer. Le radar devient tes yeux.
 
@@ -49,13 +51,14 @@ Tout ce qui ne dépend pas de l'écran se vérifie sans navigateur :
 npm run test-physique   # le voilier flotte, se redresse, avance
 npm run test-houle      # la hauteur des vagues selon le vent
 npm run test-pont       # on marche partout à bord sans rester coincé, on rentre dans le cockpit de partout, la porte fermée tient
-npm run test-barre      # la barre assistée tient le cap, à toutes les allures et dans la tempête (≈ 1 min)
+npm run test-barre      # la barre assistée tient le cap, à toutes les allures et dans la tempête (≈ 3 min)
 npm run test-journee    # un élève automatique fait toute la journée (≈ 1 min)
 npm run test-tempete    # dans la tempête, la bonne tactique protège vraiment (≈ 2 min)
 npm run test-nuit       # trois marins automatiques font la nuit : le prudent voit l'aube (≈ 1 min)
 npm run test-scelerate  # la vague scélérate de 20 m, prise de six façons, sur trois mers (≈ 2 min)
 npm run test-peur       # trois nuits de peur avec un marin simulé : rien n'est jamais confirmé
 npm run test-grains     # un grain passe sur le bateau : tout arrive dans le bon ordre (le ciel, l'averse qu'on entend, la rafale, la pluie, l'accalmie)
+npm run test-risees     # une risée arrive à l'heure, on la voit venir, le vent ne forcit que quand elle est là ; sur une heure, des rafales comme il faut
 npm run polaire         # la vitesse du voilier selon le vent (src/physique/polaire.json)
 node scripts/reglage-scelerate.js 20 7.4,8.5 0.5,0.69 0.35   # régler la vague (plusieurs réglages en parallèle)
 ```
@@ -74,6 +77,7 @@ Le cahier de conception, étape par étape, avec ce qu'on a appris en route : [D
 - **Le voilier** : construit par le code (`src/bateau/`), et sa physique (`src/physique/voilier.js`) : 346 morceaux de coque qui flottent, les voiles et la quille comme des ailes, le safran qui décroche ou sort de l'eau, l'eau embarquée qui pèse.
 - **La journée et la nuit** : deux moteurs sans écran (`src/jeu/journee.js`, `src/jeu/nuit.js`), que des programmes peuvent jouer de bout en bout (`src/jeu/marins.js`).
 - **Les grains** (`src/monde/grains.js`) : des averses d'orage qui existent à un endroit, avancent avec le vent, naissent et meurent ; tout ce qui les touche en dépend — la pluie qui tombe ici, le vent du bateau (la rafale de l'air froid qui tombe d'eux arrive avant la pluie ; sur leurs côtés, le vent tourne ; derrière eux, il mollit), leur nuage d'orage au-dessus, leurs rideaux de pluie (calculés d'un coup dans les shaders : `src/rendu/glsl/grains.js`), la mer froissée sous la rafale, les éclairs qui tombent dedans, le bruit de l'averse qui approche, l'écho au radar, ce que dit Jos, les avaries qui lâchent dans la rafale. Le premier morceau du « monde connecté » (`DESIGN.md`).
+- **Les risées** (`src/monde/risees.js`) : les rafales ne tombent plus au hasard. Ce sont des taches de vent plus fort (et des molles, de vent plus faible) qui existent à un endroit autour du bateau, avancent avec le vent, naissent, vivent une à deux minutes et s'effacent : le bateau les sent quand il est dedans (`src/monde/vent.js`), la mer les dessine (une petite carte vue d'en haut, `src/rendu/risees.js` : l'eau y est froissée, plus sombre, plus blanche par vent fort), on les entend arriver, et Jos les montre le matin.
 - **Le son** : de vrais enregistrements, tous dans le domaine public (CC0 : BigSoundBank de Joseph Sardin, et Freesound), coupés et réglés par `npm run sons` d'après la recette `scripts/sons/recette.mjs` (8 Mo dans `public/sons/`), puis mélangés en direct par la Web Audio API selon le vent, la pluie, la mer, et selon qu'on est dehors ou dans la cabine (`src/son/audio.js`) ; quelques sons calculés font le reste. La voix de Jos est celle du navigateur. L'**atelier du son** (`atelier-son.html`) fait écouter et mesure le volume ressenti de chaque situation.
 
 Fait avec Three.js (licence MIT) et Vite. Inspiré d'une vidéo d'Isaac Johnson (un voilier sous l'orage, en Three.js). Kervalen, *Morgane*, Jos et le cargo *Ar Men* sont inventés.

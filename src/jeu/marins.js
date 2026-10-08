@@ -175,9 +175,9 @@ export function jouerLaNuit({
           e.cargoVu = undefined;
         }
       }
-      // le vent : le vent du moment (ses rafales, plus nombreuses sous un grain), la trombe,
-      // et l'air froid qui tombe des grains
-      const v = e.vent.maj(t, pas, nuit.meteo, nuit.ici?.agitation ?? 0).clone();
+      // le vent : le vent du moment (ses risées, autour du bateau, plus nombreuses sous un
+      // grain), la trombe, et l'air froid qui tombe des grains
+      const v = e.vent.maj(t, pas, nuit.meteo, nuit.ici?.agitation ?? 0, b.position.x, b.position.z, nuit.grains).clone();
       nuit.ventTrombe(b.position.x, b.position.z, trombe);
       nuit.ventGrains(b.position.x, b.position.z, grain);
       v.add(trombe).add(grain);

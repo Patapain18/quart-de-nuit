@@ -99,6 +99,8 @@ export class Monde3D {
     // les grains (monde/grains.js : le jeu donne ceux de la nuit, ou ceux du décor) ; et ce
     // qu'ils font là où est la caméra (la pluie qui tombe ici, leur vent…)
     this.etatGrains = null;
+    // les risées (monde/risees.js : le jeu donne celles qui vivent autour du bateau)
+    this.etatRisees = null;
     this.ici = { pluie: 0, agitation: 0, ombre: 0, approche: 0, vent: { x: 0, y: 0, z: 0 }, grain: null };
     this.bateau = null;
     this.aPrecompiler = []; // (d'autres objets qui n'apparaissent que plus tard : le jeu les ajoute)
@@ -505,6 +507,7 @@ export class Monde3D {
     const face = Math.max(0, -regard.dot(vent.clone().normalize()));
     this.gouttes.maj(dt, { pluie: ici.pluie * Math.min(1, m.vent / 20), face, dehors: !this.dansLaCabine });
     this.post.reglages.uForceGouttes.value = this.dansLaCabine || !this.gouttesActives ? 0 : 1;
+    this.eau.risees.maj(dt, this.etatRisees, this.camera, m);
     this.mesurer('eau', () => this.eau.preparer(this.camera));
     this.mesurer('ciel', () => this.ciel.preparer(this.camera, { toutLeCube }));
     this.mesurer('trombe', () => this.trombe.preparer(this.camera));

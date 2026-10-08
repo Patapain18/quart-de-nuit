@@ -20,6 +20,7 @@ import { glslFront } from './glsl/front.js';
 import { LONGUEUR as LONGUEUR_CARGO, GLSL_CARGO } from './forme-cargo.js';
 import { GLSL_SCELERATE, reglerUniformsScelerate } from '../mer/scelerate.js';
 import { glslGrains } from './glsl/grains.js';
+import { RiseesRendu, GLSL_RISEES } from './risees.js';
 
 const N_SILLAGE = 24; // points du sillage (le premier : la poupe ; puis un toutes les 2,5 s)
 const N_CARGO = 24; // ceux du cargo (un toutes les 7 s : près de trois minutes, plus d'un kilomètre)
@@ -224,6 +225,7 @@ float ecumeScelerate(Scelerate sc, vec2 p) {
 }
 ${glslFront('uBruit')}
 ${glslGrains('uBruit')}
+${GLSL_RISEES}
 
 float saturer(float x) { return clamp(x, 0.0, 1.0); }
 
@@ -436,6 +438,17 @@ ${cascades.map((_, i) => `  p = texture(uPentes${i}, vSource / uGrille${i}.x);
   // ciel clair de l'horizon : elle fonce), et son bord avance comme une ligne sombre
   vec2 rafale = rafaleGrains(vMonde.xz);
   variance += 0.09 * rafale.x + 0.14 * rafale.y;
+  // les risées (rendu/risees.js) : sous leur vent plus fort, l'eau se froisse (elle ne
+  // reflète plus le ciel clair de l'horizon : elle fonce), par plaques qui filent avec le
+  // vent, et plus encore à leur bord avant, là où elles arrivent ; dans une molle, elle se
+  // lisse (elle brille, plus claire)
+  vec2 risee = riseesEn(vMonde.xz);
+  // (par petit temps, l'eau presque lisse se froisse beaucoup pour un peu de vent en plus ;
+  // dans la tempête, elle l'est déjà partout)
+  risee *= 1.7 - 0.9 * smoothstep(8.0, 30.0, uRiseesCentre.w);
+  float froisse = risee.x;
+  if (froisse > 0.0) froisse *= 0.55 + 0.9 * texture(uBruit, vec3((vMonde.xz - uRiseesGlisse.zw) / 90.0, 0.29)).g;
+  variance = max(0.0, variance * (1.0 + 2.5 * min(froisse, 0.0)) + 0.25 * max(froisse, 0.0) + 0.12 * risee.y);
 
   vec3 n = normalize(vec3(-pente.x, 1.0, -pente.y));
   vec3 versOeil = cameraPosition - vMonde;
@@ -448,8 +461,13 @@ ${cascades.map((_, i) => `  p = texture(uPentes${i}, vSource / uGrille${i}.x);
     couleur = uCouleurTranslucide * (uAmbiance + uSoleil) * 0.4;
   } else {
     float nv = max(dot(n, v), 1e-4);
+    // (dans une risée, l'eau est couverte de petites rides : vues en rasant, beaucoup se
+    // tournent un peu vers nous, et l'on y voit l'eau sombre plutôt que le ciel clair de
+    // l'horizon — c'est pour cela qu'une risée paraît sombre)
+    float rides = 0.9 * sqrt(max(froisse, 0.0) * 0.16 + 0.1 * risee.y);
     float fresnel = 0.02 + 0.98 * pow(1.0 - nv, 5.0);
-    float a = clamp(sqrt(variance * 0.5 + uRugosite * uRugosite * (1.0 - 0.6 * bateau.z)), 0.02, 0.6);
+    float fresnelRides = 0.02 + 0.98 * pow(1.0 - min(1.0, nv + rides), 5.0);
+    float a = clamp(sqrt(variance * 0.5 + uRugosite * uRugosite * (1.0 - 0.6 * bateau.z) * max(0.3, 1.0 + 3.0 * froisse)), 0.02, 0.6);
 
     // le reflet du ciel (jamais sous l'horizon : on reflète alors le ciel bas)
     vec3 r = reflect(-v, n);
@@ -496,6 +514,8 @@ ${cascades.map((_, i) => `  p = texture(uPentes${i}, vSource / uGrille${i}.x);
     corps += uCouleurFond * lumiereBord * 1.5 + uCouleurTranslucide * lumiereBord * 0.25 * crete;
 
     couleur = corps * (1.0 - fresnel) + reflet * fresnel + eclats;
+    // (la part du ciel que les rides d'une risée ne renvoient plus : l'eau profonde, sombre)
+    couleur += (uCouleurFond * lumiere - reflet) * (fresnel - fresnelRides);
     // sous les remous du bateau, l'eau pleine de bulles s'éclaircit, turquoise
     couleur += uCouleurTranslucide * lumiere * bateau.w * 0.4 * (1.0 - fresnel);
 
@@ -507,8 +527,9 @@ ${cascades.map((_, i) => `  p = texture(uPentes${i}, vSource / uGrille${i}.x);
                    + texture(uBruit, vec3(q.x * 0.17, q.y * 0.5, 0.63 - uTemps * 0.005)).b * 0.3
                    + texture(uBruit, vec3(vSource * 0.9, 0.4)).a * 0.15;
     // seuil réglé selon le vent : ~1 % de la mer blanchit par 13 nœuds, ~20 % par 48 nœuds
-    // (sous la rafale d'un grain, la mer blanchit davantage)
-    float seuil = uSeuilEcume - 0.16 * rafale.x;
+    // (sous la rafale d'un grain, la mer blanchit davantage ; dans une risée aussi, comme
+    // sous un vent plus fort)
+    float seuil = uSeuilEcume - 0.16 * rafale.x - 0.018 * uRiseesCentre.w * max(risee.x, 0.0) / (1.7 - 0.9 * smoothstep(8.0, 30.0, uRiseesCentre.w));
     float fraiche = smoothstep(seuil, seuil + 0.35, ecume);
     // la trombe arrache la mer. Sa vie, sur l'eau (Golden, 1974) : d'abord une tache
     // sombre ; puis des bandes d'écume qui s'enroulent en spirales vers son pied ; puis
@@ -697,6 +718,8 @@ export class Eau {
       sortie.textures[1].anisotropy = anisotropie;
       return { cascade: c, entree, sortie };
     });
+    // les risées sur la mer (leur carte, vue d'en haut, autour de nous)
+    this.risees = new RiseesRendu();
     this.passe = new PassePleinEcran(new THREE.ShaderMaterial({
       glslVersion: THREE.GLSL3,
       uniforms: { uDonnees: { value: null }, uPas: { value: 1 }, uN: { value: 128 } },
@@ -756,6 +779,7 @@ export class Eau {
       uScelerate3: { value: new THREE.Vector4() },
       ...ciel.uniformsFront,
       ...ciel.grains.uniforms,
+      ...this.risees.uniforms,
     };
     // une texture de déplacement, une de pentes et une fiche (taille, texel, flou max) par grille
     this.grilles.forEach(({ cascade: c, sortie }, i) => {

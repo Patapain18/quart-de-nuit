@@ -177,6 +177,35 @@ export const LECONS = [
         conseils: [{ si: (ctx) => angleVent(ctx) > 163, apres: 1, repos: 12, dire: 'Pas trop ! Remonte un peu vers le vent, sinon la bôme va passer de l\'autre côté.' }],
         bravo: 'Près, travers, largue : ce sont les allures. Retiens-les bien.',
       },
+      {
+        // (une risée envoyée sur le bateau : monde/risees.js ; et une autre, si celle-ci l'a
+        // manqué parce qu'il a changé de route)
+        id: 'vent.risee',
+        dire: [
+          'Encore une chose. Regarde au vent, sur l\'eau : tu vois ces taches plus sombres ? Ce sont des risées : du vent plus fort, qui court sur la mer.',
+          'Elles viennent vers toi avec le vent. Il y en a une qui arrive : remets-toi au travers, et regarde ce qu\'elle fait au bateau quand elle passe.',
+        ],
+        objectif: 'Laisse passer une risée sur le bateau (regarde au vent)',
+        debut: (ctx, memo) => {
+          ctx.envoyerRisee?.({ dans: 40 });
+          memo.envoyee = 0;
+        },
+        verifier: (ctx, memo) => {
+          const r = ctx.risee;
+          if (r && !r.approche && r.force < 0.05 && (memo.age ?? 0) - memo.envoyee > 25) {
+            ctx.envoyerRisee?.({ dans: 30 });
+            memo.envoyee = memo.age;
+          }
+          return cumuler(memo, 'risee', (r?.force ?? 0) > 0.12, 3, ctx.dt);
+        },
+        progression: (ctx, memo) => {
+          if ((memo.risee ?? 0) > 0) return 0.6 + 0.4 * memo.risee / 3;
+          const a = ctx.risee?.approche;
+          return a ? 0.6 * Math.max(0, 1 - a.dans / 40) : 0;
+        },
+        conseils: [{ si: (ctx) => angleVent(ctx) > 125 || angleVent(ctx) < 55, apres: 8, repos: 20, dire: 'Remets-toi au travers : la risée vient de là, du côté du vent.' }],
+        bravo: 'Tu l\'as sentie ? Le bateau gîte, il accélère, le vent tourne un peu. Une risée, ça se voit venir : quand elle arrive, choque un peu, ou lofe.',
+      },
     ],
   },
 

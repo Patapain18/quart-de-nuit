@@ -1,0 +1,12 @@
+/* Atelier des risées : la carte vue d'en haut (le reste : l'atelier de la mer et celui des
+   grains) */
+#carte {
+  display: block;
+  width: 100%;
+  max-width: 256px;
+  aspect-ratio: 1;
+  margin: 0 auto;
+  border-radius: var(--rayon);
+  border: 1px solid var(--bordure);
+  background: #0a1a22;
+}

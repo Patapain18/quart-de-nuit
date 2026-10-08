@@ -57,7 +57,7 @@ function essayer(graine, { hauteur, parMetre, force, levier }) {
           e.apres = 12;
         }
       }
-      b.avancer(1 / 60, houle, e.vent.maj(t, 1 / 60, meteo), 4);
+      b.avancer(1 / 60, houle, e.vent.maj(t, 1 / 60, meteo, 0, b.position.x, b.position.z), 4);
       if (b.reprises || !Number.isFinite(b.position.x)) { e.gite = NaN; e.fini = true; continue; }
       if (e.apres > 0) {
         e.apres -= 1 / 60;

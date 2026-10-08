@@ -114,6 +114,7 @@ function eleve(ctx) {
     case 'vent.face': cap = meteo.directionVent; break;
     case 'vent.travers': cap = capPourVent(90, coteActuel()); break;
     case 'vent.largue': cap = capPourVent(140, coteActuel()); break;
+    case 'vent.risee': cap = capPourVent(90, coteActuel()); break;
     case 'gv.auto': etat.regleurAuto = false; break;
     case 'gv.faseyer':
       cap = capPourVent(90, coteActuel());
@@ -198,8 +199,11 @@ function contexte() {
       attache: etat.attache, dehors: etat.dehors, zone: etat.mode === 'pied' ? 'passavant' : 'cockpit',
     },
     evenements: etat.evenements,
+    risee: vent.risees.mesurer(b.position.x, b.position.z, b.vitesse.x, b.vitesse.z, risee),
+    envoyerRisee: (o) => vent.risees.envoyer({ x: b.position.x, z: b.position.z, vbx: b.vitesse.x, vbz: b.vitesse.z, ...o }),
   };
 }
+const risee = {};
 
 // ---------- La journée ----------
 const fins = [];
@@ -222,7 +226,7 @@ for (let n = 0; t < tMax && j.etat !== 'finie'; n++) {
   trajet.xMax = Math.max(trajet.xMax, b.position.x);
   trajet.zMin = Math.min(trajet.zMin, b.position.z);
   trajet.zMax = Math.max(trajet.zMax, b.position.z);
-  b.avancer(DT, houle, vent.maj(t, DT, meteo), 8);
+  b.avancer(DT, houle, vent.maj(t, DT, meteo, 0, b.position.x, b.position.z), 8);
   const ctx = contexte();
   const avant = j.i;
   j.maj(DT, ctx);

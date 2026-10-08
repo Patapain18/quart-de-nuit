@@ -49,6 +49,8 @@ monde.regler(meteo);
 const bateau = monde.ajouterBateau();
 const physique = new PhysiqueVoilier();
 const vent = new Vent(5);
+// (ses risées, la mer les dessine)
+monde.etatRisees = vent.risees;
 // les grains (monde/grains.js) : la nuit, ceux de la nuit (jeu/nuit.js) ; le jour et sur
 // l'écran d'accueil, ceux du décor, qui vivent ici
 const grainsDuDecor = new Grains(13);
@@ -562,9 +564,12 @@ function simuler(dt) {
     grainsDuDecor.maj(dt, meteo, p.x, p.z, physique.vitesse.x, physique.vitesse.z);
     ici = grainsDuDecor.mesurer(p.x, p.z, ici);
   } else if (nuit.ici) ici = nuit.ici;
-  // le vent : le vent du moment (ses rafales viennent plus souvent sous un grain), et l'air
-  // froid qui tombe des grains (la rafale qui les précède, le vent qui tourne sur leurs côtés)
-  const v = vent.maj(monde.temps, dt, meteo, ici.agitation);
+  // le vent : le vent du moment, et ses risées (elles vivent autour du bateau ; on les voit
+  // venir sur l'eau ; sous un grain, il y en a bien plus), et l'air froid qui tombe des
+  // grains (la rafale qui les précède, le vent qui tourne sur leurs côtés)
+  const v = vent.maj(monde.temps, dt, meteo, ici.agitation, p.x, p.z, grainsActifs());
+  // (la risée où l'on est, et celle qui arrive : on l'entend, Jos en parle le matin)
+  etat.risee = vent.risees.mesurer(p.x, p.z, physique.vitesse.x, physique.vitesse.z, etat.risee ?? {});
   v.add(grainsActifs().ventEn(p.x, p.z, _grains));
   // (au crépuscule, le tourbillon de la trombe, quand elle passe près : il souffle sur le
   // bateau, le secoue, et lui jette l'eau qu'il arrache à la mer)
@@ -769,6 +774,8 @@ function simuler(dt) {
     // la pluie qui tombe ici, et l'averse d'un grain qui arrive (on l'entend sur la mer)
     pluie: ici.pluie,
     averse: ici.approche,
+    // (la risée qui arrive : l'eau froissée qui chuinte)
+    risee: etat.risee?.niveau ?? 0,
     bordage: etat.bordage,
     houle: monde.houle.hauteurSignificative,
     // la nuit : l'eau à bord, la trombe et le cargo (0 : loin → 1 : sur nous)
@@ -828,6 +835,9 @@ function contexteJournee(dt) {
       zone: marin.zone,
     },
     evenements: etat.evenements,
+    // la risée où l'on est, et celle qui arrive ; en envoyer une sur le bateau (Jos la montre)
+    risee: etat.risee,
+    envoyerRisee: (o) => vent.risees.envoyer({ x: physique.position.x, z: physique.position.z, vbx: physique.vitesse.x, vbz: physique.vitesse.z, ...o }),
   };
 }
 

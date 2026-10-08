@@ -76,7 +76,7 @@ function naviguer(graine) {
           e.apres = APRES;
         }
       }
-      const vent = e.vent.maj(t, 1 / 60, meteo);
+      const vent = e.vent.maj(t, 1 / 60, meteo, 0, b.position.x, b.position.z);
       b.avancer(1 / 60, houle, vent, 4);
       if (b.reprises || !Number.isFinite(b.position.x)) { e.valide = false; e.fini = true; continue; }
       if (t > LANCER && e.scelerates.active) {

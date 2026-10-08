@@ -18,6 +18,7 @@
     "test-scelerate": "node scripts/test-scelerate.js",
     "test-peur": "node scripts/test-peur.js",
     "test-grains": "node scripts/test-grains.js",
+    "test-risees": "node scripts/test-risees.js",
     "sons": "node scripts/preparer-sons.mjs"
   },
   "dependencies": {

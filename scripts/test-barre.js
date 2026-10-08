@@ -21,7 +21,7 @@ const DT = 1 / 60;
 
 // Fait naviguer un bateau. programme(t) : l'axe des touches (-1, 0, 1) à l'instant t ;
 // renvoie les écarts au cap voulu, seconde par seconde, et la trace du cap
-function naviguer({ ambiance, angle, duree, programme = () => 0, ris = 0, deroule = 1, deferlantes = false, graine = 5, assistee = true }) {
+function naviguer({ ambiance, angle, duree, programme = () => 0, ris = 0, deroule = 1, deferlantes = false, graine = 5, graineVent = 7, assistee = true }) {
   const meteo = etatMeteo(AMBIANCES[ambiance]);
   // (la houle « légère » des marins automatiques : les vagues qui comptent pour le bateau,
   // en grilles de 64 : quatre fois plus rapide)
@@ -32,7 +32,7 @@ function naviguer({ ambiance, angle, duree, programme = () => 0, ris = 0, deroul
   b.vitesse.copy(b.avant).multiplyScalar(3);
   b.ris = ris;
   b.deroule = deroule;
-  const vent = new Vent(7);
+  const vent = new Vent(graineVent);
   const vagues = deferlantes ? new Deferlantes(graine * 3) : null;
   const barre = new BarreAssistee();
   b.mesurer();
@@ -48,7 +48,7 @@ function naviguer({ ambiance, angle, duree, programme = () => 0, ris = 0, deroul
     reglerAutomatiquement(b, DT);
     const frappe = vagues?.maj(DT, meteo);
     if (frappe) b.deferlante(frappe.vers, frappe.force);
-    b.avancer(DT, houle, vent.maj(t, DT, meteo), 4);
+    b.avancer(DT, houle, vent.maj(t, DT, meteo, 0, b.position.x, b.position.z), 4);
     if (i % 60 === 0) {
       ecarts.push(assistee ? ecartCap(b.mesures.cap, barre.capVoulu) : 0);
       caps.push(b.mesures.cap);
@@ -114,13 +114,25 @@ console.log('Près du vent : le cap voulu ne reste pas dans le cône interdit');
   verifier(finV < -38 && finV > -60, `tourner à travers le vent : il vire de bord (le vent à ${(-finV).toFixed(0)}° bâbord)`);
 }
 
-console.log('Dans la tempête (40 nœuds, vagues de 5 m, déferlantes), en fuite sous un bout de foc');
+// (dans la tempête, le bateau en fuite est un système chaotique : une risée, une déferlante
+// un peu plus tôt ou un peu plus tard, et une traversée qui passait part au lof. Une seule
+// ne dit rien : on en fait dix — deux mers, cinq vents — et on regarde l'ensemble)
+console.log('Dans la tempête (40 nœuds, vagues de 5 m, déferlantes), en fuite sous un bout de foc : deux mers, cinq vents');
+const traversees = [];
 for (const graine of [9, 21]) {
-  const r = naviguer({ ambiance: 'nuit-tempete', angle: 160, duree: 90, ris: 3, deroule: 0.25, deferlantes: true, graine });
-  const apres = r.ecarts.slice(15);
-  const embardees = apres.filter((e) => Math.abs(e) > 45).length;
-  verifier(rms(apres) < 15 && embardees <= 3, `mer ${graine} : écart moyen ${rms(apres).toFixed(1)}°, au plus ${maxAbs(apres).toFixed(0)}°, ${embardees} s à plus de 45°`);
+  for (const graineVent of [1, 2, 3, 4, 5]) {
+    const r = naviguer({ ambiance: 'nuit-tempete', angle: 160, duree: 90, ris: 3, deroule: 0.25, deferlantes: true, graine, graineVent });
+    const apres = r.ecarts.slice(15);
+    const embardees = apres.filter((e) => Math.abs(e) > 45).length;
+    const tenu = rms(apres) < 15 && embardees <= 3;
+    traversees.push({ rms: rms(apres), tenu });
+    console.log(`    mer ${graine}, vent ${graineVent} : écart moyen ${rms(apres).toFixed(1)}°, au plus ${maxAbs(apres).toFixed(0)}°, ${embardees} s à plus de 45°${tenu ? '' : ' (parti au lof)'}`);
+  }
 }
+const tenues = traversees.filter((x) => x.tenu).length;
+const moyenne = traversees.reduce((a, x) => a + x.rms, 0) / traversees.length;
+verifier(tenues >= 8, `il tient son cap ${tenues} fois sur ${traversees.length} (au moins 8)`);
+verifier(moyenne < 12, `écart moyen sur les dix traversées : ${moyenne.toFixed(1)}° (moins de 12°)`);
 
 console.log(echecs ? `\n${echecs} échec(s)` : '\nTout est bon.');
 process.exit(echecs ? 1 : 0);

@@ -57,7 +57,7 @@ function naviguer(graine) {
       const sens = b.vitesse.dot(b.avant) < -0.2 ? -1 : 1;
       b.barre = sens * Math.max(-0.55, Math.min(0.55, erreur * 0.025 + b.rotation.y * 1.5));
       reglerAutomatiquement(b, 1 / 60);
-      const vent = e.vent.maj(t, 1 / 60, meteo);
+      const vent = e.vent.maj(t, 1 / 60, meteo, 0, b.position.x, b.position.z);
       const frappe = e.deferlantes.maj(1 / 60, meteo);
       if (frappe) {
         b.deferlante(frappe.vers, frappe.force);

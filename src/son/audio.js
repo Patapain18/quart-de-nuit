@@ -202,6 +202,10 @@ export class Audio {
       source(this.blanc, 0.9 + i * 0.13).connect(f).connect(g).connect(this.bus.dehors);
       return { filtre: f, gain: g };
     });
+    // la risée qui arrive : l'eau froissée qui chuinte, de plus en plus fort, puis le
+    // souffle qui passe sur nous
+    this.risee = { filtre: filtre('bandpass', 1900, 0.7), gain: gain() };
+    source(this.blanc, 1.07).connect(this.risee.filtre).connect(this.risee.gain).connect(this.bus.dehors);
     // l'eau le long de la coque
     this.eau = { filtre: filtre('lowpass', 500, 0.5), gain: gain() };
     source(this.rose, 0.8).connect(this.eau.filtre).connect(this.eau.gain).connect(this.bus.dehors);
@@ -377,7 +381,8 @@ export class Audio {
   actif() { return this.ctx && (this.horsLigne || this.ctx.state === 'running'); }
 
   // e : { ventApparent (nds), vitesse (nds), faseyement (0 → 1), pluie (0 → 1), averse (0 → 1 :
-  //       l'averse d'un grain qui arrive, on l'entend sur la mer),
+  //       l'averse d'un grain qui arrive, on l'entend sur la mer), risee (0 → 1 : une risée
+  //       qui arrive, puis qui passe),
   //       bordage (vitesse de rotation d'un winch, 0 → 1), houle (m, hauteur significative),
   //       eauCale, eauCockpit (litres), roulis (rad/s), mouvement (secousses du bateau, 0 → 1),
   //       trombe, cargo (0 : loin → 1 : sur nous), pilote (le vérin travaille, 0 → 1),
@@ -398,6 +403,11 @@ export class Audio {
     this.boucle('vent-rafales', 0.75 * lisse(24, 40, vent), 0.6);
     this.vers(this.vent.gain.gain, (0.04 + 0.5 * fv * fv + 0.05 * fv) * calcul('vent-doux', 0.2));
     this.vers(this.vent.filtre.frequency, 280 + 900 * fv);
+    // la risée : on l'entend arriver sur l'eau (par gros temps, le vent la couvre)
+    const risee = e.risee ?? 0;
+    this.niveaux.risee = risee;
+    this.vers(this.risee.gain.gain, 0.2 * risee ** 1.5 * (1 - 0.6 * lisse(28, 40, vent)), 0.6);
+    this.vers(this.risee.filtre.frequency, 1500 + 900 * risee, 0.6);
     // le gréement : il siffle quand ça forcit, il hurle au plus fort
     this.boucle('greement', 0.45 * lisse(14, 28, vent) * (1 - 0.4 * lisse(32, 42, vent)), 0.5, 0.82 + 0.008 * vent);
     this.boucle('greement-aigu', 0.4 * lisse(27, 42, vent), 0.5, 0.9 + 0.005 * vent);

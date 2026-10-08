@@ -851,7 +851,7 @@ annoncer ; les éclairs, n'importe où ; le baromètre suivait le temps au lieu 
 l'annoncer. Son choix, dans cet ordre :
 
 27. ✅ **Les grains**, qui existent vraiment, et dont tout dépend.
-28. ⬜ **Les rafales qu'on voit venir** : une tache sombre qui court sur l'eau, la risée.
+28. ✅ **Les rafales qu'on voit venir** : une tache sombre qui court sur l'eau, la risée.
 29. ⬜ **Les éclairs qui partent des nuages d'orage**, et plus de n'importe où.
 30. ⬜ **Le baromètre qui annonce le temps**, au lieu de le suivre.
 31. ⬜ **La bête, née d'un des grains** qu'on a vus arriver au radar.
@@ -968,6 +968,69 @@ l'annoncer. Son choix, dans cet ordre :
       image, le temps de l'éclair.
     Images : `docs/etape27-enclume-avant-apres.jpg`, `docs/etape27-enclume-au-coucher.jpg`,
     `docs/etape27-enclume-de-loin.jpg`, `docs/etape27-eclair-avant-apres.jpg`.
+
+28. ✅ **Les risées** (`src/monde/risees.js`, `src/monde/vent.js`, `src/rendu/risees.js`,
+    `atelier-risees.html`) — Les rafales tombaient au hasard dans le temps, les mêmes
+    partout, sans rien pour les annoncer. Ce sont maintenant des **risées** : des taches de
+    vent plus fort qui existent à un endroit sur la mer, comme les vraies vues d'un bateau.
+    Une tache ovale de 70 à 320 m (plus grande quand il souffle fort), plus longue dans le
+    sens du vent, au bord irrégulier ; elle **arrive d'un coup** (son bord avant est net : de
+    rien au plein en une seconde et demie) et s'en va lentement ; son vent est plus fort de
+    12 à 24 % par beau temps, jusqu'à 40 % à l'orage, et il **tourne un peu à droite** (il
+    vient de plus haut, où le vent a déjà tourné) ; elle avance avec le vent (un peu plus ou
+    un peu moins vite que lui), naît, vit une à deux minutes et s'efface. Plus rares, les
+    **molles** : le vent y faiblit, l'eau y est plus lisse, plus claire. Elles vivent là où
+    on peut les voir, dans 0,7 à 1,2 km autour du bateau, une centaine à la fois ; sous un
+    grain, il y en a bien plus, et l'air froid qui s'étale les pousse en éventail.
+    **Ce qui en dépend** :
+    - *le vent du bateau* : celui de la risée où il est (`Vent.maj` reçoit sa position) ; la
+      respiration lente du vent et ses bascules restent ; à l'orage, il souffle par
+      bouffées, même entre deux risées (8 % au-dessus du vent établi : le vent moyen
+      ressenti reste celui d'avant, et la nuit garde sa difficulté) ;
+    - *la mer* : une petite carte vue d'en haut (3 km de côté, redessinée dix fois par
+      seconde ; entre deux, elle glisse avec le vent) dit en chaque point de combien le vent
+      y forcit. Dans une risée, l'eau se froisse, par plaques qui filent avec le vent, et
+      surtout elle **fonce** : vues en rasant, ses petites rides se tournent vers nous, et
+      l'on voit l'eau sombre au lieu du ciel clair de l'horizon (le reflet perdu est
+      remplacé par le bleu profond de l'eau : sinon, à contre-jour, une bande turquoise
+      apparaissait à l'horizon) ; son bord avant, plus encore ; par vent fort, elle blanchit
+      (le seuil de l'écume suit le vent qu'il y fait). Par petit temps, l'effet est plus fort
+      (une eau presque lisse se froisse beaucoup pour un peu de vent en plus) ; dans la
+      tempête, moins (elle l'est déjà partout). Dans une molle, l'eau se lisse et brille.
+      Vue d'en haut, c'est très net ; depuis la barre, une risée qui arrive est une bande
+      d'eau sombre qui approche, et les lointaines, des traits sombres près de l'horizon ;
+    - *le son* : l'eau froissée qu'on entend chuinter quelques secondes avant que la risée
+      arrive, puis le souffle qui passe (par gros temps, le vent le couvre) ;
+    - *Jos*, le matin : une étape de plus dans la leçon « Lire le vent ». Il montre les
+      taches sombres au vent, en envoie une sur le bateau (elle naît là-bas et grandit en
+      approchant ; si on change de route et qu'elle le manque, une autre arrive), et demande
+      de la laisser passer ; puis : « Une risée, ça se voit venir : quand elle arrive, choque
+      un peu, ou lofe » ;
+    - *les marins automatiques* (la nuit, l'atelier de la tempête) et *l'élève* de la
+      journée vivent les mêmes risées.
+    **Mesuré** (`npm run test-risees`) : une risée envoyée arrive à l'heure (son bord avant à
+    0,1 s près) et d'un coup (1,4 s) ; 20 s avant, on la voit venir, formée à 84 %, à 150 m ;
+    on l'entend 8 s avant ; le vent ne forcit pas en avance ; dedans, il tourne de 2,4°. Sur
+    une heure, comme les rafales d'avant : de 17 % du temps dans une risée le matin à 38 %
+    dans la tempête, une à deux par minute, jusqu'à +22 % le matin et +41 % dans la
+    tempête ; elles couvrent 31 % de la mer ; le vent et les risées, 7 µs par image.
+    **Les essais d'avant** : en fuite dans la tempête (`test-barre`), le bateau est un
+    système chaotique : une risée ou une déferlante un peu plus tôt, et une traversée qui
+    passait part au lof. Sur 20 traversées (deux mers, dix vents), l'ancien vent tenait le
+    cap 17 fois, les risées 18 (écart moyen 8,3° et 7,9°) ; l'essai en fait maintenant dix
+    (deux mers, cinq vents) au lieu d'une : il tient 9 fois sur 10. `test-nuit` : le
+    prudent ne passe pas toujours au cœur des grains (à 450 m d'un grain fort, il pleut à
+    87 %) : le seuil « à verse » passe de 90 à 85 % (il fait 89 %).
+    **Ce que ça coûte** : dessiner la carte, 0,4 à 0,9 ms, dix fois par seconde (sur le
+    processeur) ; la mer, rien de mesurable.
+    **Les outils** : l'atelier des risées (`atelier-risees.html` : cinq moments, du matin
+    calme à la tempête, dont un coup de vent de jour qui n'existe pas dans le jeu ; le
+    bateau navigue tout seul, à l'allure choisie, la vraie physique ; envoyer une risée ou
+    une molle sur lui ; leur force, combien il y en a, les dessiner ou non ; quatre points
+    de vue, de la barre à l'avion ; ce qu'elles font au bateau, en chiffres et en courbes
+    (le vent, la gîte, la vitesse, ce qu'on entend) ; la carte vue d'en haut ;
+    `__risees.planche()`, `film()`, `couts()`, `statistiques()`).
+    Images : `docs/etape28-les-risees.jpg`, `docs/etape28-une-risee-arrive.jpg`.
 
 ## 4. Pistes graphiques notées pour plus tard
 
