@@ -94,7 +94,7 @@ export const VARIANTES = {
 export const VARIANTE_DU_JEU = 'bete';
 
 // ---------- Sa vie ----------
-// age, duree : en secondes (jeu/nuit.js : elle vit 260 s). Renvoie ce qui se voit à cet âge.
+// age, duree : en secondes (quart/nuit.js : elle vit 200 s). Renvoie ce qui se voit à cet âge.
 export const DUREE_NAISSANCE = 50; // de la tache sombre sur l'eau à l'entonnoir qui touche la mer
 export const DUREE_CORDE = 60; // la fin : elle s'amincit en corde, se couche, se tord
 export function vieDeLaTrombe(age, duree) {
@@ -785,7 +785,7 @@ export class Trombe3D {
     this.uniformsComposition.uTailleEcran.value.set(largeur, hauteur);
   }
 
-  // trombe : { x, z, force, age, duree, grain } (jeu/nuit.js), ou null ; directionVent : vers où
+  // trombe : { x, z, force, age, duree, grain } (quart/nuit.js), ou null ; directionVent : vers où
   // va le vent (radians, dans le plan) ; temps : l'horloge du monde ; nuit : 0 → 1 ;
   // eclaire : l'éclair autour de nous (monde3d)
   maj(dt, trombe, { temps, directionVent, camera = null, nuit = 0, noir = 0, eclaire = 0 }) {
@@ -836,7 +836,7 @@ export class Trombe3D {
     const r = V.rideau;
     // (le rideau de pluie est derrière elle, du côté d'où elle vient : elle s'en détache,
     // et le bateau, qu'elle vient chercher sous le vent, n'est pas dedans. Sous son grain
-    // — jeu/nuit.js —, c'est la pluie du grain qui fait ce rideau : la vraie, en colonnes, et
+    // — quart/nuit.js —, c'est la pluie du grain qui fait ce rideau : la vraie, en colonnes, et
     // le crochet qui s'enroule autour d'elle — rendu/grains.js — ; on ne dessine pas le sien,
     // qui la cacherait)
     const densitePluie = trombe.grain ? 0 : r.densite * k.pluie;

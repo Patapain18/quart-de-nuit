@@ -1,4 +1,4 @@
-// Les apparitions de la nuit (jeu/peur.js décide quand et où ; ici, ce qu'on voit) :
+// Les apparitions de la nuit (quart/peur.js décide quand et où ; ici, ce qu'on voit) :
 //  - la silhouette : quelqu'un debout sur le pont avant, en ciré jaune délavé (comme le
 //    tien), la capuche rabattue, sans visage ; de dos, regardant la mer — ou, dans un
 //    éclair, face à toi. Dans le noir, on ne la voit qu'à ses bandes réfléchissantes (sur
@@ -161,7 +161,7 @@ export class Apparitions {
   // Les objets à préparer (compiler) avant la nuit
   get objets() { return [this.silhouette, this.reflet]; }
 
-  // peur : jeu/peur.js ; temps ; eclairage ('rouge', 'blanc', 'eteint') ; ambiance (la
+  // peur : quart/peur.js ; temps ; eclairage ('rouge', 'blanc', 'eteint') ; ambiance (la
   // lumière du ciel, [r, g, b]) ; eclair (0 → 1) ; lampe (la frontale allumée) ;
   // faisceau : la frontale elle-même (sa position et sa cible, dans le monde)
   maj(peur, { temps = 0, eclairage = 'eteint', ambiance = [0, 0, 0], eclair = 0, lampe = false, faisceau = null } = {}) {

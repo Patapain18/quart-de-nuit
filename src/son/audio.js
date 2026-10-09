@@ -489,7 +489,7 @@ export class Audio {
     this.vers(this.trombe.gain.gain, 0.9 * tr * tr * (grondement ? 0.5 : 1), 0.5);
     this.vers(this.trombe.gainSifflement.gain, 0.12 * tr * tr * tr, 0.5);
     this.vers(this.moteur.gain.gain, 0.5 * (e.cargo ?? 0) ** 2, 0.8);
-    // la tension de la nuit (jeu/peur.js) : le bourdonnement, et le sifflement aigu
+    // la tension de la nuit (quart/peur.js) : le bourdonnement, et le sifflement aigu
     // quand elle est très haute
     const tension = e.tension ?? 0;
     this.vers(this.angoisse.gain.gain, 0.16 * lisse(0.3, 1, tension) ** 1.5, 2);
@@ -1014,7 +1014,7 @@ export class Audio {
     g.linearRampToValueAtTime(1, t + duree + 1.8);
   }
 
-  // ---------- La peur (jeu/peur.js) ----------
+  // ---------- La peur (quart/peur.js) ----------
   // La mer gémit : une voix immense et grave, au loin, qui monte puis retombe, noyée dans
   // un long écho (pan : de quel côté, −1 → 1)
   gemissement(pan = 0) {

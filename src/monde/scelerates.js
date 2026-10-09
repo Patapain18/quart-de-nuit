@@ -5,7 +5,7 @@
 // vagues : la physique la sent, la mer la dessine).
 //
 // Comme pour les déferlantes (monde/deferlantes.js), rien ici ne dessine ni ne fait de
-// bruit : la nuit (jeu/nuit.js), l'atelier de la mer et l'essai automatique
+// bruit : la nuit (quart/nuit.js), l'atelier de la mer et l'essai automatique
 // (scripts/test-scelerate.js) s'en servent de la même façon.
 import { Vector3 } from 'three';
 import { creerScelerate, repereScelerate } from '../mer/scelerate.js';

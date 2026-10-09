@@ -9,7 +9,7 @@
 // (le feu de Saint-Elme). Puis une nuit entière, et cent passages du grain le plus fort.
 import { Foudre, REGLAGES_FOUDRE, activiteDuGrain, eclairsParSeconde, lumiereEclair } from '../src/monde/foudre.js';
 import { Grains } from '../src/monde/grains.js';
-import { meteoDeLaNuit, heureA, CHAPITRES } from '../src/jeu/nuit.js';
+import { meteoDeLaNuit, heureA, DUREE_HEURE } from '../src/quart/nuit.js';
 
 let echecs = 0;
 const verifier = (condition, message) => {
@@ -19,7 +19,7 @@ const verifier = (condition, message) => {
 const arrondi = (x, n = 1) => Math.round(x * 10 ** n) / 10 ** n;
 const pc = (x) => `${Math.round(x * 100)} %`;
 const P = REGLAGES_FOUDRE;
-const AU_PLUS_FORT = meteoDeLaNuit(26);
+const AU_PLUS_FORT = meteoDeLaNuit(29.3);
 
 // Un grain posé, immobile, dans la force de l'âge
 function grainPose(grains, { x = 0, z = 0, force = 0.9, orage = 1, rayon = 1050 } = {}) {
@@ -210,33 +210,31 @@ console.log('\nL\'air chargé (le feu de Saint-Elme)');
 
 // ---------- Une nuit entière ----------
 console.log('\nUne nuit entière (le bateau immobile ; les grains de la nuit, et ceux qui passent sur lui)');
+// (les grains de la nuit — quart/nuit.js —, et celui de la bête, qui passe au large)
 const PLANS = [
-  { arrivee: 360, force: 0.6, orage: 0.75, ecart: 1100 },
-  { arrivee: 650, force: 0.8, orage: 0.6, ecart: 250 },
-  { arrivee: 820, force: 0.9, orage: 1, ecart: 120 },
-  { arrivee: 1010, force: 0.55, orage: 0.3, ecart: 450 },
+  { arrivee: 1.35 * DUREE_HEURE, force: 0.6, orage: 0.5, ecart: 380 },
+  { arrivee: 2.9 * DUREE_HEURE, force: 0.8, orage: 0.8, ecart: 200 },
+  { arrivee: 3.55 * DUREE_HEURE, force: 0.6, orage: 1, ecart: 900 },
+  { arrivee: 4.65 * DUREE_HEURE, force: 0.95, orage: 1, ecart: 120 },
 ];
+const HEURES = 6;
+const LE_FORT = 3;
 function nuitDeFoudre(graine, { seulementLeFort = false } = {}) {
   const grains = new Grains(graine * 31337 + 7);
   const foudre = new Foudre(graine * 977 + 3);
-  const fin = CHAPITRES.reduce((s, c) => s + c.duree, 0);
+  const fin = HEURES * DUREE_HEURE;
   const lances = new Set();
   const pas = 1 / 20;
-  const parChapitre = CHAPITRES.map(() => ({ eclairs: 0, front: 0 }));
-  let debut = 0;
-  let ch = 0;
+  const parHeure = Array.from({ length: HEURES }, () => ({ eclairs: 0, front: 0 }));
   const frappes = [];
   let saintElme = 0;
-  const de = seulementLeFort ? 560 : 0;
-  const a = seulementLeFort ? 1000 : fin;
+  const de = seulementLeFort ? PLANS[LE_FORT].arrivee - 260 : 0;
+  const a = seulementLeFort ? PLANS[LE_FORT].arrivee + 180 : fin;
   for (let t = de; t < a; t += pas) {
-    while (ch < CHAPITRES.length - 1 && t >= debut + CHAPITRES[ch].duree) {
-      debut += CHAPITRES[ch].duree;
-      ch++;
-    }
+    const ch = Math.min(HEURES - 1, Math.floor(t / DUREE_HEURE));
     const meteo = meteoDeLaNuit(heureA(t));
     PLANS.forEach((p, k) => {
-      if (seulementLeFort && k !== 2) return;
+      if (seulementLeFort && k !== LE_FORT) return;
       if (!lances.has(k) && t >= p.arrivee - 240) {
         lances.add(k);
         grains.maj(0, meteo, 0, 0);
@@ -248,22 +246,23 @@ function nuitDeFoudre(graine, { seulementLeFort = false } = {}) {
     foudre.maj(pas, { meteo, grains, x: 0, z: 0 });
     if (foudre.champ > 0.6) saintElme += pas;
     for (const ev of foudre.evenements) {
-      if (ev.type === 'eclair') parChapitre[ch][ev.eclair.type === 'front' ? 'front' : 'eclairs']++;
+      if (ev.type === 'eclair') parHeure[ch][ev.eclair.type === 'front' ? 'front' : 'eclairs']++;
       if (ev.type === 'frappe') frappes.push(ev);
     }
   }
-  return { parChapitre, frappes, saintElme, compte: foudre.compte };
+  return { parHeure, frappes, saintElme, compte: foudre.compte };
 }
 {
   const r = nuitDeFoudre(1);
-  const parMinute = r.parChapitre.map((c, k) => c.eclairs / (CHAPITRES[k].duree / 60));
-  CHAPITRES.forEach((c, k) => console.log(`  ${c.titre.padEnd(24)} ${arrondi(parMinute[k])} éclairs par minute${r.parChapitre[k].front ? ` (et ${r.parChapitre[k].front} dans le front, au loin)` : ''}`));
-  verifier(parMinute[2] > 5 && parMinute[2] < 20, `au cœur de la tempête : ${arrondi(parMinute[2])} par minute`);
-  verifier(parMinute[0] < parMinute[2] && parMinute[3] < parMinute[2], 'moins au crépuscule et à l\'accalmie qu\'au plus fort');
-  verifier(r.parChapitre[0].front > 5 && r.parChapitre[2].front === 0, `le front, au loin : ses éclairs au crépuscule (${r.parChapitre[0].front}), plus quand il est sur nous`);
+  const parMinute = r.parHeure.map((c) => c.eclairs / (DUREE_HEURE / 60));
+  parMinute.forEach((x, h) => console.log(`  ${h} h : ${arrondi(x)} éclairs par minute`));
+  const debut = (parMinute[0] + parMinute[1]) / 2;
+  const finNuit = (parMinute[4] + parMinute[5]) / 2;
+  verifier(finNuit > debut, `de plus en plus d'éclairs : ${arrondi(debut)} par minute entre minuit et 2 h, ${arrondi(finNuit)} entre 4 h et 6 h`);
+  verifier(Math.max(...parMinute) > 4 && Math.max(...parMinute) < 25, `au plus fort : ${arrondi(Math.max(...parMinute))} par minute`);
   verifier(r.saintElme > 30 && r.saintElme < 400, `le feu de Saint-Elme, sous les grains orageux : ${Math.round(r.saintElme)} s dans la nuit`);
 }
-console.log('\nCent passages du grain le plus fort (orage 1, force 0,9, son cœur à 120 m du bateau)');
+console.log('\nCent passages du grain le plus fort (orage 1, force 0,95, son cœur à 120 m du bateau)');
 {
   let surLeMat = 0;
   let avecProche = 0;

@@ -1,5 +1,5 @@
 // L'atelier de la peur : un panneau, à droite du jeu, pour régler et vérifier ce que fait
-// jeu/peur.js. On l'ouvre en ajoutant ?peur à l'adresse du jeu (jeu.html?peur).
+// quart/peur.js. On l'ouvre en ajoutant ?peur à l'adresse du jeu (jeu.html?peur).
 //
 // On y voit :
 //  - la tension (et on peut la forcer) ;
@@ -10,7 +10,7 @@
 //  - la frise de la nuit : le silence de Jos, les vagues scélérates, la trombe, le cargo,
 //    l'étrange ancien, les fenêtres de la peur et ce qui est arrivé.
 // Des boutons pour commencer la nuit et sauter à une heure.
-import { EVENEMENTS, surEcran, coinDeLOeil, enFace } from '../jeu/peur.js';
+import { EVENEMENTS, surEcran, coinDeLOeil, enFace } from '../quart/peur.js';
 
 const NOMS = {
   gemissement: 'La mer gémit', silhouette: 'Quelqu\'un à l\'avant', reflet: 'Le reflet dans la vitre', forme: 'La forme dans l\'eau',
@@ -71,7 +71,7 @@ export function ouvrirAtelierPeur(jeu) {
 
   // sauter à une heure (et commencer la nuit s'il le faut)
   const zoneHeures = panneau.querySelector('#ap-heures');
-  for (const [texte, h] of [['Commencer la nuit', null], ['22 h', 22], ['0 h', 24], ['1 h 45', 25.75], ['3 h', 27], ['5 h', 29]]) {
+  for (const [texte, h] of [['Commencer la nuit', null], ['1 h', 25], ['2 h 30', 26.5], ['4 h', 28], ['5 h 30', 29.5]]) {
     const b = document.createElement('button');
     b.type = 'button';
     b.textContent = texte;
@@ -116,7 +116,7 @@ export function ouvrirAtelierPeur(jeu) {
     const p = nuit.peur;
     const ctx = p.dernierCtx;
     panneau.querySelector('#ap-tension').style.width = `${Math.round(p.tension * 100)}%`;
-    panneau.querySelector('#ap-tension-texte').textContent = `${p.tension.toFixed(2)} · ${heure(nuit.heure)}${ctx?.occupe ? ' · occupé (vague, trombe, cargo, danger)' : ''}${nuit.silence ? ' · Jos ne répond plus' : ''}`;
+    panneau.querySelector('#ap-tension-texte').textContent = `${p.tension.toFixed(2)} · ${heure(nuit.heure)}${ctx?.occupe ? ' · occupé (vague, trombe, danger)' : ''}`;
     for (const [nom, e] of Object.entries(EVENEMENTS)) {
       const l = lignes[nom];
       const possible = ctx ? p.possible(nom, ctx) : false;
@@ -147,7 +147,7 @@ export function ouvrirAtelierPeur(jeu) {
 function dessinerFrise(svg, nuit) {
   const L = 316;
   const x0 = 70;
-  const x = (h) => x0 + ((h - 18.75) / 11.25) * (L - x0 - 4);
+  const x = (h) => x0 + ((h - 24) / 6) * (L - x0 - 4);
   const pr = nuit.prevu;
   const rangs = [
     ['Jos se tait', [[pr.silence, pr.silence + 0.55]]],

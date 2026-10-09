@@ -5,8 +5,8 @@
 // Ce fichier décide QUAND (l'heure, la tension, rien d'autre en cours) et OÙ (ce que le
 // marin regarde, où il est) ; il ne dessine rien et ne fait aucun bruit : le jeu montre
 // (rendu/apparitions.js) et fait entendre (son/audio.js). L'étrange plus ancien — la lumière
-// sur l'eau, la voix sur le 16, le silence de Jos, les coups, l'écho radar — est dans
-// jeu/nuit.js ; tout passe par la même tension.
+// sur l'eau, la voix sur le 16, les coups — est dans quart/nuit.js ; tout passe par la même
+// tension.
 //
 // ctx, à chaque image :
 //   heure ; lieu : 'barre', 'pont', 'timonerie' ou 'carre' ; yeux, regard, haut : la
@@ -15,8 +15,8 @@
 //   tangente du demi-angle, en largeur et en hauteur) ; lampe (la frontale allumée) ; eclairage ('eteint', 'rouge', 'blanc') ; eclair
 //   (0 → 1 : un éclair en ce moment) ; noir (0 → 1 : le noir d'encre de la nuit d'orage) ;
 //   occupe (une vague scélérate, la trombe, le cargo, un danger : rien d'étrange ne vient
-//   s'y mêler) ; danger (0 → 1) ; silence (Jos ne répond plus) ; calme (secondes depuis la
-//   dernière déferlante) ; porteOuverte.
+//   s'y mêler) ; danger (0 → 1) ; silence (plus personne à la radio : toujours, maintenant) ;
+//   calme (secondes depuis la dernière déferlante) ; porteOuverte.
 import { zDe, hauteurPont } from '../bateau/forme.js';
 
 const lisse = (a, b, x) => {
@@ -33,9 +33,9 @@ function generateur(graine) {
   };
 }
 
-// La tension de fond : elle monte avec la nuit, culmine au plus fort de la tempête (vers
-// 2 h), et retombe avant l'aube
-const FOND = [[18.75, 0.04], [20.5, 0.14], [22.5, 0.28], [24.5, 0.42], [26.3, 0.55], [27.5, 0.48], [28.6, 0.28], [30, 0.1]];
+// La tension de fond : elle monte d'heure en heure, de minuit (24) jusqu'au plus fort, juste
+// avant l'aube (6 h : 30), et ne retombe qu'avec le jour
+const FOND = [[24, 0.14], [25, 0.24], [26, 0.34], [27, 0.44], [28, 0.53], [29, 0.62], [29.8, 0.68], [30.3, 0.15]];
 export function tensionDeFond(h) {
   if (h <= FOND[0][0]) return FOND[0][1];
   for (let i = 1; i < FOND.length; i++) {
@@ -49,33 +49,34 @@ export function tensionDeFond(h) {
 // Où se tient la silhouette : sur le pont avant, près du balcon (les pieds)
 export const SILHOUETTE = { x: 0, y: hauteurPont(0.83, 0), z: zDe(0.83), taille: 1.78 };
 
-// Ce qui peut arriver : combien de fois au plus, entre quelles heures, ce que ça ajoute à
-// la tension, et à quelles conditions (dans quel lieu, en regardant quoi)
+// Ce qui peut arriver : combien de fois au plus, entre quelles heures (24 : minuit ; 30 : six
+// heures), ce que ça ajoute à la tension, et à quelles conditions (dans quel lieu, en
+// regardant quoi). Les plus discrètes viennent tôt, les sursauts tard.
 export const EVENEMENTS = {
   // la mer gémit : un long son grave, au loin, qui n'est pas celui du vent
-  gemissement: { fois: 3, de: 21.4, a: 29.4, choc: 0.15, attente: 50 },
+  gemissement: { fois: 3, de: 24.3, a: 29.8, choc: 0.15, attente: 50 },
   // quelqu'un, debout à l'avant (du coin de l'œil seulement)
-  silhouette: { fois: 2, de: 22.3, a: 29.2, choc: 0.35 },
+  silhouette: { fois: 2, de: 25.2, a: 29.7, choc: 0.35 },
   // dans le pare-brise de la timonerie, quelqu'un debout derrière toi (le reflet)
-  reflet: { fois: 2, de: 21.8, a: 29.6, choc: 0.4 },
+  reflet: { fois: 2, de: 24.8, a: 29.8, choc: 0.4 },
   // une forme pâle dans l'eau, le long de la coque, qui suit le bateau
-  forme: { fois: 1, de: 22.8, a: 28.5, choc: 0.3 },
+  forme: { fois: 1, de: 25.5, a: 29.2, choc: 0.3 },
   // quelque chose d'immense passe sous la coque (le sondeur, le raclement, le plancton)
-  chose: { fois: 1, de: 24.6, a: 27.6, choc: 0.5 },
+  chose: { fois: 1, de: 26.2, a: 29.4, choc: 0.5 },
   // des pas sur le pont, au-dessus de soi
-  pas: { fois: 2, de: 23, a: 29.4, choc: 0.35 },
+  pas: { fois: 2, de: 25.6, a: 29.8, choc: 0.35 },
   // ton nom, chuchoté sur le 16
-  nom: { fois: 1, de: 25, a: 27.4, choc: 0.4 },
+  nom: { fois: 1, de: 27.2, a: 29.6, choc: 0.4 },
   // un choc énorme contre la coque, après un long calme (un sursaut)
-  coupCoque: { fois: 1, de: 25.2, a: 29.2, choc: 0.6 },
+  coupCoque: { fois: 1, de: 27, a: 29.8, choc: 0.6 },
   // dans un éclair, quelqu'un à l'avant ; à l'éclair suivant, plus personne (un sursaut)
-  eclairSilhouette: { fois: 1, de: 24.3, a: 28.8, choc: 0.7 },
+  eclairSilhouette: { fois: 1, de: 27.5, a: 29.7, choc: 0.7 },
   // sur le radar, un écho qui nous suit : toujours au même relèvement, quel que soit notre
   // cap, et il se rapproche ; dans un éclair, la mer est vide — et il n'est plus là
-  echoSuiveur: { fois: 1, de: 21.9, a: 26.4, choc: 0.3 },
+  echoSuiveur: { fois: 1, de: 24.6, a: 28.4, choc: 0.3 },
   // l'alarme du radar : un écho tout près, dans la zone de garde, presque dans notre
   // sillage ; un éclair montre la mer : il n'y a rien (et l'alarme se tait)
-  echoProche: { fois: 1, de: 24.9, a: 28.6, choc: 0.55 },
+  echoProche: { fois: 1, de: 27.4, a: 29.7, choc: 0.55 },
 };
 const ATTENTE = 75; // secondes au moins entre deux choses étranges (hors gémissements)
 const DEHORS = new Set(['barre', 'pont']);

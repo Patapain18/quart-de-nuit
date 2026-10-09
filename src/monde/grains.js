@@ -18,7 +18,7 @@
 // d'altitude, freinés par la mer).
 //
 // Ce fichier ne dessine rien : il dit où sont les grains et ce qu'ils font en chaque point
-// (rendu/glsl/grains.js les dessine ; jeu/nuit.js en fait passer sur le bateau ; le radar,
+// (rendu/glsl/grains.js les dessine ; quart/nuit.js en fait passer sur le bateau ; le radar,
 // le son, la physique lisent ce qu'ils font).
 import { NOEUD, angleVers } from './meteo.js';
 
@@ -37,7 +37,7 @@ export const REGLAGES_GRAINS = {
   extinctionPluie: 0.006,
 };
 
-// Le grain qui porte une trombe (celui de la bête : jeu/nuit.js). Pas un grain comme les
+// Le grain qui porte une trombe (celui de la bête : quart/nuit.js). Pas un grain comme les
 // autres : il traîne. Il avance moins vite que les autres, droit sous le vent (eux dérivent à
 // sa droite) : il se nourrit de l'air chaud qu'il aspire devant lui, et ses nouvelles tours
 // poussent à l'arrière des anciennes — les orages qui font des trombes sont souvent de ceux-là.
@@ -160,7 +160,7 @@ export class Grains {
     for (const g of this.liste) {
       g.vx += ((g.route ? g.route.x : this.ux * this.vitesse) - g.vx) * k;
       g.vz += ((g.route ? g.route.z : this.uz * this.vitesse) - g.vz) * k;
-      // (glisse : un petit écart à sa route, sans qu'il tourne — jeu/nuit.js s'en sert pour
+      // (glisse : un petit écart à sa route, sans qu'il tourne — quart/nuit.js s'en sert pour
       // amener le grain de la bête là où elle doit naître)
       g.x += (g.vx + (g.glisse?.x ?? 0)) * dt;
       g.z += (g.vz + (g.glisse?.z ?? 0)) * dt;

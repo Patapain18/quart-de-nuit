@@ -1,4 +1,4 @@
-// Les déferlantes, en 3D. Quand la nuit annonce une déferlante (jeu/nuit.js), on voit sa
+// Les déferlantes, en 3D. Quand la nuit annonce une déferlante (quart/nuit.js), on voit sa
 // crête qui s'écroule arriver du côté du vent, quelques secondes avant qu'elle frappe :
 // un front d'eau sombre et raide, coiffé d'une lèvre blanche dont l'écume cascade sur le
 // devant de la vague, une traîne d'écume derrière, et des embruns que le vent arrache à

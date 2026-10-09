@@ -37,8 +37,7 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: #071014; col
   background: linear-gradient(90deg, rgba(4, 8, 10, 0) 35%, rgba(4, 8, 10, 0.55));
 }
 #pause { place-items: center; background: rgba(4, 8, 10, 0.5); }
-#fin, #soir, #aube { position: fixed; inset: 0; display: grid; place-items: center; padding: var(--e4); background: rgba(2, 6, 9, 0.72); overflow-y: auto; }
-#soir { background: linear-gradient(180deg, rgba(20, 8, 4, 0.2), rgba(2, 6, 9, 0.78)); }
+#fin, #aube { position: fixed; inset: 0; display: grid; place-items: center; padding: var(--e4); background: rgba(2, 6, 9, 0.72); overflow-y: auto; }
 #aube { background: linear-gradient(180deg, rgba(40, 24, 10, 0.15), rgba(2, 6, 9, 0.7)); }
 #aube .niveau { display: block; margin-top: var(--e2); font-size: 13px; }
 [hidden] { display: none !important; }
@@ -64,18 +63,10 @@ details { margin: var(--e4) 0 0; }
 summary { cursor: pointer; color: var(--encre-douce); font-size: 14px; padding: var(--e1) 0; }
 summary:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
 details[open] summary { margin-bottom: var(--e3); }
-details #embarquer { width: 100%; text-align: center; margin-top: calc(-1 * var(--e2)); }
-#passer-lecon { width: 100%; text-align: center; margin-top: var(--e3); }
 .bilan { display: grid; grid-template-columns: auto 1fr; gap: var(--e1) var(--e4); margin: 0; font-size: 14.5px; }
 .bilan dt { color: var(--encre-douce); }
 .bilan dd { margin: 0; font: 600 14.5px/1.45 var(--texte); }
 /* la difficulté de la nuit : trois boutons côte à côte, un mot d'explication sous chacun */
-.choix-difficulte { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--e2); }
-.choix-difficulte button { display: grid; gap: 2px; text-align: left; font-weight: 600; }
-.choix-difficulte small { font-weight: 400; font-size: 12px; line-height: 1.3; color: var(--encre-douce); }
-.difficulte-soir { margin: var(--e5) 0 0; }
-details #nuit-directe { width: 100%; text-align: center; margin-top: calc(-1 * var(--e2)); }
-@media (max-width: 520px) { .choix-difficulte { grid-template-columns: 1fr; } }
 
 button {
   font: inherit; color: var(--encre); cursor: pointer; text-align: left;
@@ -97,36 +88,16 @@ button.principal:hover { background: #f6c47a; }
 
 /* le HUD : discret, dans les coins */
 #hud { position: fixed; inset: 0; pointer-events: none; }
-#instruments {
-  position: absolute; right: var(--e4); top: var(--e4);
-  display: grid; grid-template-columns: repeat(3, auto); gap: var(--e2) var(--e5);
-  background: rgba(4, 9, 12, 0.62); border: 1px solid var(--bordure); border-radius: var(--rayon);
-  padding: var(--e3) var(--e4);
+/* l'heure de la nuit, en haut à droite (comme une montre qu'on regarde), et dessous ce qui
+   ne va pas à bord */
+#heure {
+  position: absolute; right: var(--e5); top: var(--e4);
+  display: grid; justify-items: end; gap: var(--e1); text-align: right;
+  text-shadow: 0 1px 6px rgba(0, 0, 0, 0.7);
 }
-.instrument { display: grid; gap: 2px; min-width: 76px; }
-.instrument .etiquette { font-size: 11px; color: var(--encre-douce); }
-.instrument .valeur { font: 600 22px/1 var(--chiffres); }
-.instrument .unite { font-size: 12px; color: var(--encre-douce); margin-left: 3px; }
-
-#reglages {
-  position: absolute; left: 50%; bottom: var(--e4); transform: translateX(-50%);
-  display: grid; gap: var(--e2);
-  background: rgba(4, 9, 12, 0.55); border: 1px solid var(--bordure); border-radius: var(--rayon);
-  padding: var(--e2) var(--e3);
-}
-.jauge { display: grid; grid-template-columns: 86px 180px 92px; align-items: center; gap: var(--e3); font-size: 13px; }
-.jauge .barre {
-  position: relative; height: 8px; border-radius: 4px;
-  /* faseye (trop choqué) à gauche, bon au milieu, trop bordé à droite */
-  background: linear-gradient(90deg, #8a6e45 0 28%, #3f8f69 28% 72%, #8a4b45 72% 100%);
-}
-.jauge .barre i {
-  position: absolute; top: -4px; width: 4px; height: 16px; border-radius: 2px;
-  background: var(--encre); transform: translateX(-2px); left: 50%;
-}
-.jauge .etat { color: var(--encre-douce); }
-.jauge[data-etat="bon"] .etat { color: var(--vert); }
-.jauge[data-etat="faseye"] .etat, .jauge[data-etat="trop-bordee"] .etat { color: var(--ambre); }
+#heure .h { margin: 0; font: 600 34px/1 var(--chiffres); letter-spacing: 0.02em; color: rgba(236, 240, 236, 0.92); }
+#heure .alertes { margin: 0; padding: 0; list-style: none; display: grid; gap: 2px; font-size: 13.5px; color: var(--ambre); }
+#heure .alertes:empty { display: none; }
 
 #aide-touches {
   position: absolute; left: var(--e4); bottom: var(--e4); margin: 0;
@@ -169,34 +140,6 @@ button.principal:hover { background: #f6c47a; }
   position: absolute; left: var(--e4); top: var(--e4);
   display: grid; gap: var(--e2); justify-items: start; width: min(360px, 40vw);
 }
-#lecon {
-  width: 100%;
-  background: rgba(4, 9, 12, 0.68); border: 1px solid var(--bordure); border-radius: var(--rayon);
-  padding: var(--e3) var(--e4);
-}
-#lecon .numero { margin: 0 0 3px; font: 600 11px/1.3 var(--texte); letter-spacing: 0.1em; text-transform: uppercase; color: var(--ambre); }
-#lecon .titre { margin: 0 0 var(--e1); font: 600 19px/1.2 var(--titre); }
-#lecon .objectif { margin: 0; font-size: 14.5px; text-wrap: pretty; }
-#lecon .objectif:empty { display: none; }
-#lecon .liste { margin: var(--e1) 0 0; padding: 0; list-style: none; display: grid; gap: 2px; font-size: 13.5px; }
-#lecon .liste:empty { display: none; }
-#lecon .liste li::before { content: "○"; display: inline-block; width: 1.3em; color: var(--encre-douce); }
-#lecon .liste li[data-fait="true"] { color: var(--vert); }
-#lecon .liste li[data-fait="true"]::before { content: "✓"; color: var(--vert); }
-/* la nuit : l'état du bord (ce qui va, ce qui inquiète, ce qui presse, ce qu'il reste à préparer) */
-#lecon .liste li[data-etat="ok"]::before { content: "·"; }
-#lecon .liste li[data-etat="alerte"] { color: var(--ambre); }
-#lecon .liste li[data-etat="alerte"]::before { content: "!"; color: var(--ambre); font-weight: 700; }
-#lecon .liste li[data-etat="danger"] { color: var(--rouge); font-weight: 600; }
-#lecon .liste li[data-etat="danger"]::before { content: "▲"; color: var(--rouge); }
-#lecon .liste li[data-etat="afaire"]::before { content: "○"; }
-#lecon .progression { margin-top: var(--e2); height: 4px; border-radius: 2px; background: rgba(255, 255, 255, 0.13); overflow: hidden; }
-#lecon .progression i { display: block; height: 100%; width: 0; background: var(--ambre); transition: width 0.25s; }
-#lecon.reussie { animation: reussie 0.9s ease-out; }
-@keyframes reussie {
-  0% { border-color: var(--vert); box-shadow: 0 0 0 3px rgba(111, 211, 155, 0.45); }
-  100% { border-color: var(--bordure); box-shadow: 0 0 0 0 rgba(111, 211, 155, 0); }
-}
 #etat-bord {
   margin: 0;
   display: grid; gap: var(--e2); font-size: 13px;
@@ -207,7 +150,6 @@ button.principal:hover { background: #f6c47a; }
 }
 #harnais[data-attache="true"] { color: var(--vert); }
 #harnais[data-attache="false"] { color: var(--ambre); }
-#gilet { color: var(--vert); }
 
 /* l'annonce d'une leçon, au milieu en haut */
 #annonce {
@@ -220,21 +162,6 @@ button.principal:hover { background: #f6c47a; }
 #annonce.visible { opacity: 1; }
 
 /* le repère de la bouée vers laquelle on va */
-#cible {
-  position: absolute; left: 0; top: 0; display: grid; justify-items: center; gap: 4px;
-  transform: translate(-50%, -100%); will-change: transform;
-}
-#cible .losange {
-  width: 12px; height: 12px; transform: rotate(45deg);
-  border: 2px solid var(--ambre); background: rgba(240, 179, 90, 0.18);
-  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.35);
-}
-#cible .nom {
-  font: 600 12px/1 var(--texte); white-space: nowrap;
-  background: rgba(4, 9, 12, 0.66); border-radius: 4px; padding: 4px 7px;
-}
-#cible[data-bord="gauche"] .losange, #cible[data-bord="droite"] .losange { display: none; }
-
 /* le carnet de bord : un cahier ouvert, posé devant la scène */
 #carnet {
   position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
@@ -257,51 +184,13 @@ button.principal:hover { background: #f6c47a; }
   margin: 12px 0 0; font: 600 11.5px/28px var(--texte); letter-spacing: 0.12em; text-transform: uppercase; color: #7a6440;
 }
 #carnet ol, #carnet ul { margin: 0; padding: 0; list-style: none; font: 16px/28px var(--manuscrit); }
-#carnet-lecons li { display: grid; grid-template-columns: 1.4em 1fr; }
-#carnet-lecons li::before { content: attr(data-n); font: 13px/28px var(--chiffres); color: #8a7350; }
-#carnet-lecons li[data-etat="faite"] { color: #23593d; }
-#carnet-lecons li[data-etat="faite"]::before { content: "✓"; font-family: var(--manuscrit); color: #23593d; }
-#carnet-lecons li[data-etat="encours"] { font-weight: 700; }
-#carnet-lecons li[data-etat="avenir"] { color: rgba(30, 53, 86, 0.42); }
-#carnet-reflexes li { line-height: 28px; padding-left: 1.1em; text-indent: -1.1em; font-size: 15px; }
-#carnet-reflexes li::before { content: "– "; }
-#carnet-reflexes:empty::after { content: "(ils s'écriront ici, leçon après leçon)"; color: rgba(30, 53, 86, 0.45); font-size: 15px; }
+#carnet-consignes li { line-height: 26px; padding-left: 1.1em; text-indent: -1.1em; font-size: 15px; margin-bottom: 4px; }
+#carnet-consignes li::before { content: "– "; }
 #carnet-journal { overflow: hidden; align-self: start; }
 #carnet-journal li { display: grid; grid-template-columns: 4.6em 1fr; line-height: 28px; font-size: 15px; }
 #carnet-journal .h { font: 12.5px/28px var(--chiffres); color: #7a6440; }
 #carnet .fermer { margin: 8px 0 0; text-align: right; font: 12.5px/1 var(--texte); color: #7a6440; }
 #carnet kbd { font: 600 11px/1 var(--chiffres); background: #1b2538; color: var(--papier); border-radius: 3px; padding: 2px 5px; }
-
-/* le livre des feux : un livre imprimé, ouvert devant la scène (jeu/livre-des-feux.js) */
-#livre-feux {
-  position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
-  width: min(940px, 94vw); height: min(600px, 86vh);
-  display: grid; grid-template-columns: 1fr 1fr;
-  background: #f4efe1; color: #26323a;
-  border-radius: 6px;
-  box-shadow: 0 28px 70px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(60, 70, 90, 0.35);
-}
-#livre-feux .page { padding: 22px 28px 18px; overflow: hidden; }
-#livre-feux .gauche { box-shadow: inset -22px 0 26px -24px rgba(40, 50, 70, 0.5); border-right: 1px solid rgba(60, 70, 90, 0.25); }
-#livre-feux .droite { box-shadow: inset 22px 0 26px -24px rgba(40, 50, 70, 0.5); display: grid; grid-template-rows: 1fr auto; }
-#livre-feux h2 { margin: 0; font: 600 26px/1.1 var(--titre); color: #1b2538; }
-#livre-feux .bateau { margin: 2px 0 10px; font: italic 13.5px/1.4 var(--titre); color: #5d5240; }
-#livre-feux .carte-feux { display: block; width: auto; height: 230px; max-width: 100%; border: 1px solid #c8b98e; }
-#livre-feux h3 { margin: 12px 0 4px; font: 600 11px/1.6 var(--texte); letter-spacing: 0.12em; text-transform: uppercase; color: #5d6a78; }
-#livre-signes { margin: 0; padding: 0; list-style: none; font: 13px/1.45 var(--texte); }
-#livre-signes li { display: grid; grid-template-columns: 6.2em 1fr; margin-bottom: 2px; }
-#livre-signes b { font: 600 12.5px/1.45 var(--chiffres); color: #7a2350; }
-#livre-feux .conseil { margin: 10px 0 0; font: italic 13px/1.45 var(--titre); color: #5d5240; }
-#livre-entrees { overflow: hidden; }
-#livre-feux .feu { border-top: 1px solid #d8cba3; padding: 7px 0 5px; }
-#livre-feux .feu:first-child { border-top: none; padding-top: 0; }
-#livre-feux h4 { margin: 0; font: 600 14px/1.3 var(--titre); color: #1b2538; }
-#livre-feux .caractere { margin: 2px 0 4px; font: 600 15px/1.2 var(--chiffres); color: #7a2350; }
-#livre-feux .rythme { display: block; }
-#livre-feux .details, #livre-feux .explication { margin: 3px 0 0; font: 12.5px/1.4 var(--texte); }
-#livre-feux .details { color: #6d6250; }
-#livre-feux .fermer { margin: 8px 0 0; text-align: right; font: 12.5px/1 var(--texte); color: #5d6a78; }
-#livre-feux kbd { font: 600 11px/1 var(--chiffres); background: #1b2538; color: #f4efe1; border-radius: 3px; padding: 2px 5px; }
 
 #sous-titres {
   position: absolute; left: 50%; bottom: 96px; transform: translateX(-50%);
@@ -324,9 +213,7 @@ button.principal:hover { background: #f6c47a; }
 @media (max-width: 720px) {
   #accueil { place-items: center; }
   #colonne { width: min(320px, 70vw); }
-  .jauge { grid-template-columns: 70px 110px 80px; }
   #aide-touches { display: none; }
-  #instruments { grid-template-columns: repeat(2, auto); }
 }
 
 /* ---------- Étape 6 : les finitions ---------- */
@@ -336,8 +223,8 @@ button.principal:hover { background: #f6c47a; }
 #accueil button:disabled { opacity: 0.45; cursor: progress; }
 button.deux-lignes { display: grid; gap: 2px; padding-block: var(--e2); }
 button.deux-lignes small { font-weight: 500; font-size: 13px; opacity: 0.8; }
-#reprendre-partie:not([hidden]) + #commencer-journee { margin-top: var(--e2); background: rgba(255, 255, 255, 0.06); color: var(--encre); border-color: var(--bordure); font-weight: 600; }
-#reprendre-partie:not([hidden]) + #commencer-journee:hover { background: rgba(255, 255, 255, 0.12); }
+#reprendre-partie:not([hidden]) + #prendre-le-quart { margin-top: var(--e2); background: rgba(255, 255, 255, 0.06); color: var(--encre); border-color: var(--bordure); font-weight: 600; }
+#reprendre-partie:not([hidden]) + #prendre-le-quart:hover { background: rgba(255, 255, 255, 0.12); }
 .liens-bas { display: flex; gap: var(--e2); margin-top: var(--e4); }
 .liens-bas button { flex: 1; text-align: center; }
 .avertissement { border-left: 3px solid var(--ambre); padding-left: var(--e3); color: var(--encre); }
@@ -370,26 +257,7 @@ dialog fieldset { margin-bottom: var(--e4); display: grid; gap: var(--e2); }
 input:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
 @media (max-width: 520px) { .choix-qualite { grid-template-columns: 1fr 1fr; } }
 
-/* l'aube : la note de Jos */
-.note-jos { margin: 0 0 var(--e4); padding: var(--e3) var(--e4); border-radius: var(--rayon); background: rgba(240, 179, 90, 0.1); border: 1px solid rgba(240, 179, 90, 0.35); }
-.note-jos .etoiles { margin: 0; font-size: 26px; letter-spacing: 0.12em; color: var(--ambre); }
-.note-jos .etoiles .vide { color: rgba(240, 179, 90, 0.28); }
-.note-jos .titre-note { margin: 2px 0 var(--e1); font: 600 20px/1.2 var(--titre); }
-.note-jos .mot-jos { margin: 0; color: var(--encre-douce); font-style: italic; }
-
-/* sur un écran étroit, l'annonce du chapitre passe sous les instruments */
+/* sur un écran étroit, l'annonce de l'heure descend un peu */
 @media (max-width: 760px) {
   #annonce { top: auto; bottom: 28%; white-space: normal; width: 90%; }
-}
-
-/* ---------- Étape 8 : la barre assistée ---------- */
-/* le compas : une bande graduée en haut, au milieu (le cap, le cap voulu, le vent) */
-#compas {
-  position: absolute; left: 50%; top: var(--e3); transform: translateX(-50%);
-  width: min(420px, 32vw); height: 50px;
-}
-/* (fenêtre étroite : les instruments prennent le haut ; le compas descend au-dessus des
-   jauges et des sous-titres) */
-@media (max-width: 1100px) {
-  #compas { top: auto; bottom: 172px; width: min(420px, 70vw); }
 }

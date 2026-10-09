@@ -8,7 +8,7 @@
 import * as THREE from 'three';
 import { Monde3D } from './rendu/monde3d.js';
 import { AMBIANCES, etatMeteo, angleVers } from './monde/meteo.js';
-import { meteoDeLaNuit, BETE } from './jeu/nuit.js';
+import { meteoDeLaNuit, BETE } from './quart/nuit.js';
 import { Grains, PORTEUR } from './monde/grains.js';
 import { Bateau } from './bateau/bateau.js';
 import { VARIANTES, VARIANTE_DU_JEU, vieDeLaTrombe } from './rendu/trombe.js';
@@ -23,11 +23,13 @@ const DUREE = 260;
 
 // ---------- Les moments ----------
 // (le début de nuit : la lumière quand la trombe passe près du bateau, dans le jeu — elle
-// vient vers 19 h 30 et le crépuscule s'attarde pendant son passage, jeu/nuit.js)
+// vient vers 3 h 30, dans le noir : quart/nuit.js)
 const MOMENTS = {
-  jeu: { nom: 'Début de nuit (le jeu)', meteo: () => meteoDeLaNuit(19.7) },
-  crepuscule: { nom: 'Crépuscule', meteo: () => meteoDeLaNuit(19.15) },
-  nuit: { nom: 'Nuit noire', meteo: () => meteoDeLaNuit(23.2) },
+  // (la nuit du jeu : la bête vient vers 3 h 30, dans le noir ; on ne la voit qu'aux éclairs)
+  jeu: { nom: 'La nuit du jeu (3 h 30)', meteo: () => meteoDeLaNuit(27.45) },
+  // (le crépuscule de l'ancien jeu, pour comparer : on la voyait se découper sur le ciel)
+  crepuscule: { nom: 'Crépuscule', meteo: () => etatMeteo({ ...AMBIANCES['coucher-menacant'], heure: 19.2, vent: 26, directionVent: 221, nuages: 0.82, orage: 0.66, pluie: 0.15, brume: 0.3, front: 0.86, houle: { hs: 2.2, periode: 12, direction: 251 } }) },
+  nuit: { nom: 'Minuit', meteo: () => meteoDeLaNuit(24.3) },
   jour: { nom: 'Jour d\'orage', meteo: () => etatMeteo({ ...AMBIANCES['fin-apres-midi'], heure: 15.2, nuages: 0.9, orage: 0.7, pluie: 0.15, brume: 0.3, vent: 26, directionVent: 222 }) },
 };
 let moment = MOMENTS[parametres.get('moment')] ? parametres.get('moment') : 'jeu';
@@ -80,7 +82,7 @@ function majEtat(dt) {
 }
 
 // ---------- Son grain ----------
-// Comme dans le jeu (jeu/nuit.js) : elle naît sous l'avant d'un grain d'orage (un
+// Comme dans le jeu (quart/nuit.js) : elle naît sous l'avant d'un grain d'orage (un
 // « porteur » : monde/grains.js), qui avance avec elle ; sa pluie s'enroule autour d'elle.
 // Ici, il ne vit pas : il est là, formé, et on ne fait pas naître de grains alentour.
 const grains = new Grains(7);
@@ -106,7 +108,7 @@ function placerGrain() {
 function majGrain() {
   if (!grain) return;
   const v = Math.hypot(grain.vx, grain.vz);
-  // (le crochet se forme à mesure que son tourbillon s'organise : jeu/nuit.js)
+  // (le crochet se forme à mesure que son tourbillon s'organise : quart/nuit.js)
   grain.crochet = { x: etat.x, z: etat.z, ux: grain.vx / v, uz: grain.vz / v, force: etat.force * lisse(etat.age, 5, 45) };
 }
 function choisirVariante(nom) {

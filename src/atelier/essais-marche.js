@@ -1,6 +1,6 @@
 // Les essais de marche : un marin automatique fait le tour du bord dans le vrai jeu (le
-// bateau qui bouge, la bôme, la barre, les vraies images), va à chaque chose que l'on
-// peut manier, la regarde, et vérifie que le geste est proposé.
+// bateau qui bouge, la bôme, les vraies images), va à chaque chose que l'on peut manier, la
+// regarde, et vérifie que le geste est proposé.
 //
 // À chaque image, il mesure aussi ce que le joueur verrait de travers :
 //  - la caméra trop près d'une paroi (moins de 6 cm : l'écran montrerait l'envers du décor) ;
@@ -15,17 +15,14 @@ function tournees(interieur) {
   const tableau = interieur.positionTableau;
   const cire = interieur.positionCire;
   return [
-    { nom: 'le winch tribord', chemin: [[0.32, zDe(0.25)]], geste: 'winch-tribord' },
-    { nom: 'le winch bâbord', chemin: [[-0.32, zDe(0.25)]], geste: 'winch-babord' },
     { nom: 'la pompe de cale', chemin: [[-0.2, zDe(0.12)]], geste: 'pompe' },
-    { nom: 'l\'écoute de grand-voile', chemin: [[0.25, zDe(0.09)]], geste: 'ecoute-gv' },
+    { nom: 'la bosse d\'enrouleur', chemin: [[0.32, zDe(0.28)]], geste: 'enrouleur' },
     { nom: 'la porte de la timonerie', chemin: [[0, zDe(0.24)]], geste: 'descente' },
     {
-      nom: 'le pied de mât, par tribord',
-      chemin: [[0.6, zDe(0.2)], [1.12, zDe(0.2)], [1.15, zDe(0.42)], [0.95, zDe(0.58)]],
-      geste: 'mat',
+      nom: 'le pied de l\'étai, par tribord',
+      chemin: [[0.6, zDe(0.2)], [1.12, zDe(0.2)], [1.15, zDe(0.42)], [1.0, zDe(0.68)], [0.35, zDe(0.88)], [0.12, zDe(0.93)]],
+      geste: 'etai',
     },
-    { nom: 'le pied de l\'étai', chemin: [[1.0, zDe(0.68)], [0.35, zDe(0.88)], [0.12, zDe(0.93)]], geste: 'etai' },
     {
       nom: 'retour au cockpit par bâbord',
       chemin: [[-0.35, zDe(0.88)], [-0.95, zDe(0.68)], [-1.15, zDe(0.45)], [-1.12, zDe(0.2)], [-0.25, zDe(0.2)]],
@@ -41,14 +38,14 @@ function tournees(interieur) {
     { nom: 'descendre au carré', chemin: [[-0.18, 1.0], [-0.3, 0.88], [-0.3, 0.3], [-0.3, 0.0], [0.39, -0.25], [0.39, -1.05]], geste: null },
     { nom: 'le ciré, au pied de l\'escalier', chemin: [[0.39, -0.2], [0.1, 0.0]], geste: 'cire' },
     {
-      nom: 'remonter, et prendre la barre',
-      chemin: [[-0.3, 0.0], [-0.3, 0.3], [-0.3, 0.6], [-0.25, 0.95], [-0.1, 1.3], [0, zDe(0.24)], [0.3, zDe(0.15)]],
-      geste: 'barre',
+      nom: 'remonter, et ressortir dans le cockpit',
+      chemin: [[-0.3, 0.0], [-0.3, 0.3], [-0.3, 0.6], [-0.25, 0.95], [-0.1, 1.3], [0, zDe(0.24)], [-0.2, zDe(0.12)]],
+      geste: 'pompe',
     },
   ];
 }
 
-// ctx : ce que le jeu prête (voir jeu.js)
+// ctx : ce que le jeu prête (voir quart.js)
 export async function essayerLaMarche(ctx, { dt = 1 / 60 } = {}) {
   const { marin, gestes, gesteVise, uneImage, commandes, seLever, bateau, regarder } = ctx;
   const g = marin.encombrement;

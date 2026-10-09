@@ -11,7 +11,7 @@
 import * as THREE from 'three';
 import { Monde3D } from './rendu/monde3d.js';
 import { AMBIANCES, etatMeteo } from './monde/meteo.js';
-import { meteoDeLaNuit } from './jeu/nuit.js';
+import { meteoDeLaNuit } from './quart/nuit.js';
 import { Bateau } from './bateau/bateau.js';
 import { Grains, REGLAGES_GRAINS } from './monde/grains.js';
 import { Foudre, REGLAGES_FOUDRE, activiteDuGrain, lumiereEclair } from './monde/foudre.js';
@@ -29,11 +29,11 @@ audio.precharger(`${import.meta.env.BASE_URL}sons/`);
 // la nuit du jeu)
 const MOMENTS = {
   jour: { nom: 'Après-midi d\'orage', meteo: () => etatMeteo({ ...AMBIANCES['fin-apres-midi'], heure: 16.3, nuages: 0.6, orage: 0.7, pluie: 0.2, brume: 0.22, vent: 25, directionVent: 222, front: 0.3 }) },
-  coucher: { nom: 'Coucher du soleil, le front au loin', meteo: () => meteoDeLaNuit(18.95) },
-  soir: { nom: 'Le soir tombe, le front approche', meteo: () => meteoDeLaNuit(19.3) },
-  crepuscule: { nom: 'Début de nuit', meteo: () => meteoDeLaNuit(19.7) },
-  nuit: { nom: 'Nuit noire', meteo: () => meteoDeLaNuit(23.5) },
-  fort: { nom: 'Au plus fort', meteo: () => meteoDeLaNuit(26.6) },
+  coucher: { nom: 'Coucher du soleil, le front au loin', meteo: () => etatMeteo({ ...AMBIANCES['coucher-menacant'], heure: 18.95, vent: 25.5, directionVent: 222, nuages: 0.74, orage: 0.62, pluie: 0.1, brume: 0.29, front: 0.8, houle: { hs: 2.2, periode: 12, direction: 252 } }) },
+  soir: { nom: 'Minuit', meteo: () => meteoDeLaNuit(24.2) },
+  crepuscule: { nom: '2 h', meteo: () => meteoDeLaNuit(26) },
+  nuit: { nom: '4 h', meteo: () => meteoDeLaNuit(28) },
+  fort: { nom: 'Au plus fort (5 h 20)', meteo: () => meteoDeLaNuit(29.35) },
 };
 let moment = MOMENTS[parametres.get('moment')] ? parametres.get('moment') : 'nuit';
 let meteo = MOMENTS[moment].meteo();

@@ -4,7 +4,7 @@
 // plus le nombre de fois prévu, jamais deux à la fois, jamais pendant qu'autre chose occupe
 // le marin — et surtout que rien n'est jamais confirmé : ce qu'on regarde en face disparaît,
 // et l'écho du radar s'efface quand un éclair montre la mer.
-import { Peur, EVENEMENTS, SILHOUETTE, angleVu, EN_FACE } from '../src/jeu/peur.js';
+import { Peur, EVENEMENTS, SILHOUETTE, angleVu, EN_FACE } from '../src/quart/peur.js';
 
 let echecs = 0;
 const verifier = (condition, message) => {
@@ -26,7 +26,7 @@ const LIEUX = {
 function nuitEntiere(graine) {
   const peur = new Peur({ graine });
   const dt = 0.1;
-  const duree = 1140; // s (≈ 19 min, comme la nuit du jeu)
+  const duree = 816; // s (la nuit du jeu, 12 min, et le jour qui se lève)
   let hasard = graine * 7 + 1;
   const h = () => {
     hasard = (hasard * 16807) % 2147483647;
@@ -42,11 +42,12 @@ function nuitEntiere(graine) {
   const tensions = [];
   let pendantOccupe = 0;
   for (let t = 0; t < duree; t += dt) {
-    const heure = 18.75 + (11.25 * t) / duree;
-    // il change de lieu toutes les une à trois minutes (la moitié du temps à la barre)
+    const heure = 24 + (6.8 * t) / duree;
+    // il change de lieu toutes les une à trois minutes (la moitié du temps dans la timonerie,
+    // le reste dehors ou à l'intérieur)
     if (t > prochainLieu) {
       const r = h();
-      lieu = r < 0.5 ? 'barre' : r < 0.8 ? 'timonerie' : 'carre';
+      lieu = r < 0.25 ? 'barre' : r < 0.75 ? 'timonerie' : 'carre';
       prochainLieu = t + 60 + 120 * h();
     }
     // il regarde ici et là
@@ -55,14 +56,14 @@ function nuitEntiere(graine) {
       site = (h() - 0.6) * 0.8;
       prochainRegard = t + 1 + 4 * h();
     }
-    // des éclairs (au plus fort de la nuit)
-    eclair = heure > 22 && heure < 28 && h() < 0.012 ? 1 : Math.max(0, eclair - dt * 6);
-    // (de temps en temps, quelque chose l'occupe : une vague, la trombe, le cargo)
-    const occupe = (heure > 21.5 && heure < 21.9) || (heure > 25.9 && heure < 26.5) || (heure > 28 && heure < 28.4);
+    // des éclairs (toute la nuit, de plus en plus)
+    eclair = heure < 30 && h() < 0.004 + 0.002 * (heure - 24) ? 1 : Math.max(0, eclair - dt * 6);
+    // (de temps en temps, quelque chose l'occupe : une vague scélérate, la trombe)
+    const occupe = (heure > 26.5 && heure < 26.9) || (heure > 27.4 && heure < 28.2) || (heure > 29.25 && heure < 29.6);
     const ctx = {
       heure, lieu, yeux: LIEUX[lieu], regard: regardDe(lacet, site), lampe: false,
       eclairage: lieu === 'barre' ? 'eteint' : 'rouge', eclair, occupe, danger: 0, calme: 60,
-      silence: heure > 25.7 && heure < 26.3, porteOuverte: false,
+      silence: true, porteOuverte: false,
     };
     const evts = peur.maj(dt, ctx);
     for (const e of evts) {
@@ -84,8 +85,10 @@ for (const [k, n] of nuits.entries()) {
 console.log('');
 const tout = nuits.flatMap((n) => n.journal);
 verifier(nuits.every((n) => n.tensions.every((x) => x.v >= 0 && x.v <= 1)), 'la tension reste entre 0 et 1');
-verifier(nuits.every((n) => Math.max(...n.tensions.filter((x) => x.heure > 25 && x.heure < 27.5).map((x) => x.v)) > 0.5), 'elle monte au-dessus de 0,5 au plus fort de la nuit');
-verifier(nuits.every((n) => n.tensions.at(-1).v < 0.35), 'elle retombe avant l\'aube');
+verifier(nuits.every((n) => Math.max(...n.tensions.filter((x) => x.heure > 28.5 && x.heure < 30).map((x) => x.v)) > 0.5), 'elle monte au-dessus de 0,5 au plus fort de la nuit, avant l\'aube');
+const moyenne = (n, a, b) => { const x = n.tensions.filter((y) => y.heure >= a && y.heure < b); return x.reduce((s, y) => s + y.v, 0) / x.length; };
+verifier(nuits.every((n) => moyenne(n, 24, 25) < moyenne(n, 26, 27) && moyenne(n, 26, 27) < moyenne(n, 28.5, 29.8)), 'elle monte d\'heure en heure');
+verifier(nuits.every((n) => n.tensions.at(-1).v < 0.35), 'elle retombe avec le jour');
 verifier(nuits.every((n) => Object.entries(EVENEMENTS).every(([nom, e]) => n.peur.fois[nom] <= e.fois)), 'chaque chose arrive au plus le nombre de fois prévu');
 verifier(nuits.every((n) => new Set(n.journal.map((j) => j.e)).size >= 5), 'au moins cinq choses différentes par nuit (le marin simulé va au hasard)');
 verifier(nuits.every((n) => n.pendantOccupe === 0), 'rien d\'étrange pendant qu\'autre chose occupe le marin');
@@ -100,7 +103,7 @@ verifier(tout.filter((j) => j.e === 'pas' || j.e === 'coupCoque').every((j) => j
 
 // ---------- 2. Rien n'est jamais confirmé ----------
 console.log('');
-const base = { heure: 25, lieu: 'barre', yeux: LIEUX.barre, lampe: false, eclairage: 'eteint', eclair: 0, occupe: false, danger: 0, calme: 60, silence: false, porteOuverte: false };
+const base = { heure: 27.6, lieu: 'barre', yeux: LIEUX.barre, lampe: false, eclairage: 'eteint', eclair: 0, occupe: false, danger: 0, calme: 60, silence: false, porteOuverte: false };
 // la silhouette : vue du coin de l'œil, elle reste ; regardée en face, elle n'est plus là
 {
   const peur = new Peur({ graine: 5 });

@@ -1,10 +1,8 @@
-// La radio VHF du bord : le bulletin météo, lu à voix haute (synthèse vocale du
-// navigateur, en français) et écrit en sous-titres, et Jos, le vieux marin du sémaphore,
-// qui donne les leçons de la journée.
-// Le poste est fictif (« Kervalen Radio ») ; les mots sont ceux des vrais bulletins :
-// l'échelle de Beaufort pour le vent, l'état de la mer de calme à grosse.
-// Les messages font la queue : on ne se coupe pas la parole à la radio. Le canal 16 est
-// celui de la veille et des appels ; pour bavarder, on passe sur un canal de travail (72).
+// La radio VHF du bord. Cette nuit, personne n'y parle : elle grésille, elle claque à chaque
+// éclair… et parfois une voix passe sur le 16, trop faible pour qu'on la comprenne (fantome),
+// ou tout près du micro (chuchoter). Ce qu'elle sait encore faire de l'ancien jeu (la voix de
+// synthèse, le bulletin de « Kervalen Radio », la file des messages) reste là, sans servir.
+// Le canal 16 est celui de la veille et des appels de détresse.
 import { leverCoucher } from '../monde/astres.js';
 import { tendanceEnMots } from '../monde/pression.js';
 

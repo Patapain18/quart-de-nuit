@@ -175,10 +175,10 @@ uniform vec4 uCargo;          // présent (0 ou 1), vitesse (m/s)
 uniform vec4 uCargoSillage[${N_CARGO}];
 uniform int uCargoSillageN;
 uniform vec4 uCargoBoite;
-// la chose sous la coque (jeu/peur.js) : x, z, sa route (rad, dans le plan x z), sa force ;
+// la chose sous la coque (quart/peur.js) : x, z, sa route (rad, dans le plan x z), sa force ;
 // elle remue le plancton en passant : on devine sa forme, immense
 uniform vec4 uChose;
-// la forme pâle sous la surface (jeu/peur.js) : x, z, son orientation (rad), son opacité
+// la forme pâle sous la surface (quart/peur.js) : x, z, son orientation (rad), son opacité
 uniform vec4 uForme;
 
 const float PI = 3.14159265359;

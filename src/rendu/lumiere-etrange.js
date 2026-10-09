@@ -1,6 +1,6 @@
 // Une lumière sur l'eau, la nuit, au loin : un feu blanc, en tête d'un mât, qui
 // apparaît et disparaît dans le creux des vagues, une dizaine de secondes, puis plus rien.
-// Pas de bateau sur le radar de Jos, pas de réponse à la radio. (jeu/nuit.js : l'étrange)
+// Pas de bateau sur le radar de Jos, pas de réponse à la radio. (quart/nuit.js : l'étrange)
 //
 // Elle est cachée quand une vague, entre elle et nous, monte plus haut que la ligne qui
 // va de nos yeux à elle : on mesure la mer à mi-chemin.

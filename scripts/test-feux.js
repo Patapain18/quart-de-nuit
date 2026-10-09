@@ -4,15 +4,14 @@
 // regarde). Ce qu'on en voit dépend de la distance (son intensité vient de sa portée), de la
 // rondeur de la Terre, de la brume, de la pluie d'un grain entre lui et nous — il s'y perd —,
 // et des vagues : dans un creux, la crête la plus proche cache les feux bas. Ils s'allument
-// au coucher du soleil. Le livre des feux dit la même chose qu'eux.
+// au coucher du soleil. (La nuit du jeu, on les devine au loin, au nord : le phare surtout.)
 import {
   FEUX, SEMAPHORE, OPTIQUE, MILLE, eclat, rythme, intensite, lumiereRecue, porteeGeographique, allumage,
 } from '../src/monde/feux.js';
 import { Grains } from '../src/monde/grains.js';
-import { meteoDeLaNuit } from '../src/jeu/nuit.js';
+import { meteoDeLaNuit } from '../src/quart/nuit.js';
 import { Houle, CASCADES } from '../src/mer/houle.js';
 import { etatMer } from '../src/monde/meteo.js';
-import { pageDesFeux, dessinRythme } from '../src/jeu/livre-des-feux.js';
 
 let echecs = 0;
 const verifier = (condition, message) => {
@@ -94,7 +93,7 @@ verifier(loin.horizon && loin.recu === 0, 'au-delà, on ne le voit plus, même p
 // ---------- Cette nuit-là ----------
 console.log('\nCette nuit-là, au départ (5 milles du phare)');
 const depart = { x: 1500, y: 3, z: 7000 };
-const heures = [18.8, 19.6, 21, 23, 24.5, 26, 27.4, 28.4, 29.5];
+const heures = [24, 24.5, 25, 26, 27, 27.5, 28.3, 29, 29.5, 29.9];
 const auDepart = heures.map((h) => {
   const m = meteoDeLaNuit(h);
   const g = new Grains(1);
@@ -106,11 +105,11 @@ const auDepart = heures.map((h) => {
   });
 });
 const phares = auDepart.map((x) => x[0]);
-verifier(phares.every((x) => x > 100), `entre les grains, le phare se voit toute la nuit (au plus faible ${Math.round(Math.min(...phares))} fois le seuil, au plus fort de la tempête ; ${Math.round(Math.max(...phares))} au coucher)`);
-verifier(auDepart.every((x) => x[2] < 6 && x[3] < 6), 'les feux du port, à 6 milles : tout juste visibles au coucher du soleil, perdus ensuite (portée 5 et 6 milles)');
+verifier(phares.every((x) => x > 100), `entre les grains, le phare se voit toute la nuit (au plus faible ${Math.round(Math.min(...phares))} fois le seuil, au plus fort de la tempête ; ${Math.round(Math.max(...phares))} à minuit)`);
+verifier(auDepart.every((x) => x[2] < 6 && x[3] < 6), 'les feux du port, à 6 milles : à peine, ou pas du tout (portée 5 et 6 milles)');
 
 console.log('\nUn grain entre lui et nous');
-const m23 = meteoDeLaNuit(23);
+const m23 = meteoDeLaNuit(25);
 const grains = new Grains(3);
 grains.meteo = m23;
 grains.peuple = true;
@@ -143,26 +142,18 @@ function parLesVagues(heure, obs, { duree = 60, pas = 0.1, merPlate = false } = 
   }
   return { hs: houle.hauteurSignificative, caches: Object.fromEntries([...caches].map(([k, v]) => [k, v / n])) };
 }
-const tempete = parLesVagues(23.5, depart);
+const tempete = parLesVagues(27, depart);
 verifier(tempete.caches.phare > 0.1 && tempete.caches.phare < 0.6, `dans la tempête (${virgule(tempete.hs)} m de creux), le phare, à 5 milles, est caché ${Math.round(tempete.caches.phare * 100)} % du temps : on le voit du haut des vagues`);
 const devantLePort = { x: (feu('jetee').x + feu('roche-rouge').x) / 2, z: feu('jetee').z + 1100 };
-const port = parLesVagues(28.6, devantLePort);
-verifier(port.caches.jetee > port.caches.phare && port.caches.jetee > 0.05, `les feux bas plus souvent : devant le port, à l'accalmie (${virgule(port.hs)} m), le feu de la jetée (${feu('jetee').hauteur} m) est caché ${Math.round(port.caches.jetee * 100)} % du temps, le phare ${Math.round(port.caches.phare * 100)} %`);
-const plate = parLesVagues(28.6, devantLePort, { merPlate: true, duree: 20 });
+const port = parLesVagues(24, devantLePort);
+verifier(port.caches.jetee > port.caches.phare && port.caches.jetee > 0.05, `les feux bas plus souvent : devant le port, à minuit (${virgule(port.hs)} m), le feu de la jetée (${feu('jetee').hauteur} m) est caché ${Math.round(port.caches.jetee * 100)} % du temps, le phare ${Math.round(port.caches.phare * 100)} %`);
+const plate = parLesVagues(24, devantLePort, { merPlate: true, duree: 20 });
 verifier(Object.values(plate.caches).every((x) => x === 0), 'par mer plate, jamais');
 
 // ---------- L'allumage ----------
 console.log('\nL\'allumage');
 verifier(allumage(0.2) === 0 && allumage(0.04) === 0, 'éteints le jour (le soleil à plus de 2° au-dessus de l\'horizon)');
 verifier(allumage(0) === 1 && allumage(-0.3) === 1, 'allumés quand il se couche, et toute la nuit');
-
-// ---------- Le livre des feux ----------
-console.log('\nLe livre des feux');
-const { entrees, carte } = pageDesFeux();
-verifier(FEUX.every((f) => entrees.includes(f.caractere) && entrees.includes(f.nom) && carte.includes(f.caractere)), `chaque feu y est, avec sa signature (${FEUX.map((f) => f.caractere).join(' · ')}), et sur sa carte`);
-const traits = (f) => (dessinRythme(f, { periodes: 1 }).match(/<rect x="[\d.]+" y="2"/g) ?? []).length;
-verifier(traits(phare) === 3 && traits(basse) === 7 && traits(feu('jetee')) === 1, `le dessin de leurs éclats, sur une période : ${traits(phare)} pour le phare, ${traits(basse)} pour la Basse du Bec, ${traits(feu('jetee'))} pour la jetée`);
-verifier(rythme(phare).periode === 12 && rythme(basse).periode === 15, 'les mêmes périodes que les feux eux-mêmes');
 
 console.log(echecs ? `\n${echecs} vérification(s) en échec` : '\nTout est bon.');
 process.exit(echecs ? 1 : 0);

@@ -209,7 +209,7 @@ export class Cargo3D {
     this._e = new THREE.Euler(0, 0, 0, 'YXZ');
   }
 
-  // cargo : { x, z, cap (degrés) } (jeu/nuit.js), ou null ; camera : pour les secteurs
+  // cargo : { x, z, cap (degrés) } (quart/nuit.js), ou null ; camera : pour les secteurs
   maj(cargo, camera) {
     this.groupe.visible = !!cargo;
     if (!cargo) return;

@@ -8,7 +8,7 @@
 import * as THREE from 'three';
 import { Monde3D } from './rendu/monde3d.js';
 import { AMBIANCES, etatMeteo, angleVers, NOEUD } from './monde/meteo.js';
-import { meteoDeLaNuit } from './jeu/nuit.js';
+import { meteoDeLaNuit } from './quart/nuit.js';
 import { Bateau } from './bateau/bateau.js';
 import { Grains, REGLAGES_GRAINS } from './monde/grains.js';
 import { distanceALaTerre } from './rendu/cote.js';
@@ -23,10 +23,10 @@ const bateau = monde.ajouterBateau();
 // rideaux de pluie sur le ciel clair ; les autres : des heures de la nuit du jeu)
 const MOMENTS = {
   jour: { nom: 'Après-midi d\'orage', meteo: () => etatMeteo({ ...AMBIANCES['fin-apres-midi'], heure: 16.3, nuages: 0.6, orage: 0.7, pluie: 0.2, brume: 0.22, vent: 25, directionVent: 222, front: 0.3 }) },
-  coucher: { nom: 'Coucher du soleil', meteo: () => meteoDeLaNuit(18.95) },
-  crepuscule: { nom: 'Début de nuit', meteo: () => meteoDeLaNuit(19.7) },
-  nuit: { nom: 'Nuit noire', meteo: () => meteoDeLaNuit(23.5) },
-  fort: { nom: 'Au plus fort', meteo: () => meteoDeLaNuit(26.6) },
+  coucher: { nom: 'Coucher du soleil', meteo: () => etatMeteo({ ...AMBIANCES['coucher-menacant'], heure: 18.95, vent: 25.5, directionVent: 222, nuages: 0.74, orage: 0.62, pluie: 0.1, brume: 0.29, front: 0.8, houle: { hs: 2.2, periode: 12, direction: 252 } }) },
+  crepuscule: { nom: 'Minuit', meteo: () => meteoDeLaNuit(24.2) },
+  nuit: { nom: '3 h', meteo: () => meteoDeLaNuit(27) },
+  fort: { nom: 'Au plus fort (5 h 20)', meteo: () => meteoDeLaNuit(29.35) },
 };
 let moment = MOMENTS[parametres.get('moment')] ? parametres.get('moment') : 'jour';
 let meteo = MOMENTS[moment].meteo();

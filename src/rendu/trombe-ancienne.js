@@ -311,7 +311,7 @@ export class TrombeAncienne {
     this._p = new THREE.Vector3();
   }
 
-  // trombe : { x, z, force, age, duree } (jeu/nuit.js), ou null ; directionVent : vers où
+  // trombe : { x, z, force, age, duree } (quart/nuit.js), ou null ; directionVent : vers où
   // va le vent (radians, dans le plan) ; temps : l'horloge du monde
   maj(dt, trombe, { temps, directionVent, camera = null }) {
     const visible = !!trombe && trombe.force > 0.01;

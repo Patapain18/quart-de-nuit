@@ -1,65 +1,72 @@
-// La nuit de tempête jouée par trois marins automatiques, sans navigateur :
-//   node scripts/test-nuit.js            (une mer plus grossière : ≈ 1 min)
-//   node scripts/test-nuit.js --fine     (la mer à pleine résolution : ≈ 3 min)
-// Les trois marins (src/jeu/marins.js : le prudent, le moyen, l'imprudent) font la même
-// nuit. On vérifie que le prudent voit l'aube, que l'imprudent ne la voit pas, et que la
-// nuit se déroule comme prévu (la trombe, le cargo, les avaries, l'eau…).
-import { jouerLaNuit } from '../src/jeu/marins.js';
-import { HEURE_AUBE } from '../src/jeu/nuit.js';
-import { heureEnTexte } from '../src/jeu/journee.js';
+// La nuit de tempête, sans navigateur : node scripts/test-nuit.js
+// Trois veilleurs automatiques (src/quart/veilleurs.js) font toute la nuit, de minuit à six
+// heures, avec la vraie physique : l'attentif, le distrait, l'absent. On vérifie que la nuit
+// dure ce qu'elle doit, que le temps empire d'heure en heure, que ce qui doit arriver arrive
+// (les grains, la trombe, les deux vagues scélérates, les avaries), que chaque heure est gardée
+// et qu'on peut la reprendre.
+import { jouerLaNuit } from '../src/quart/veilleurs.js';
+import { meteoDeLaNuit, heureEnTexte, HEURE_DEBUT, HEURE_AUBE, DUREE_HEURE } from '../src/quart/nuit.js';
 
 let echecs = 0;
 const verifier = (condition, message) => {
   console.log(`${condition ? '  ✓' : '  ✗'} ${message}`);
   if (!condition) echecs++;
 };
+const arrondi = (x, n = 1) => Math.round(x * 10 ** n) / 10 ** n;
 
+// ---------- Le temps qu'il fait ----------
+console.log('Le temps, d\'heure en heure');
+const vents = [24, 25, 26, 27, 28, 29, 29.6].map((h) => meteoDeLaNuit(h).vent);
+console.log(`  le vent : ${vents.map((v) => Math.round(v)).join(', ')} nœuds (minuit, 1 h… 5 h 36)`);
+verifier(vents.every((v, i) => i === 0 || v >= vents[i - 1] - 0.5), 'il ne fait que monter jusqu\'au matin');
+verifier(vents[0] > 30 && vents[0] < 34 && vents.at(-1) > 44, `de ${Math.round(vents[0])} nœuds à minuit à ${Math.round(vents.at(-1))} au plus fort`);
+const tourne = meteoDeLaNuit(29.4).directionVent - meteoDeLaNuit(28).directionVent;
+verifier(tourne > 15 && tourne < 35, `le front passe vers 4 h 30 : le vent tourne de ${Math.round(tourne)}°`);
+verifier(meteoDeLaNuit(30.4).vent < meteoDeLaNuit(29.6).vent - 8, 'à six heures, il tombe enfin');
+
+// ---------- La nuit entière ----------
+console.log('\nToute la nuit, trois veilleurs (≈ 1 min)');
 const debut = performance.now();
-let derniere = 0;
-const resultats = jouerLaNuit({
-  graine: 3,
-  fine: process.argv.includes('--fine'),
-  surProgres: (nuit, t) => {
-    if (t - derniere < 120) return;
-    derniere = t;
-    console.log(`  ${heureEnTexte(nuit.heure).padStart(8)} · vent ${nuit.meteo.vent.toFixed(0)} nds`);
-  },
-});
-const duree = resultats[0].serie.t.at(-1) ?? 0;
-console.log(`(${((performance.now() - debut) / 1000).toFixed(0)} s de calcul pour ${(duree / 60).toFixed(1)} min de nuit)`);
-
+const resultats = jouerLaNuit({ graine: 3 });
+console.log(`  (${Math.round((performance.now() - debut) / 1000)} s)`);
 for (const r of resultats) {
   const s = r.stats;
-  console.log(`\n${r.nom} : ${r.fin === 'aube' ? 'a vu l\'aube' : `perdu à ${heureEnTexte(r.heureFin)} (${r.fin})`}`);
-  console.log(`  ${s.deferlantes} déferlantes, ${s.coups} l'ont couché, gîte max ${Math.round(s.giteMax)}°, couché ${s.couche.toFixed(1)} s`);
-  console.log(`  eau : ${Math.round(s.caleMax)} L au plus dans la cale, ${Math.round(s.pompee)} L pompés · ${(s.distance / 1852).toFixed(1)} milles, ${s.vitesseMax.toFixed(1)} nds au plus`);
-  console.log(`  trombe à ${Math.round(s.trombeDistance)} m · cargo à ${Math.round(s.cargoDistance)} m${s.cargoAppele ? ' (appelé)' : ''} · avaries : ${r.avaries.map((a) => `${heureEnTexte(a.heure)} ${a.nom}`).join(', ') || 'aucune'}`);
-  console.log(`  vagues scélérates : ${r.scelerates.map((v) => `${heureEnTexte(v.heure)} prise à ${Math.round(v.angle)}°, gîte ${Math.round(v.gite)}°`).join(' · ') || 'aucune'}`);
-  console.log(`  grains : ${r.journal.filter((j) => j.texte.startsWith('Le grain est passé')).map((j) => `${heureEnTexte(j.heure)} ${j.texte.match(/rafales à \d+/)?.[0] ?? ''}`).join(' · ') || 'aucun'}`);
+  console.log(`  ${r.nom.padEnd(12)} ${r.fin === 'aube' ? 'a vu l\'aube' : `perdu (${r.fin}) à ${heureEnTexte(r.heureFin)}`} · ${s.deferlantes} déferlantes (couché ${s.coups} fois) · gîte max ${Math.round(s.giteMax)}° · eau à bord au plus ${Math.round(s.caleMax)} L · avaries : ${r.avaries.map((a) => `${a.nom} à ${heureEnTexte(a.heure)}`).join(', ') || 'aucune'}`);
 }
-const [prudent, moyen, imprudent] = resultats;
-console.log('');
-verifier(resultats.every((r) => r.fin !== 'instable'), 'la simulation reste stable toute la nuit');
-verifier(prudent.fin === 'aube', 'le prudent voit l\'aube');
-verifier(prudent.stats.coups <= 2 && prudent.stats.caleMax < 600, 'le prudent n\'est presque jamais couché et garde le bateau au sec');
-verifier(imprudent.fin !== 'aube', 'l\'imprudent ne voit pas l\'aube');
-verifier(moyen.fin === 'aube' || moyen.heureFin > imprudent.heureFin, 'le moyen tient plus longtemps que l\'imprudent');
-verifier(prudent.nuit.faits.has('trombe') && prudent.stats.trombeDistance > 150, 'la trombe est passée, et le prudent s\'en est écarté');
-verifier(prudent.nuit.faits.has('cargo') && prudent.stats.cargoAppele && prudent.stats.cargoDistance > 150, 'le cargo est passé au large du prudent, qui l\'a appelé');
-verifier(prudent.avaries.some((a) => a.nom === 'ecouteFoc') && prudent.reparees.ecouteFoc === 'reparee', 'l\'écoute de foc a cassé, et le prudent l\'a remplacée');
-verifier(prudent.stats.deferlantes >= 12, 'des déferlantes toute la nuit (au moins 12)');
-verifier(prudent.scelerates.length === 3, 'trois vagues scélérates sont passées sur le prudent');
-verifier(prudent.scelerates.every((v) => v.angle > 140), 'le prudent les a toutes prises par l\'arrière (à plus de 140°)');
-verifier(prudent.stats.sceleratesCouche <= 1, 'elles ne l\'ont pas couché (une fois au plus)');
-verifier(prudent.heureFin >= HEURE_AUBE, 'la nuit va jusqu\'à 6 h');
-const annonces = prudent.journal.filter((j) => /^Un grain (au |à l')/.test(j.texte)).length;
-verifier(prudent.stats.grains >= 3 && annonces >= 3, `des grains sont passés sur le prudent (${prudent.stats.grains}), annoncés par Jos (${annonces})`);
-verifier(prudent.stats.rafaleMax > 45, `leurs rafales soufflent fort (jusqu'à ${Math.round(prudent.stats.rafaleMax)} nœuds)`);
-// (« à verse » : la pluie de partout fait la moitié ; sous le cœur d'un grain, tout le reste.
-// Le bateau ne passe pas toujours en plein cœur : à 450 m d'un grain fort, il pleut à 87 %)
-const pluieMax = Math.max(...prudent.serie.pluie);
-const pluieMin = Math.min(...prudent.serie.pluie.filter((_, i) => prudent.serie.heure[i] > 22 && prudent.serie.heure[i] < 27));
-verifier(pluieMax > 0.85 && pluieMin < 0.5, `il pleut à verse sous les grains (${Math.round(pluieMax * 100)} %), moins entre eux (${Math.round(pluieMin * 100)} %)`);
+const attentif = resultats.find((r) => r.cle === 'attentif');
+const nuit = attentif.nuit;
+verifier(attentif.fin === 'aube', 'l\'attentif voit le jour se lever');
+verifier(Math.abs(attentif.serie.t.at(-1) - (HEURE_AUBE - HEURE_DEBUT) * DUREE_HEURE) < 10, `la nuit dure ${arrondi(attentif.serie.t.at(-1) / 60)} minutes de jeu (deux par heure)`);
+const heures = attentif.journal.filter((j) => /^(Minuit|\d h)\./.test(j.texte)).map((j) => Math.floor(j.heure + 1e-6));
+verifier([24, 25, 26, 27, 28, 29].every((h) => heures.includes(h)), `chaque heure sonne, et le journal la note (${heures.length} fois)`);
+verifier(nuit.stats.grains >= 3, `les grains passent sur le bateau (${nuit.stats.grains}, rafales jusqu'à ${Math.round(nuit.stats.rafaleMax)} nœuds)`);
+const trombe = attentif.journal.find((j) => j.texte.startsWith('Une trombe'));
+verifier(trombe && trombe.heure > 27.2 && trombe.heure < 27.8, `la trombe naît vers 3 h 30 (${trombe ? heureEnTexte(trombe.heure) : 'pas vue'}), et passe à ${Math.round(nuit.stats.trombeDistance)} m`);
+const scelerates = attentif.journal.filter((j) => j.texte.startsWith('Un grondement énorme'));
+verifier(scelerates.length === 2 && scelerates[0].heure > 26.3 && scelerates[0].heure < 26.9 && scelerates[1].heure > 29 && scelerates[1].heure < 29.7,
+  `deux vagues scélérates : ${scelerates.map((j) => heureEnTexte(j.heure)).join(' et ')}`);
+verifier(attentif.avaries.some((a) => a.nom === 'pilote') && attentif.avaries.some((a) => a.nom === 'ecouteFoc'), 'le pilote lâche, l\'écoute de foc casse');
+const pilotes = attentif.avaries.filter((a) => a.nom === 'pilote');
+verifier(pilotes.length >= 3, `le pilote lâche de plus en plus souvent (${pilotes.length} fois : ${pilotes.map((a) => heureEnTexte(a.heure)).join(', ')})`);
+verifier(nuit.stats.eclairs > 100, `la foudre : ${nuit.stats.eclairs} éclairs, le plus proche à ${Math.round(nuit.stats.eclairPlusPres)} m`);
+const etrange = ['Une voix sur le 16', 'Des coups contre la coque'].filter((t) => resultats.some((r) => r.journal.some((j) => j.texte.startsWith(t))));
+verifier(etrange.length === 2, `l'étrange : ${etrange.join(', ').toLowerCase()}`);
+const absent = resultats.find((r) => r.cle === 'absent');
+verifier(absent.stats.caleMax > 4 * Math.max(1, attentif.stats.caleMax), `qui ne pompe pas finit avec ${Math.round(absent.stats.caleMax)} L d'eau à bord (l'attentif : ${Math.round(attentif.stats.caleMax)} L)`);
+
+// ---------- Reprendre une heure ----------
+console.log('\nReprendre au début d\'une heure');
+{
+  const [r] = jouerLaNuit({ graine: 5, veilleurs: ['attentif'], heureMax: 27.5 });
+  const n = r.nuit;
+  const s = n.sauvegarde;
+  verifier(s && s.heure === 27, `à 3 h 30, la nuit a gardé le début de l'heure (${s ? `${s.heure - 24} h` : 'rien'})`);
+  const avant = n.journal.length;
+  n.restaurer(s, r.ctx);
+  verifier(n.heure === 27 && n.etat === 'nuit' && n.journal.length === avant + 1, `reprise à ${heureEnTexte(n.heure)}, le journal le note`);
+  const garde = JSON.parse(JSON.stringify(n.instantaneAGarder()));
+  verifier(Array.isArray(garde.faits) && garde.heure === 27, 'elle se garde dans le navigateur (en texte)');
+}
 
 console.log(echecs ? `\n${echecs} vérification(s) en échec` : '\nTout est bon.');
 process.exit(echecs ? 1 : 0);

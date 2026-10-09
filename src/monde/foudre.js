@@ -55,7 +55,7 @@ const lisse = (a, b, x) => {
 // éclairs viennent quand sa tour a fini de monter, les derniers un peu avant la fin de sa
 // pluie ; et l'air qu'il traverse : quand l'orage s'en va (orage du moment, 0 → 1), les
 // grains qui restent ne font plus guère d'éclairs. (g.saut : le « saut d'éclairs » d'un
-// grain qui va faire naître une trombe — ses éclairs se multiplient juste avant : jeu/nuit.js)
+// grain qui va faire naître une trombe — ses éclairs se multiplient juste avant : quart/nuit.js)
 export function activiteDuGrain(g, orage = 1) {
   if (!g.orage) return 0;
   const mur = lisse(0.5 * g.naissance, 1.3 * g.naissance, g.age);

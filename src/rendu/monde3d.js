@@ -93,7 +93,7 @@ export class Monde3D {
     this.dansLaCabine = false; // (le jeu le dit : dedans, pas de gouttes sur l'objectif)
     this.noirMax = 1; // (le noir d'encre de la nuit d'orage : 1 ; moins, pour un écran peu lumineux)
     this.gouttesActives = true; // (les options : on peut ne pas en vouloir)
-    // le cargo et la trombe de la nuit (le jeu donne leur état : jeu/nuit.js)
+    // le cargo et la trombe de la nuit (le jeu donne leur état : quart/nuit.js)
     this.cargo = new Cargo3D(this.scene, this.houle, this.eau);
     this.trombe = new Trombe3D(this.scene, this.houle, this.eau, this.ciel, this.embruns);
     // (l'étrange : une lumière sur l'eau, au loin, que personne n'explique)
