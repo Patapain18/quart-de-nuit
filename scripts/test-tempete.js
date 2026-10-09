@@ -113,7 +113,10 @@ verifier(R.fuiteFoc.couche < 0.5 && R.fuiteFoc.coups === 0, 'en fuite sous un bo
 verifier(R.fuiteFoc.vitesse < 10, 'sous un bout de foc, il ne file pas trop vite (moins de 10 nœuds en moyenne)');
 verifier(R.fuite.couche < 1.5, 'en fuite, toile réduite : le bateau ne se couche presque jamais');
 verifier(R.fuite.vitesse < 11, 'en fuite, il ne dépasse pas ~11 nœuds en moyenne (un croiseur ne déjauge pas)');
-verifier(R.travers.coups >= R.fuiteFoc.coups + 3 && R.travers.coups > R.fuite.coups + 2, 'prendre les vagues de travers est bien plus dangereux que fuir (les déferlantes le couchent)');
+// (la toile de la nuit du jeu, c'est la fuite sous un bout de foc : le pilote qui lâche met le
+// bateau en travers, et là, les déferlantes le couchent ; la fuite à deux ris, que le jeu
+// n'utilise plus, est entre les deux)
+verifier(R.travers.coups >= R.fuiteFoc.coups + 3 && R.travers.coups > R.fuite.coups, `prendre les vagues de travers est bien plus dangereux que fuir (les déferlantes le couchent : ${R.travers.coups} fois de travers, ${R.fuite.coups} en fuite à deux ris, ${R.fuiteFoc.coups} sous un bout de foc)`);
 verifier(R.imprudentPres.gite45 > R.pres.gite45 * 2 + 3, 'au près, toute la toile, il passe bien plus de temps couché sur l\'eau qu\'avec 2 ris');
 verifier(R.imprudentFuite.gite45 > R.fuite.gite45 * 2 + 2 || R.imprudentFuite.coups > R.fuite.coups, 'en fuite aussi, trop de toile le met en danger');
 

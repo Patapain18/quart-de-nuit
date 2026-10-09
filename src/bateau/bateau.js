@@ -1,9 +1,7 @@
-// Le voilier complet : le modèle 3D, les voiles, et ses pièces qui bougent.
-//
-// Pour l'instant (étape 1), le bateau « flotte » simplement : il suit la hauteur et
-// la pente de l'eau sous lui, avec un peu d'inertie, et gîte (penche) sous le vent.
-// La vraie physique (poussée de l'eau sur la coque, force du vent dans les voiles,
-// safran) viendra à l'étape 2.
+// Le voilier complet : le modèle 3D, les voiles, et ses pièces qui bougent (la bôme, le
+// safran et la roue, la porte de la timonerie, les essuie-glaces, le levier de la pompe, la
+// trappe de la cale, les volets de tempête).
+// (La vraie physique est dans physique/voilier.js ; flotter() ne sert qu'aux ateliers.)
 import * as THREE from 'three';
 import { construireBateau } from './modele.js';
 import { Voiles } from './voiles.js';
@@ -15,12 +13,13 @@ import { Radar } from './radar.js';
 import { PaquetDeMer } from './paquet-de-mer.js';
 import { Electronique } from './electronique.js';
 import { mouillerLesVitres } from './vitres.js';
-import { zDe, demiLargeur, COCKPIT, hauteurLivet, hauteurPont } from './forme.js';
+import { zDe, demiLargeur, COCKPIT, MAT, hauteurLivet, hauteurPont } from './forme.js';
 import { LARGEUR_BATTANT } from './timonerie.js';
 
 export class Bateau {
   constructor() {
-    const { groupe, materiaux, pivotBome, pivotSafran, mesures, porte, essuieGlaces, levierPompe } = construireBateau();
+    const { groupe, materiaux, pivotBome, pivotSafran, roue, mesures, porte, essuieGlaces } = construireBateau();
+    this.roue = roue; // (elle tourne avec le safran : le pilote la fait tourner)
     this.porte = porte; // la porte coulissante de la timonerie, vers le cockpit
     this.essuieGlaces = essuieGlaces;
     this.balayage = 0; // (les essuie-glaces : 0 arrêtés → 1 au plus vite, réglé par le jeu)
@@ -28,7 +27,6 @@ export class Bateau {
     this.vitres = mouillerLesVitres(materiaux.vitreTimonerie);
     this.pluieSurLesVitres = 0;
     this._phaseEssuie = 0;
-    this.levierPompe = levierPompe;
     this.groupe = groupe;
     this.materiaux = materiaux;
     this.pivotBome = pivotBome;
@@ -42,6 +40,7 @@ export class Bateau {
     this.cordages = new Cordages(this);
     this.instruments = new Instruments(this);
     this.interieur = new Interieur(this);
+    this.levierPompe = this.interieur.levierPompe; // (la pompe de cale, dans la timonerie)
     this.radar = new Radar(this, this.interieur); // (sur la console de la timonerie, et son répétiteur dans le cockpit)
     this.electronique = new Electronique(this, this.interieur, this.instruments); // (le traceur, le pilote)
     this.paquet = new PaquetDeMer(this); // (l'eau verte qui balaie le pont quand une déferlante frappe)
@@ -108,9 +107,10 @@ export class Bateau {
     droite.position.x = ouverte ? l - 0.03 : 0;
   }
 
-  // Le levier de la pompe de cale (angle en radians)
+  // Le levier de la pompe de cale (angle en radians, de -0,7 à 0,7 : de haut en bas ; il
+  // ne monte pas jusqu'aux volets, sous la fenêtre)
   pomper(angle) {
-    this.levierPompe.rotation.x = angle;
+    this.levierPompe.rotation.x = 0.2 + angle * 0.5;
   }
 
   // Les feux de navigation : rouge à bâbord, vert à tribord (à l'avant), blanc à
@@ -149,10 +149,10 @@ export class Bateau {
     const zPoupe = zDe(0.006);
     const cote = (s) => [s * Math.sin(1.0), -0.25, -Math.cos(1.0)];
     this.feux = [
-      feu(0xff2a1a, [-0.22, yBalcon, zDe(0.962)], 3.5, cote(-1), 1.05),
-      feu(0x22ff66, [0.22, yBalcon, zDe(0.962)], 3.5, cote(1), 1.05),
-      feu(0xfff4e0, [0, hauteurPont(0.01, 0) + 0.72, zPoupe], 7, [0, -0.3, 1], 1.15, [0, hauteurPont(0.01, 0), zPoupe]),
-      feu(0xfff4e0, [0, m.tete + 0.12, m.zMat], 6, [0, -0.35, -1], 1.35),
+      feu(0xff2a1a, [-0.3, yBalcon, zDe(0.962)], 5, cote(-1), 1.05),
+      feu(0x22ff66, [0.3, yBalcon, zDe(0.962)], 5, cote(1), 1.05),
+      feu(0xfff4e0, [0, hauteurPont(0.01, 0) + 0.8, zPoupe], 9, [0, -0.3, 1], 1.15, [0, hauteurPont(0.01, 0), zPoupe]),
+      feu(0xfff4e0, [0, m.tete + 0.14, m.zMat], 8, [0, -0.35, -1], 1.35),
     ];
     this.allumerFeux(0);
   }
@@ -178,6 +178,8 @@ export class Bateau {
     // angle du safran (rad, + = bord de fuite vers tribord) ; la barre franche, de
     // l'autre côté de la mèche, part donc dans l'autre sens
     this.pivotSafran.rotation.y = r.angleSafran ?? -r.barre * 0.55;
+    // (la roue : un tour et demi d'une butée à l'autre, pour 70° de safran)
+    this.roue.rotation.z = -(r.angleSafran ?? 0) * 7.7;
     this.voiles.maj(dt, r);
     this.cordages.maj(dt);
     // les essuie-glaces : un aller-retour d'une seconde et demie (ou deux par seconde au plus
@@ -198,18 +200,19 @@ export class Bateau {
 
   // Les points de vue à bord (repère du bateau)
   static POSTES = {
-    // assis au vent sur le bord du banc tribord, la barre à la main (il voit devant lui le
-    // long de la timonerie)
-    barreur: new THREE.Vector3(0.76, COCKPIT.banc + 0.82, zDe(0.16)),
-    // debout dans le cockpit, devant la descente
-    debout: new THREE.Vector3(0.0, COCKPIT.plancher + 1.62, zDe(0.27)),
-    // au pied du mât (pour prendre un ris)
-    mat: new THREE.Vector3(0.35, 1.0 + 1.6, zDe(0.55)),
+    // debout derrière la roue
+    barreur: new THREE.Vector3(0, COCKPIT.plancher + 1.62, zDe(0.06)),
+    // debout dans le cockpit, devant la porte de la timonerie
+    debout: new THREE.Vector3(0.0, COCKPIT.plancher + 1.62, zDe(0.17)),
+    // au pied du mât
+    mat: new THREE.Vector3(0.45, hauteurPont(MAT.u, 0.45) + 1.62, zDe(MAT.u - 0.03)),
   };
 }
 
 // La grand-voile ferlée sur la bôme : un long boudin de toile, plus gros près du mât,
 // serré tous les 60 cm par un raban (les petites sangles qui la tiennent)
+// (la toile roulée court sur presque toute la bôme)
+const L_FERLEE = MAT.bome * 0.88;
 function creerVoileFerlee() {
   const groupe = new THREE.Group();
   groupe.name = 'voile-ferlee';
@@ -220,11 +223,11 @@ function creerVoileFerlee() {
     const t = k / 24;
     // (rayon le long de la bôme : gros au mât, fin vers la chute, avec des renflements
     // entre les rabans)
-    const r = (0.14 - 0.08 * t) * (1 - 0.18 * Math.abs(Math.cos(t * Math.PI * 5.5)));
-    profil.push(new THREE.Vector2(Math.max(0.005, r), 0.15 + t * 3.25));
+    const r = (0.19 - 0.1 * t) * (1 - 0.18 * Math.abs(Math.cos(t * Math.PI * 7.5)));
+    profil.push(new THREE.Vector2(Math.max(0.005, r), 0.2 + t * L_FERLEE));
   }
-  profil.unshift(new THREE.Vector2(0.001, 0.12));
-  profil.push(new THREE.Vector2(0.001, 3.42));
+  profil.unshift(new THREE.Vector2(0.001, 0.16));
+  profil.push(new THREE.Vector2(0.001, 0.2 + L_FERLEE + 0.17));
   const boudin = new THREE.LatheGeometry(profil, 18);
   boudin.rotateX(Math.PI / 2); // le long de la bôme (+z)
   boudin.scale(1, 0.8, 1); // un peu aplati
@@ -233,10 +236,10 @@ function creerVoileFerlee() {
   // (le groupe « bas » est grossi selon les ris, et posé sur la bôme : voir maj())
   const bas = new THREE.Group();
   bas.add(corps);
-  for (let k = 1; k <= 5; k++) {
-    const z = 0.15 + k * 0.6;
-    const t = (z - 0.15) / 3.25;
-    const r = (0.14 - 0.08 * t) * 1.02;
+  for (let k = 1; k <= 7; k++) {
+    const z = 0.2 + k * 0.62;
+    const t = (z - 0.2) / L_FERLEE;
+    const r = (0.19 - 0.1 * t) * 1.02;
     const anneau = new THREE.Mesh(new THREE.TorusGeometry(r, 0.012, 6, 18), sangle);
     anneau.scale.set(1, 0.8, 1);
     anneau.position.set(0, 0, z);

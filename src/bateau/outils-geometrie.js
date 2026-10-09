@@ -1,4 +1,4 @@
-// Petits outils de géométrie partagés par l'intérieur du bateau (le carré, la timonerie).
+// Petits outils de géométrie partagés par l'intérieur du bateau (la timonerie, la cale).
 import * as THREE from 'three';
 
 // Une boîte de dimensions (l, h, p) centrée en (x, y, z)

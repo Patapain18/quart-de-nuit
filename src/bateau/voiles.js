@@ -8,6 +8,7 @@
 //  - la prise de ris : on réduit la grand-voile par gros temps (le haut descend,
 //    le bas est roulé sur la bôme) ; le foc s'enroule autour de l'étai.
 import * as THREE from 'three';
+import { MAT } from './forme.js';
 import { texturesToile } from './textures.js';
 
 // La toile : tissu, coutures des laizes, lattes, bandes de ris ; elle laisse passer
@@ -179,8 +180,8 @@ export class Voiles {
     this.materiauGrandVoile.userData.uniforms.uDechiree.value = r.dechiree ? 1 : 0;
     if (ris >= 3) return;
     // chaque ris descend la têtière d'environ 1,5 m
-    const hauteurGuindant = m.tete - 0.15 - vit - ris * 1.45;
-    const bordure = 3.55; // longueur de la bordure (le bas, le long de la bôme)
+    const hauteurGuindant = m.tete - 0.15 - vit - ris * 2.1;
+    const bordure = MAT.bome * 0.96; // longueur de la bordure (le bas, le long de la bôme)
     const zGuindant = m.zMat + 0.08;
     const temps = this.temps;
     const fas = r.faseyement ?? 0;
@@ -213,8 +214,8 @@ export class Voiles {
     const temps = this.temps;
     // le guindant suit l'étai, de l'étrave au capelage
     const pied = m.etrave;
-    const tete = [0, m.capelage - 0.35, m.zMat - 0.1];
-    const bordure = 3.3 * deroule;
+    const tete = [0, m.capelage - 0.5, m.zMat - 0.15];
+    const bordure = 4.9 * deroule;
     const vrillage = 0.18 + 0.15 * fas;
     const profondeur = 0.13 * (1 - 0.8 * fas);
     this.foc.remplir((t, v) => {
@@ -230,7 +231,7 @@ export class Voiles {
       bombe += fas * corde * 0.07 * vague * Math.sin(Math.PI * t) * (0.4 + 0.6 * t);
       // la bordure remonte un peu vers le point d'écoute
       const y = ly + 0.25 * t * (1 - v);
-      return { p: [lx + dx * corde * t + dz * bombe * cote, y, lz + dz * corde * t - dx * bombe * cote], hauteur: v * 9 };
+      return { p: [lx + dx * corde * t + dz * bombe * cote, y, lz + dz * corde * t - dx * bombe * cote], hauteur: v * 13.5 };
     });
   }
 

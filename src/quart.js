@@ -21,15 +21,14 @@ import { Monde3D, QUALITES } from './rendu/monde3d.js';
 import { Vent } from './monde/vent.js';
 import { Grains } from './monde/grains.js';
 import { Foudre, REGLAGES_FOUDRE } from './monde/foudre.js';
-import { Barometre, pressionDuJour, tendanceRecente, fleche } from './monde/pression.js';
+import { Barometre, pressionDuJour, tendanceRecente } from './monde/pression.js';
 import { PhysiqueVoilier } from './physique/voilier.js';
 import { reglerAutomatiquement } from './physique/regleur.js';
 import { Commandes, TOUCHES } from './quart/commandes.js';
-import { Bateau } from './bateau/bateau.js';
 import { Audio } from './son/audio.js';
 import { Marin } from './joueur/marin.js';
 import { construireEncombrement } from './joueur/encombrement.js';
-import { ouvrirDescente } from './joueur/pont.js';
+import { ouvrirDescente, ouvrirTrappe } from './joueur/pont.js';
 import { creerGestes, gesteVise } from './joueur/gestes.js';
 import { Radio } from './quart/radio.js';
 import { FEUX } from './monde/feux.js';
@@ -41,8 +40,8 @@ import { positionCrete } from './mer/scelerate.js';
 import { Apparitions } from './rendu/apparitions.js';
 import { distanceALaTerre } from './rendu/cote.js';
 import { lireOptions, changerOptions, quandOptionsChangent } from './quart/options.js';
-import { COCKPIT, MAT, TIMONERIE, zDe } from './bateau/forme.js';
-import { SIEGE, YEUX_POSTE } from './bateau/interieur-timonerie.js';
+import { COCKPIT, MAT, TIMONERIE } from './bateau/forme.js';
+import { SIEGE, YEUX_POSTE, COTES_VOLETS } from './bateau/interieur-timonerie.js';
 
 const parametres = new URLSearchParams(location.search);
 const canvas = document.getElementById('scene');
@@ -210,6 +209,22 @@ const jeu = {
     }
     bateau.pomper(Math.sin(etat.phasePompe) * 0.7);
   },
+  // la trappe de la cale : on la soulève pour voir l'eau (la baladeuse s'allume avec elle)
+  basculerTrappe() {
+    const ouverte = !bateau.interieur.trappeOuverte;
+    bateau.interieur.ouvrirTrappe(ouverte);
+    ouvrirTrappe(ouverte);
+    audio.clic?.();
+    afficherMessage(ouverte ? 'Trappe de la cale ouverte' : 'Trappe refermée');
+  },
+  // les volets de tempête d'un côté de la timonerie
+  basculerVolets(cote) {
+    const fermer = !bateau.interieur.voletsFermes(cote);
+    bateau.interieur.fermerVolets(cote, fermer);
+    audio.clic?.();
+    const nom = { avant: 'du pare-brise', tribord: 'de tribord', babord: 'de bâbord', arriere: 'de l\'arrière' }[cote];
+    afficherMessage(fermer ? `Les volets ${nom} descendent : les vitres sont protégées, mais on ne voit plus dehors` : `Les volets ${nom} remontent`);
+  },
   basculerFeux() {
     etat.feux = !etat.feux;
     afficherMessage(etat.feux ? 'Feux de navigation allumés' : 'Feux de navigation éteints');
@@ -220,6 +235,7 @@ const jeu = {
   },
 };
 const gestes = creerGestes(jeu, bateau.interieur);
+const gestesDehors = gestes.filter((g) => !g.dedans);
 const sousTitres = document.getElementById('sous-titres');
 jeu.radio = new Radio({
   afficher: (t) => { sousTitres.textContent = t; sousTitres.hidden = !t || !options.sousTitres; },
@@ -281,7 +297,7 @@ function touchesAppuyees() {
 
 function quitterLePoste() {
   etat.mode = 'pied';
-  // debout, à côté du siège (à bâbord : dans le passage entre la porte et l'escalier)
+  // debout, à côté du siège (à bâbord, du côté de la pompe et de la trappe)
   marin.placer(SIEGE.x - SIEGE.demiLargeur - 0.2, TIMONERIE.plancher, SIEGE.z + 0.05);
   majAide();
 }
@@ -479,7 +495,7 @@ function simuler(dt) {
     }
     const oeil = marin.position.clone();
     oeil.y += marin.hauteurYeux();
-    etat.geste = gesteVise(gestes, oeil, marin.direction(), { encombrement: marin.encombrement, obstacle: porteFermeeEntre });
+    etat.geste = gesteVise(marin.dansLaTimonerie ? gestes : gestesDehors, oeil, marin.direction(), { encombrement: marin.encombrement, obstacle: porteFermeeEntre });
     poursuivreAction(dt);
     dangers();
   } else if (etat.mode === 'poste') {
@@ -539,10 +555,12 @@ function simuler(dt) {
   bateau.balayage = eauDansLAir > 0.05 ? Math.min(1, eauDansLAir * 1.2) : 0;
   bateau.pluieSurLesVitres = eauDansLAir;
   mouillerLePont(dt);
-  // l'eau embarquée : dans le cockpit, et à l'intérieur au-dessus des planchers
+  // l'eau embarquée : dans le cockpit, et dans la cale (au naufrage, elle passe sur le
+  // plancher de la timonerie)
   bateau.eauABord.maj(dt, bateau.groupe, {
     litresCockpit: physique.eauCockpit,
-    litresCabine: Math.max(0, etat.eauCale - EAU.planchers),
+    litresCale: etat.eauCale,
+    plein: EAU.naufrage,
     pesanteur,
     temps: monde.temps,
   });
@@ -566,6 +584,7 @@ function simuler(dt) {
     heure: nuit ? nuit.heure % 24 : meteo.heure,
     vacille,
     pilotePanne: nuit?.avaries.pilote === 'panne',
+    baladeuse: bateau.interieur.trappeOuverte,
     nuit: monde.ecl.nuit,
     dt,
   });
@@ -593,7 +612,7 @@ function simuler(dt) {
   reglages.uVignettage.value = et.vignettage + 0.5 * tension * tension;
   reglages.uSaturation.value *= 1 - 0.25 * tension;
   monde.lampeFrontale(etat.lampe);
-  // (dans la timonerie, on voit la pluie par les vitres ; dans le carré, plus du tout)
+  // (dans la timonerie, on voit la pluie par les vitres)
   monde.pluie.mesh.visible = (!dedans || enTimonerie) && (monde.ici?.pluie ?? ici.pluie) > 0.01;
   monde.dansLaCabine = dedans;
   monde.gouttesActives = options.gouttes && etat.mode === 'pied';
@@ -660,8 +679,7 @@ function regardDansLeBateau() {
   const regard = cam.getWorldDirection(new THREE.Vector3()).applyQuaternion(_qInverse);
   const haut = new THREE.Vector3(0, 1, 0).applyQuaternion(cam.quaternion).applyQuaternion(_qInverse);
   const tanY = Math.tan(THREE.MathUtils.degToRad(cam.fov / 2));
-  const lieu = etat.mode === 'poste' || (etat.mode === 'pied' && marin.dansLaTimonerie) ? 'timonerie'
-    : etat.mode === 'pied' && !marin.dehors ? 'carre' : 'pont';
+  const lieu = etat.mode === 'poste' || (etat.mode === 'pied' && marin.dansLaTimonerie) ? 'timonerie' : 'pont';
   return { lieu, yeux, regard, haut, tanX: tanY * cam.aspect, tanY };
 }
 function contexteNuit(dt) {
@@ -686,6 +704,8 @@ function contexteNuit(dt) {
       feux: etat.feux,
       gilet: etat.gilet,
       descenteOuverte: bateau.descenteOuverte,
+      trappeOuverte: bateau.interieur.trappeOuverte,
+      volets: Object.fromEntries(COTES_VOLETS.map((c) => [c, bateau.interieur.etatVolets(c)])),
       attache: marin.attache,
       dehors: etat.mode === 'pied' && marin.dehors,
       zone: marin.zone,
@@ -931,6 +951,16 @@ function cotePar(vers) {
   return a < 30 ? 'de face' : a < 70 ? `par l'avant ${bord}` : a < 115 ? `de travers, à ${bord}` : a < 155 ? `par la hanche ${bord}` : 'par l\'arrière';
 }
 
+// La timonerie au début d'une nuit (ou d'une heure reprise) : la porte et la trappe fermées,
+// les volets ouverts
+function remettreLaTimonerie() {
+  bateau.ouvrirDescente(false);
+  ouvrirDescente(false);
+  bateau.interieur.ouvrirTrappe(false);
+  ouvrirTrappe(false);
+  for (const c of COTES_VOLETS) bateau.interieur.fermerVolets(c, false, true);
+}
+
 // Commencer la nuit : à minuit (ou reprendre une nuit gardée, au début d'une heure)
 function commencerNuit({ reprise = null, heure = null } = {}) {
   jeu.radio.taire();
@@ -950,8 +980,7 @@ function commencerNuit({ reprise = null, heure = null } = {}) {
     aubeEnAttente: false, eauCale: 0, calme: 0, danger: 0,
   });
   bateau.interieur.cire.visible = false;
-  bateau.ouvrirDescente(false);
-  ouvrirDescente(false);
+  remettreLaTimonerie();
   marin.attache = false;
   barometre.historique.length = 0;
   if (reprise) {
@@ -1049,7 +1078,7 @@ function commencerNuit({ reprise = null, heure = null } = {}) {
         if (!marin.attache) marin.etourdi = Math.max(marin.etourdi, 1.5);
       }
     })
-    .on('eau', (seuil) => afficherMessage(seuil >= 1300 ? 'Le bateau s\'alourdit : pompe, vite !' : seuil >= 700 ? 'L\'eau monte à l\'intérieur : pompe !' : 'De l\'eau au-dessus des planchers : pompe (la pompe est dans le cockpit, à bâbord)'))
+    .on('eau', (seuil) => afficherMessage(seuil >= 1300 ? 'Le bateau s\'alourdit : pompe, vite !' : seuil >= 700 ? 'L\'eau monte dans la cale : pompe !' : 'De l\'eau dans la cale : pompe (la pompe est sur la paroi bâbord de la timonerie, à côté de la trappe)'))
     .on('perdue', (raison) => finir(raison))
     .on('aube', () => {
       oublierPartie(); // (la partie est finie : elle n'est plus à reprendre)
@@ -1080,8 +1109,7 @@ function reprendreLHeure() {
   meteo = nuit.meteo;
   jeu.meteo = meteo;
   monde.regler(meteo);
-  bateau.ouvrirDescente(false);
-  ouvrirDescente(false);
+  remettreLaTimonerie();
   etat.pilote = true;
   etat.eauCale = nuit.eau.cale;
   etat.mode = 'pause';
@@ -1215,6 +1243,14 @@ function placerCamera(dt) {
     cam.lookAt(cible.x - 4, cible.y, cible.z);
     return;
   }
+  // (outil de mise au point : une caméra posée n'importe où, dans le repère du bateau)
+  if (etat.cameraLibre) {
+    const { position, cible } = etat.cameraLibre;
+    cam.position.copy(position).applyMatrix4(bateau.groupe.matrixWorld);
+    cam.up.set(0, 1, 0);
+    cam.lookAt(cible.clone().applyMatrix4(bateau.groupe.matrixWorld));
+    return;
+  }
   // la tête tourne avec la souris
   if (etat.mode === 'pied' || etat.mode === 'poste') {
     const souris = commandes.lireSouris();
@@ -1258,7 +1294,7 @@ const pause = document.getElementById('pause');
 const fin = document.getElementById('fin');
 const AIDE = {
   poste: [
-    ['E', 'agir sur ce que tu regardes (radar, tableau, VHF…)'],
+    ['E', 'agir sur ce que tu regardes (radar, tableau, VHF, volets…)'],
     [TOUCHES.lever.nom, 'se lever'],
     [`${TOUCHES.lampe.nom} · ${TOUCHES.carnet.nom}`, 'lampe frontale · carnet de bord'],
     [TOUCHES.aide.nom, 'cacher l\'aide'],
@@ -1350,7 +1386,7 @@ function finir(raison) {
     horsBord: ['Passé par-dessus bord', 'Le bateau s\'est couché et tu as passé les filières. Dehors, accroche toujours ton harnais à la ligne de vie (X).'],
     bome: ['Assommé par la bôme', 'Quand le bateau a empanné, la bôme a traversé le cockpit. Dans le cockpit, accroupis-toi (C).'],
     emporte: ['Emporté par une déferlante', 'Une vague a balayé le bateau couché, et tu n\'étais pas attaché. Dehors, le harnais reste accroché (X).'],
-    naufrage: ['Le bateau a coulé', 'Trop d\'eau à bord : Morgane s\'est alourdie, puis enfoncée. Garde la porte fermée, et pompe dès que l\'eau passe au-dessus des planchers.'],
+    naufrage: ['Le bateau a coulé', 'Trop d\'eau à bord : Morgane s\'est alourdie, puis enfoncée. Garde la porte fermée, et pompe dès que l\'eau monte dans la cale.'],
     chavirage: ['Chaviré', 'Le bateau s\'est retourné et ne s\'est pas redressé. Sans pilote, il se met en travers des vagues : réarme-le dès qu\'il lâche.'],
   };
   const [titre, texte] = textes[raison] ?? textes.naufrage;
@@ -1549,6 +1585,9 @@ function regarder(x, y, z) {
 window.__jeu = {
   monde, physique, bateau, etat, marin, jeu, gestes, embarquer, photographier, avancer, commandes, Audio, finir,
   commencerNuit, get nuit() { return nuit; }, contexteNuit, regarder, profiler, directionRelative,
+  // (une caméra posée à la main : voir(x, y, z, versX, versY, versZ), dans le repère du bateau ;
+  // voir() la rend au marin)
+  voir: (...v) => { etat.cameraLibre = v.length ? { position: new THREE.Vector3(v[0], v[1], v[2]), cible: new THREE.Vector3(v[3], v[4], v[5]) } : null; },
   uneImage: (dt = 1 / 60) => monde.image(dt, { simuler, placerCamera }),
   // (l'étrange, à la demande, pour l'entendre et le voir : 'lumiere', 'voix16', 'coups')
   peur: (nom) => vivreEtrange(nom),
@@ -1564,6 +1603,21 @@ window.__jeu = {
         uneImage: (dt) => monde.image(dt, { simuler, placerCamera }),
         basculerDescente: () => jeu.basculerDescente(),
       }, o);
+    } finally {
+      etat.fige = false;
+    }
+  },
+  // (les essais d'entrée : on vise la porte de la timonerie de plusieurs endroits, Z enfoncé)
+  essayerLesEntrees: async (o) => {
+    const { essayerLesEntrees, essaisEntree } = await import('./atelier/essais-marche.js');
+    etat.fige = true;
+    try {
+      const r = await essayerLesEntrees({
+        marin, commandes, seLever: quitterLePoste, bateau,
+        uneImage: (dt) => monde.image(dt, { simuler, placerCamera }),
+        basculerDescente: () => jeu.basculerDescente(),
+      }, { essais: essaisEntree(TIMONERIE.zArriere), ...o });
+      return r.map((x) => `${x.ok ? '✓' : '✗'} ${x.nom} : ${x.secondes.toFixed(1)} s${x.ok ? '' : ` — arrêté en (${x.fin.map((v) => v.toFixed(2)).join(', ')}), ${x.zone}`}`);
     } finally {
       etat.fige = false;
     }

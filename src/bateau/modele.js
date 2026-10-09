@@ -2,18 +2,24 @@
 //
 // Vocabulaire du bord (on le retrouvera dans le jeu) :
 //   coque, pont, livet (le bord du pont), tableau (l'arrière plat), étrave (l'avant),
-//   cockpit (où l'on barre), hiloires (les rebords du cockpit), rouf (la cabine),
-//   descente (l'entrée de la cabine), mât, bôme (la barre horizontale de la grand-voile),
+//   cockpit (où l'on barre), hiloires (les rebords du cockpit), rouf (la cabine), la
+//   timonerie (le poste vitré, sur le rouf), mât, bôme (la barre horizontale de la grand-voile),
 //   haubans (câbles qui tiennent le mât sur les côtés), étai (devant), pataras (derrière),
 //   barres de flèche (qui écartent les haubans), filières et chandeliers (le garde-corps),
-//   balcon (à l'avant), balcon arrière, winchs (treuils), barre franche (le « manche »
-//   qui tourne le safran, le gouvernail), quille et son bulbe de plomb.
+//   balcon (à l'avant), balcon arrière, winchs (treuils), la roue (le volant qui tourne le
+//   safran, le gouvernail ; cette nuit, c'est le pilote qui la tourne), quille et son
+//   bulbe de plomb.
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import {
-  COQUE, COCKPIT, ROUF, MAT, HUBLOTS, zDe, uDe, demiLargeur, hauteurLivet, fondCoque, pointCoque,
-  hauteurPont, bordInterieur, hauteurRouf, bordsHublot, xCoteRouf, trancheToit, PANNEAU_PONT, U_TIMONERIE,
+  COQUE, COCKPIT, ROUF, MAT, HUBLOTS, TIMONERIE, ECHELLE, zDe, demiLargeur, hauteurLivet, fondCoque, pointCoque,
+  hauteurPont, bordInterieur, hauteurRouf, bordsHublot, xCoteRouf, trancheToit, U_TIMONERIE,
 } from './forme.js';
+
+// (ce qui avait été mesuré à la main sur l'ancien bateau de 9,40 m, mis à la taille de celui-ci)
+const EL = ECHELLE.longueur;
+const EB = ECHELLE.largeur;
+const EH = ECHELLE.hauteur;
 import { texturesTeck, texturesAntiderapant, texturesCordage } from './textures.js';
 import { construireTimonerie, geometrieCorniches } from './timonerie.js';
 
@@ -28,7 +34,7 @@ export function creerMateriaux() {
     antiderapant: std({ color: 0xeeece6, roughness: 0.62, normalMap: anti.normales, normalScale: new THREE.Vector2(0.9, 0.9) }),
     teck: std({ map: teck.couleur, normalMap: teck.normales, roughness: 0.78 }),
     verre: std({ color: 0x0d1418, roughness: 0.06, metalness: 0.1 }),
-    // les vitres des hublots et le plexiglas du panneau : teintés, à moitié transparents
+    // les vitres des hublots : teintées, à moitié transparentes
     vitre: std({ color: 0x1c2a30, roughness: 0.04, metalness: 0, transparent: true, opacity: 0.42, depthWrite: false }),
     // les vitres de la timonerie : grandes et claires (on doit bien voir dehors)
     vitreTimonerie: std({ color: 0x14242a, roughness: 0.03, metalness: 0, transparent: true, opacity: 0.2, depthWrite: false }),
@@ -179,32 +185,10 @@ function uvDessus(g, echelle = 1) {
   return g;
 }
 
-// Retire d'une surface les triangles dont le centre tombe dans un trou (x, z) : la grille
-// doit avoir des lignes exactement sur les bords du trou
-function percer(g, dansLeTrou) {
-  const p = g.attributes.position;
-  const idx = g.index.array;
-  const garde = [];
-  for (let k = 0; k < idx.length; k += 3) {
-    const a = idx[k];
-    const b = idx[k + 1];
-    const c = idx[k + 2];
-    const x = (p.getX(a) + p.getX(b) + p.getX(c)) / 3;
-    const z = (p.getZ(a) + p.getZ(b) + p.getZ(c)) / 3;
-    if (!dansLeTrou(x, z)) garde.push(a, b, c);
-  }
-  g.setIndex(garde);
-  return g;
-}
-
 // Répartition non régulière des tranches : plus serrées aux deux bouts
 const repartir = (t) => 0.5 - 0.5 * Math.cos(Math.PI * t);
 
 // ---------- Les pièces ----------
-
-// (les tranches du toit et le panneau de pont sont mesurés dans forme.js)
-const TROU_PANNEAU = PANNEAU_PONT.trou;
-export { PANNEAU_PONT };
 
 // Une surface faite de colonnes (une par tranche u) de points [x, y] ; garder(i, j) dit
 // si la case entre les colonnes i, i+1 et les rangs j, j+1 existe (pour les trous)
@@ -247,7 +231,7 @@ function geometrieCoque() {
     const u = repartir(a);
     // plus de points près du fond et du livet
     const s = 0.5 - 0.5 * Math.cos(Math.PI * b);
-    return { p: pointCoque(u, s), uv: [u * 9.4, s] };
+    return { p: pointCoque(u, s), uv: [u * (COQUE.zArriere - COQUE.zAvant), s] };
   });
   // le tableau arrière, fermé par un éventail
   const points = [];
@@ -358,8 +342,7 @@ function geometrieRouf() {
       ].map(([x, y]) => [s * x, y]);
     }, (i, j) => !(j === 1 && dansUnHublot(us[i], us[i + 1]))));
   }
-  // le toit, bombé, devant la timonerie, percé du panneau de pont : la grille a des
-  // tranches et des colonnes exactement sur les bords du trou (±22 cm)
+  // le toit, bombé, devant la timonerie (des colonnes plus serrées au milieu, où il bombe)
   const C = 0.33; // (les colonnes du milieu : de -33 à +33 cm, tous les 11 cm)
   const tranche = (a) => trancheToit(Math.round(a * 24));
   const colonne = (w, b) => {
@@ -368,11 +351,11 @@ function geometrieRouf() {
     if (j <= 11) return -C + 2 * C * ((j - 5) / 6);
     return C + (w - C) * ((j - 11) / 5);
   };
-  const toit = percer(grille(24, 16, (a, b) => {
+  const toit = grille(24, 16, (a, b) => {
     const u = tranche(a);
     const x = colonne(bordInterieur(u) - R.rentree, b);
     return { p: [x, hauteurRouf(u, x), zDe(u)] };
-  }), (x, z) => Math.abs(x) < TROU_PANNEAU.demiLargeur && z > TROU_PANNEAU.z0 && z < TROU_PANNEAU.z1);
+  });
   // la face avant (inclinée vers l'arrière : le haut est en retrait de 12 cm)
   const avant = grille(1, 16, (a, b) => {
     const e = bordInterieur(R.uAvant);
@@ -385,25 +368,10 @@ function geometrieRouf() {
       ? { p: [xBas, hauteurPont(R.uAvant, xBas), zBas] }
       : { p: [xHaut, hauteurRouf(R.uAvant, xHaut), zHaut] };
   });
-  // le panneau de pont, au-dessus de la table du carré : un cadre d'aluminium et un
-  // plexiglas fumé, qui laisse entrer le jour dans la cabine
-  const P = PANNEAU_PONT;
-  const uP = uDe((P.z0 + P.z1) / 2);
-  const yBasP = hauteurRouf(uP, P.demiLargeur) - 0.01;
-  const yHautP = hauteurRouf(uP, 0) + 0.045;
-  const hP = yHautP - yBasP;
-  const yP = (yBasP + yHautP) / 2;
-  const lP = P.z1 - P.z0;
-  const cadre = mergeGeometries([
-    boite(0.04, hP, lP, [P.demiLargeur - 0.02, yP, (P.z0 + P.z1) / 2]),
-    boite(0.04, hP, lP, [-P.demiLargeur + 0.02, yP, (P.z0 + P.z1) / 2]),
-    boite(P.demiLargeur * 2, hP, 0.04, [0, yP, P.z0 + 0.02]),
-    boite(P.demiLargeur * 2, hP, 0.04, [0, yP, P.z1 - 0.02]),
-  ]);
-  const plexi = boite(P.demiLargeur * 2 - 0.03, 0.012, lP - 0.03, [0, yHautP - 0.004, (P.z0 + P.z1) / 2]);
-  // les vitres des hublots : 6 mm devant les trous du rouf, teintées (on voit dehors depuis
-  // la cabine, et un peu la cabine depuis dehors)
+  // les vitres des hublots : 6 mm devant les trous du rouf, teintées ; derrière, 4 cm à
+  // l'intérieur, les rideaux tirés de la cabine avant (on ne voit pas dedans)
   const vitres = [];
+  const rideaux = [];
   for (const s of [1, -1]) {
     for (const [ua, ub] of HUBLOTS) {
       vitres.push(grille(16, 1, (a, b) => {
@@ -411,6 +379,11 @@ function geometrieRouf() {
         const h = bordsHublot(u, ua, ub);
         const y = b < 0.5 ? h.bas : h.haut;
         return { p: [s * (xCoteRouf(u, y) + 0.006), y, zDe(u)] };
+      }));
+      rideaux.push(grille(16, 1, (a, b) => {
+        const u = ua - 0.006 + (ub - ua + 0.012) * a;
+        const y = bordsHublot(Math.min(ub, Math.max(ua, u)), ua, ub).centre + (b - 0.5) * 0.2;
+        return { p: [s * (xCoteRouf(u, y) - 0.04), y, zDe(u)] };
       }));
     }
   }
@@ -431,9 +404,9 @@ function geometrieRouf() {
   }
   return {
     blanc: mergeGeometries([...cotes, avant]),
-    panneau: { cadre, plexi },
     antiderapant: uvDessus(toit, 2),
     verre: mergeGeometries(vitres),
+    rideaux: mergeGeometries(rideaux),
     teck: mergeGeometries(mains.map((g) => uvDessus(g, 3))),
   };
 }
@@ -466,10 +439,10 @@ function geometrieQuille() {
     });
     return g;
   };
-  const quille = aileron(-0.75, 1.25, 0.82, -0.3, -1.55, 0.12, 0.28);
+  const quille = aileron(-0.75 * EL, 1.25 * EL, 0.82 * EL, -0.3 * EH, -1.55 * EH, 0.12, 0.28 * EL);
   const bulbe = new THREE.SphereGeometry(1, 24, 12);
-  bulbe.scale(0.17, 0.15, 0.85);
-  bulbe.translate(0, -1.6, -0.12);
+  bulbe.scale(0.17 * EB, 0.15 * EH, 0.85 * EL);
+  bulbe.translate(0, -1.6 * EH, -0.12 * EL);
   return { quille: mergeGeometries([quille, bulbe]) };
 }
 
@@ -486,9 +459,9 @@ function geometrieSafran() {
     const k = Math.round(a * (nb * 2 - 2));
     const cote = k < nb ? 1 : -1;
     const i = k < nb ? k : nb * 2 - 2 - k;
-    const corde = 0.46 - 0.12 * b;
+    const corde = (0.46 - 0.12 * b) * EL;
     const p = profil[i];
-    return { p: [cote * p[1] * corde, -0.15 - 1.3 * b, -0.12 + p[0] * corde + 0.06 * b] };
+    return { p: [cote * p[1] * corde, (-0.15 - 1.3 * b) * EH, (-0.12 + 0.06 * b) * EL + p[0] * corde] };
   });
   return g;
 }
@@ -509,24 +482,26 @@ function mesuresGreement() {
 function geometrieGreement() {
   const g = mesuresGreement();
   const mat = new THREE.CylinderGeometry(1, 1, MAT.hauteur, 20, 1);
-  mat.scale(0.085, 1, 0.13);
+  mat.scale(0.12, 1, 0.19);
   mat.translate(0, g.piedMat + MAT.hauteur / 2, g.zMat);
-  // barres de flèche, un peu poussées vers l'arrière
-  const bout = (s) => [s * 0.78, g.barres, g.zMat + 0.18];
-  const barresFleche = [1, -1].map((s) => barre([0, g.barres, g.zMat], bout(s), 0.022));
+  // deux étages de barres de flèche, un peu poussées vers l'arrière
+  const bout = (s, y = g.barres) => [s * 0.78 * EB, y, g.zMat + 0.18 * EL];
+  const hautes = g.piedMat + MAT.hauteur * 0.76;
+  const barresFleche = [1, -1].flatMap((s) => [barre([0, g.barres, g.zMat], bout(s), 0.03), barre([0, hautes, g.zMat], bout(s * 0.72, hautes), 0.025)]);
   // les câbles : haubans, bas-haubans, étai, pataras
   const cables = [];
   for (const s of [1, -1]) {
     const cadene = [s * g.cadenes[0], g.cadenes[1], g.cadenes[2]];
-    cables.push(barre([0, g.capelage, g.zMat], bout(s), 0.0045));
-    cables.push(barre(bout(s), cadene, 0.0045));
-    cables.push(barre([s * 0.05, g.barres - 0.15, g.zMat], [s * g.cadenes[0], g.cadenes[1], g.cadenes[2] - 0.35], 0.0045));
-    cables.push(barre([s * 0.05, g.barres - 0.15, g.zMat], [s * g.cadenes[0], g.cadenes[1], g.cadenes[2] + 0.35], 0.0045));
+    cables.push(barre([0, g.capelage, g.zMat], bout(s * 0.72, hautes), 0.006));
+    cables.push(barre(bout(s * 0.72, hautes), bout(s), 0.006));
+    cables.push(barre(bout(s), cadene, 0.006));
+    cables.push(barre([s * 0.07, g.barres - 0.15, g.zMat], [s * g.cadenes[0], g.cadenes[1], g.cadenes[2] - 0.5], 0.006));
+    cables.push(barre([s * 0.07, g.barres - 0.15, g.zMat], [s * g.cadenes[0], g.cadenes[1], g.cadenes[2] + 0.5], 0.006));
   }
-  cables.push(barre([0, g.capelage, g.zMat - 0.06], g.etrave, 0.005));
-  cables.push(barre([0, g.tete, g.zMat + 0.06], [0, hauteurPont(0, 0) + 0.1, zDe(0) - 0.05], 0.0045));
+  cables.push(barre([0, g.capelage, g.zMat - 0.08], g.etrave, 0.007));
+  cables.push(barre([0, g.tete, g.zMat + 0.08], [0, hauteurPont(0, 0) + 0.1, zDe(0) - 0.05], 0.006));
   // tête de mât
-  const tete = boite(0.12, 0.08, 0.36, [0, g.tete + 0.04, g.zMat + 0.05]);
+  const tete = boite(0.17, 0.11, 0.5, [0, g.tete + 0.05, g.zMat + 0.07]);
   return { alu: mergeGeometries([mat, ...barresFleche, tete]), cable: mergeGeometries(cables), mesures: g };
 }
 
@@ -534,8 +509,8 @@ function geometrieGreement() {
 function geometrieFilieres() {
   const tubes = [];
   const cables = [];
-  const us = [0.08, 0.27, 0.46, 0.66, 0.84];
-  const hauteur = 0.62;
+  const us = [0.07, 0.19, 0.31, 0.43, 0.55, 0.67, 0.78, 0.87];
+  const hauteur = 0.66;
   const pied = (u, s) => {
     const x = s * (demiLargeur(u) - 0.07);
     return [x, hauteurPont(u, x), zDe(u)];
@@ -574,7 +549,15 @@ function geometrieFilieres() {
   return { inox: mergeGeometries(tubes), cable: mergeGeometries(cables) };
 }
 
-// Winchs, taquets, rail d'écoute, compas, instruments
+// La roue : son axe, au milieu du cockpit, vers l'arrière (y, z), et son rayon
+export const ROUE = { y: COCKPIT.plancher + 0.95, z: zDe(0.085), rayon: 0.5 };
+
+// Où sont les winchs, sur l'hiloire (tranches u) : ceux des écoutes de foc, et celui des
+// drisses et de la bosse d'enrouleur, contre la timonerie
+export const UW_ECOUTE = 0.12;
+export const UW_ENROULEUR = 0.185;
+
+// Winchs, taquets, rail d'écoute, instruments
 function geometrieAccastillage() {
   const inox = [];
   const noir = [];
@@ -588,28 +571,24 @@ function geometrieAccastillage() {
     dessus.translate(x, y + 0.135, z);
     noir.push(dessus);
   };
-  const uw = 0.27;
-  const yHiloire = hauteurPont(uw, COCKPIT.demiLargeur) + COCKPIT.hiloire;
   for (const s of [1, -1]) {
-    winch(s * (COCKPIT.demiLargeur + 0.04), yHiloire, zDe(uw));
-    // (celui des drisses et de l'enrouleur : au bout avant de l'hiloire, devant la timonerie)
-    winch(s * (COCKPIT.demiLargeur + 0.04), hauteurPont(0.302, COCKPIT.demiLargeur) + COCKPIT.hiloire, zDe(0.302));
+    // les winchs d'écoute de foc, sur l'hiloire, au milieu du cockpit
+    winch(s * (COCKPIT.demiLargeur + 0.04), hauteurPont(UW_ECOUTE, COCKPIT.demiLargeur) + COCKPIT.hiloire, zDe(UW_ECOUTE));
+    // (celui des drisses et de l'enrouleur : au bout avant de l'hiloire, contre la timonerie)
+    winch(s * (COCKPIT.demiLargeur + 0.04), hauteurPont(UW_ENROULEUR, COCKPIT.demiLargeur) + COCKPIT.hiloire, zDe(UW_ENROULEUR));
     // taquets sur le pont arrière
-    noir.push(boite(0.2, 0.04, 0.05, [s * 1.0, hauteurPont(0.02, 1.0) + 0.03, zDe(0.02)]));
+    noir.push(boite(0.28, 0.05, 0.07, [s * 1.3, hauteurPont(0.02, 1.3) + 0.035, zDe(0.02)]));
   }
-  // rail d'écoute de grand-voile, en travers du pont arrière
-  const yRail = hauteurPont(0.03, 0) + 0.03;
-  inox.push(boite(1.5, 0.03, 0.04, [0, yRail, zDe(0.03)]));
-  noir.push(boite(0.12, 0.05, 0.08, [0, yRail + 0.035, zDe(0.03)]));
-  // compas de route sur la cloison, à tribord de la descente
-  const zc = zDe(ROUF.uArriere) + 0.012;
-  const compas = new THREE.CylinderGeometry(0.075, 0.075, 0.05, 32);
-  compas.rotateX(Math.PI / 2);
-  compas.translate(0.58, 1.05, zc + 0.02);
-  noir.push(compas);
-  // deux afficheurs (vent, vitesse) au-dessus de la descente, à bâbord
-  noir.push(boite(0.13, 0.13, 0.03, [-0.52, 1.13, zc + 0.01]));
-  noir.push(boite(0.13, 0.13, 0.03, [-0.68, 1.13, zc + 0.01]));
+  // le rail d'écoute de grand-voile, en travers du toit de la timonerie, à son bord arrière
+  // (la bôme passe au-dessus)
+  const yRail = TIMONERIE.toit + 0.03;
+  inox.push(boite(2.0, 0.035, 0.05, [0, yRail, TIMONERIE.zArriere - 0.2]));
+  noir.push(boite(0.16, 0.06, 0.1, [0, yRail + 0.04, TIMONERIE.zArriere - 0.2]));
+  // deux afficheurs (vent, vitesse) sur la paroi arrière de la timonerie, à bâbord de la porte
+  const zc = TIMONERIE.zArriere + 0.012;
+  const yAff = COCKPIT.plancher + 1.12;
+  noir.push(boite(0.13, 0.13, 0.03, [-0.62, yAff, zc + 0.01]));
+  noir.push(boite(0.13, 0.13, 0.03, [-0.78, yAff, zc + 0.01]));
   return { inox: mergeGeometries(inox), noir: mergeGeometries(noir) };
 }
 
@@ -661,8 +640,7 @@ export function construireBateau() {
   groupe.add(porte);
   for (const e of timonerie.essuieGlaces) groupe.add(e.pivot);
   ajouter(rouf.verre, materiaux.vitre, 'hublots').castShadow = false;
-  ajouter(rouf.panneau.cadre, materiaux.alu, 'panneau-cadre');
-  ajouter(rouf.panneau.plexi, materiaux.vitre, 'panneau-plexi').castShadow = false;
+  ajouter(rouf.rideaux, new THREE.MeshStandardMaterial({ color: 0x2b2520, roughness: 1, side: THREE.DoubleSide }), 'rideaux-cabine-avant');
   ajouter(rouf.teck, materiaux.teck, 'rouf-teck');
   ajouter(geometrieQuille().quille, materiaux.plomb, 'quille');
   const greement = geometrieGreement();
@@ -675,18 +653,6 @@ export function construireBateau() {
   ajouter(acc.inox, materiaux.inox, 'winchs');
   ajouter(acc.noir, materiaux.noir, 'accastillage');
   ajouter(geometrieLignesDeVie(), new THREE.MeshStandardMaterial({ color: 0xe8c21a, roughness: 0.75 }), 'lignes-de-vie');
-  // la pompe de cale à main, sur le devant du banc bâbord (un hublot de bronze et son levier)
-  const pompe = new THREE.Group();
-  pompe.name = 'pompe';
-  const embase = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 0.02, 20), materiaux.inox);
-  embase.rotation.z = Math.PI / 2;
-  const levier = new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.012, 0.42, 8), materiaux.noir);
-  levier.geometry.translate(0, 0.21, 0);
-  levier.position.x = 0.02;
-  pompe.add(embase, levier);
-  pompe.position.set(-COCKPIT.demiLargeurPuits - 0.005, COCKPIT.plancher + 0.2, zDe(0.12));
-  groupe.add(pompe);
-
   // Les pièces mobiles : chacune dans un groupe qui tourne autour de son axe
   const m = greement.mesures;
   // la bôme pivote autour du mât (au vit-de-mulet)
@@ -694,14 +660,14 @@ export function construireBateau() {
   pivotBome.position.set(0, m.vit, m.zMat + 0.07);
   pivotBome.name = 'pivot-bome';
   const bome = new THREE.Mesh(new THREE.CylinderGeometry(1, 1, MAT.bome, 16), materiaux.alu);
-  bome.geometry.scale(0.055, 1, 0.075);
+  bome.geometry.scale(0.075, 1, 0.1);
   bome.geometry.rotateX(Math.PI / 2);
   bome.geometry.translate(0, 0, MAT.bome / 2);
   bome.castShadow = true;
   pivotBome.add(bome);
   groupe.add(pivotBome);
 
-  // le safran et la barre franche tournent autour de la mèche
+  // le safran tourne autour de sa mèche
   const zMeche = zDe(0.065);
   const pivotSafran = new THREE.Group();
   pivotSafran.position.set(0, 0, zMeche);
@@ -709,16 +675,37 @@ export function construireBateau() {
   const safran = new THREE.Mesh(geometrieSafran(), materiaux.gelcoat);
   safran.castShadow = true;
   pivotSafran.add(safran);
-  const yTete = COCKPIT.plancher + 0.36;
-  const tete = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, yTete - COCKPIT.plancher, 16), materiaux.inox);
-  tete.position.y = (yTete + COCKPIT.plancher) / 2;
-  pivotSafran.add(tete);
-  const barreFranche = new THREE.Mesh(tubeCourbe([[0, yTete, 0], [0, yTete + 0.05, -0.5], [0, yTete + 0.14, -1.05], [0, yTete + 0.2, -1.32]], 0.025, 24), materiaux.teck);
-  uvDessus(barreFranche.geometry, 3);
-  barreFranche.castShadow = true;
-  pivotSafran.add(barreFranche);
   groupe.add(pivotSafran);
 
-  const levierPompe = groupe.getObjectByName('pompe').children[1];
-  return { groupe, materiaux, pivotBome, pivotSafran, mesures: m, porte, essuieGlaces: timonerie.essuieGlaces, levierPompe };
+  // la roue, sur son piédestal, au milieu du cockpit (le barreur se tient derrière elle) :
+  // c'est elle qui tourne le safran — cette nuit, le pilote la fait tourner tout seul ; sur le
+  // piédestal, le compas de route
+  const zRoue = ROUE.z;
+  const pied = new THREE.Mesh(new THREE.CylinderGeometry(0.075, 0.1, ROUE.y - COCKPIT.plancher + 0.12, 20), materiaux.noir);
+  pied.position.set(0, (ROUE.y + COCKPIT.plancher + 0.12) / 2, zRoue - 0.12);
+  pied.castShadow = true;
+  pied.name = 'pied-de-roue';
+  groupe.add(pied);
+  const habitacle = new THREE.Mesh(new THREE.CylinderGeometry(0.13, 0.11, 0.1, 28), materiaux.noir);
+  habitacle.position.set(0, ROUE.y + 0.2, zRoue - 0.12);
+  groupe.add(habitacle);
+  const roue = new THREE.Group();
+  roue.name = 'roue';
+  roue.position.set(0, ROUE.y, zRoue);
+  const jante = new THREE.Mesh(new THREE.TorusGeometry(ROUE.rayon, 0.022, 10, 64), materiaux.inox);
+  roue.add(jante);
+  for (let k = 0; k < 6; k++) {
+    const a = (k / 6) * Math.PI * 2;
+    const rayon = new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.012, ROUE.rayon, 8), materiaux.inox);
+    rayon.position.set(Math.cos(a) * ROUE.rayon / 2, Math.sin(a) * ROUE.rayon / 2, 0);
+    rayon.rotation.z = a - Math.PI / 2;
+    roue.add(rayon);
+  }
+  const moyeu = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 0.09, 16), materiaux.inox);
+  moyeu.rotation.x = Math.PI / 2;
+  roue.add(moyeu);
+  for (const m2 of roue.children) m2.castShadow = true;
+  groupe.add(roue);
+
+  return { groupe, materiaux, pivotBome, pivotSafran, roue, mesures: m, porte, essuieGlaces: timonerie.essuieGlaces };
 }

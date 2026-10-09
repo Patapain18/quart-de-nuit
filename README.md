@@ -4,7 +4,7 @@
 
 Le pilote automatique tient le bateau vent arrière, les vagues dans le dos. Toi, tu ne barres pas : tu le gardes en vie. L'eau qui entre, le pilote qui lâche, la porte, le foc qui bat… et chaque heure est pire que la précédente. Si le bateau est encore à flot, et toi à bord, quand sonnent six heures, tu as gagné.
 
-> Où on en est (octobre 2026) : **le jeu change de direction** (voir [DESIGN.md](DESIGN.md)). L'ancien jeu — une journée d'apprentissage avec Jos, puis une nuit de navigation — est gardé dans git (étiquette `v1-journee-et-nuit`) et reste en ligne tant que le nouveau n'est pas prêt. Le nouveau se construit sur la branche `la-nuit-seule` : l'étape 1 (la nuit seule, de minuit à six heures, sans Jos ni barre) est faite.
+> Où on en est (octobre 2026) : **le jeu change de direction** (voir [DESIGN.md](DESIGN.md)). L'ancien jeu — une journée d'apprentissage avec Jos, puis une nuit de navigation — est gardé dans git (étiquette `v1-journee-et-nuit`) et reste en ligne tant que le nouveau n'est pas prêt. Le nouveau se construit sur la branche `la-nuit-seule` : l'étape 1 (la nuit seule, de minuit à six heures, sans Jos ni barre) et l'étape 2 (le bateau de 14 m, sa grande timonerie vitrée, ses volets de tempête et sa cale) sont faites.
 
 **Jouer en ligne (l'ancien jeu, pour l'instant) : https://patapain18.github.io/quart-de-nuit/**
 
@@ -21,15 +21,16 @@ Puis ouvrir http://localhost:5190/jeu.html (et `jeu.html?heure=27.4` pour commen
 
 Au clavier (français) et à la souris. La souris tourne la tête.
 
-- **Assis au poste** (au début de la nuit, dans la timonerie) : E pour agir sur ce que tu regardes et qui est à portée de main (le radar, le traceur, la VHF, le tableau électrique) ; Espace pour te lever.
+- **Assis au poste** (au début de la nuit, dans la timonerie) : E pour agir sur ce que tu regardes et qui est à portée de main (le radar, le traceur, la VHF et la commande des volets au plafond, le tableau électrique) ; Espace pour te lever.
 - **À pied** : Z Q S D pour marcher, E pour agir sur ce que l'on regarde (Maj + E : l'action inverse), Maj pour se tenir, C pour s'accroupir, X le harnais (dehors).
 - **Partout** : F la lampe frontale, L le carnet de bord (ce qu'il faut surveiller, et le journal de la nuit), H pour cacher l'aide, Échap la pause (la nuit continue pendant la pause).
 
 **Ce qu'il faut surveiller** (l'heure, en haut à droite, dit aussi ce qui ne va pas) :
-- **l'eau à bord** : quand elle passe les planchers, pompe (la pompe est dans le cockpit, à bâbord) ;
+- **l'eau à bord** : elle monte dans la cale ; soulève la trappe du plancher (derrière le siège, à bâbord) pour la voir, et pompe (la pompe à main est sur la paroi, juste à côté) ;
 - **le pilote** : s'il lâche, le bateau se met en travers des vagues — réarme son disjoncteur au tableau électrique, sur la console de la timonerie ;
 - **la porte de la timonerie** : fermée, sinon les vagues qui remplissent le cockpit entrent à l'intérieur ;
 - **le foc** : s'il se met à battre (son écoute a cassé), sors le rouler (la bosse d'enrouleur, dans le cockpit, à tribord), harnais accroché ;
+- **les volets de tempête** : ils protègent les vitres, côté par côté (la commande est au plafond, devant le siège) ; mais derrière un volet fermé, on ne voit plus dehors ;
 - **dehors**, accroche toujours ton harnais (X), et tiens-toi (Maj) quand une vague arrive.
 
 Et le reste, tu le verras : les grains, la foudre, la trombe qu'on ne voit qu'à la lueur des éclairs, les vagues scélérates qu'on entend gronder une minute avant… et ce qui ne s'explique pas.
@@ -65,7 +66,7 @@ Le cahier de conception, avec la nouvelle direction et ce qu'on a appris en rout
 - **Le ciel** : une atmosphère physique, des nuages en volume, le front orageux, les éclairs (`src/rendu/ciel.js`).
 - **La trombe** : calculée en volume, comme les nuages (`src/rendu/trombe.js`) ; la bête naît sous l'avant d'un grain, et avance avec lui.
 - **Les grains** (`src/monde/grains.js`) : des averses d'orage qui existent à un endroit, leur rafale, leur pluie, leur nuage ; **les risées** (`src/monde/risees.js`) ; **la foudre** (`src/monde/foudre.js`) qui part de leurs nuages.
-- **Le voilier** : construit par le code (`src/bateau/`), et sa physique (`src/physique/voilier.js`) : 346 morceaux de coque qui flottent, l'eau embarquée qui pèse.
+- **Le voilier** : un 14 m à grande timonerie, construit par le code (`src/bateau/` : la coque, la timonerie et ses volets, la cale sous son plancher), et sa physique (`src/physique/voilier.js`) : 352 morceaux de coque qui flottent, l'eau embarquée qui pèse.
 - **La peur** (`src/quart/peur.js`, `src/rendu/apparitions.js`) : ce qu'on voit du coin de l'œil et qui disparaît quand on le regarde en face.
 - **Le son** : de vrais enregistrements, tous dans le domaine public (CC0 : BigSoundBank de Joseph Sardin, et Freesound), coupés et réglés par `npm run sons`, puis mélangés en direct par la Web Audio API (`src/son/audio.js`).
 

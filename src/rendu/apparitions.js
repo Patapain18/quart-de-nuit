@@ -140,7 +140,9 @@ export class Apparitions {
     const yPied = hauteurRouf(U_TIMONERIE, 0);
     const pente = new THREE.Vector3(0, TIMONERIE.toit - yPied, TIMONERIE.recul).normalize();
     this.normaleVitre = new THREE.Vector3(0, -pente.z, pente.y); // (vers l'intérieur)
-    this.pointVitre = new THREE.Vector3(0, 1.9, zPareBrise(1.9));
+    // (un point de sa vitre du milieu, à mi-hauteur)
+    const yVitre = (yPied + TIMONERIE.vitreHaut) / 2 + 0.1;
+    this.pointVitre = new THREE.Vector3(0, yVitre, zPareBrise(yVitre));
     this.miroir = new THREE.Matrix4();
     const n = this.normaleVitre;
     const d = this.pointVitre.dot(n);

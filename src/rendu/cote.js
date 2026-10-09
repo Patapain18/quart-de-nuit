@@ -1,7 +1,7 @@
 // La côte de Kervalen, au loin (3 à 4 km au nord du point de départ) : des falaises de
 // granit rose, la lande au-dessus (herbe rase, ajoncs, bruyère), une anse avec le village
 // de Port-Kervalen et son clocher, la pointe du Bec et son phare, le sémaphore de Jos sur
-// la colline, et l'île Brune au large. C'est la côte de la carte marine du carré.
+// la colline, et l'île Brune au large. C'est la côte du traceur de cartes.
 //
 // De si loin, ce qui compte, c'est la silhouette, les couleurs et la brume : la côte se
 // fond dans l'horizon exactement comme la mer (même calcul, même couleur du ciel). Ses feux

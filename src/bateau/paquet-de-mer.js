@@ -37,7 +37,7 @@ vec2 paquetDeMer(float versLeCiel) {
   float l = dot(p, travers); // en travers
   // la tête de la nappe avance, irrégulière ; derrière elle, l'eau s'amincit et s'en va
   float irregulier = bruitP(vec2(l * 1.3, age * 2.0)) - 0.5;
-  float tete = -2.3 + ${VITESSE.toFixed(1)} * age + irregulier * 0.7;
+  float tete = -3.0 + ${VITESSE.toFixed(1)} * age + irregulier * 0.7;
   float queue = tete - 1.2 - 2.6 * age;
   float dans = smoothstep(tete + 0.05, tete - 0.25, s) * smoothstep(queue - 0.6, queue + 0.6, s);
   // elle s'étale le long du bateau en avançant
@@ -45,7 +45,7 @@ vec2 paquetDeMer(float versLeCiel) {
   dans *= 1.0 - smoothstep(longueur * 0.7, longueur, abs(l) + irregulier * 0.8);
   // seulement sur ce qui regarde le ciel, et pas plus haut que le toit du rouf (la
   // timonerie dépasse : l'eau la contourne)
-  dans *= smoothstep(0.35, 0.75, versLeCiel) * (1.0 - smoothstep(1.55, 1.75, vPaquetPos.y));
+  dans *= smoothstep(0.35, 0.75, versLeCiel) * (1.0 - smoothstep(2.05, 2.25, vPaquetPos.y));
   // et elle s'écoule par-dessus bord
   float force = uPaquet.w * (1.0 - smoothstep(1.4, 3.2, age));
   float nappe = clamp(dans * force * 1.4, 0.0, 1.0);
@@ -121,7 +121,7 @@ ${GLSL}`)
     u.uPaquet.value.set(d.x, d.y, 0, Math.min(1, 0.45 + force * 0.6));
     // elle frappe d'où elle vient : par l'arrière, c'est le cockpit qui prend ; par
     // l'avant, la plage avant
-    u.uPaquetZ.value = THREE.MathUtils.clamp(-d.y * 2.6, -3, 3);
+    u.uPaquetZ.value = THREE.MathUtils.clamp(-d.y * 3.9, -4.5, 4.5);
   }
 
   maj(dt, groupe, nuit = 0) {

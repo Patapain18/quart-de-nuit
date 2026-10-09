@@ -66,7 +66,7 @@ export class Marin {
     this._avant = new Vector3();
   }
 
-  // (dehors : sur le pont ou dans le cockpit ; la timonerie, l'escalier et le carré sont dedans)
+  // (dehors : sur le pont ou dans le cockpit ; la timonerie est dedans)
   get dehors() { return this.position.y > 0.3 && !dansLaTimonerie(this.position.x, this.position.z); }
   get dansLaTimonerie() { return dansLaTimonerie(this.position.x, this.position.z); }
   get surLePont() { return SUR_LE_PONT.has(this.zone); }
@@ -96,8 +96,8 @@ export class Marin {
           h = Math.min(h, p.y - y - SOUS_PLAFOND);
         }
       }
-      // une paroi penchée au-dessus de soi (le pare-brise au bas de l'escalier de la
-      // timonerie) : on baisse la tête jusqu'à ce qu'elle passe (un mur droit, lui, reste
+      // une paroi penchée au-dessus de soi (le pare-brise, la console du plafond) : on
+      // baisse la tête jusqu'à ce qu'elle passe (un mur droit, lui, reste
       // un mur : plié en deux, la tête le touche encore, et le corps s'y arrête)
       // (le même seuil que degagement() : sinon, entre les deux, la tête « passe » ici et
       // « touche » là, et le marin reste coincé)
@@ -149,7 +149,6 @@ export class Marin {
     if (entrees.tenir) vitesse *= 0.4;
     if (this.accroupi) vitesse *= 0.55;
     if (!this.dehors) vitesse *= 0.8;
-    if (this.zone === 'marches') vitesse *= 0.6; // (l'escalier de la timonerie est raide)
     if (this.sousLaBome) vitesse *= 0.6;
     if (this.etourdi > 0) vitesse = 0;
     const f = this._f.set(-Math.sin(this.lacet), 0, -Math.cos(this.lacet));
@@ -227,7 +226,7 @@ export class Marin {
     const v = Math.hypot(vx, vz);
     if (v > 0.1) {
       // (35 cm devant, s'il y a un plafond ou la bôme : les yeux ne devront pas dépasser
-      // cette hauteur-là ; les pieds seront sur le sol de là-bas, plus bas dans un escalier)
+      // cette hauteur-là ; les pieds seront sur le sol de là-bas, plus bas d'une marche)
       const ax = p.x + (vx / v) * 0.35;
       const az = p.z + (vz / v) * 0.35;
       const solDevant = solEn(ax, az, p.y);

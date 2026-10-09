@@ -1,7 +1,7 @@
 // La forme de la coque en GLSL : les mêmes fonctions que forme.js, pour que la carte
 // graphique sache si un point est DANS le bateau.
-// Sert à « creuser » la mer : sans ça, la surface de l'eau traverserait la cabine (on la
-// verrait couper le carré à hauteur de la flottaison), et le cockpit quand le bateau gîte.
+// Sert à « creuser » la mer : sans ça, la surface de l'eau traverserait la coque (on la
+// verrait couper la cale à hauteur de la flottaison), et le cockpit quand le bateau gîte.
 import { COQUE } from './forme.js';
 
 const f = (x) => (Number.isInteger(x) ? `${x}.0` : String(x));

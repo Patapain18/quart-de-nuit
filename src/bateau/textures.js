@@ -155,7 +155,7 @@ export function texturesCordage({ couleur = [235, 232, 222], fil = [40, 70, 140]
   }, { relief: 2 });
 }
 
-// ---------- L'intérieur (le carré) ----------
+// ---------- L'intérieur (la timonerie) ----------
 // Ces textures se répètent sans couture : le bruit a la même période que la texture
 // (x de 0 à P quand u va de 0 à 1), dans chaque direction.
 
@@ -173,7 +173,7 @@ export function texturesBoisVerni() {
   }, { relief: 1 });
 }
 
-// Le plancher du carré : du teck et du houx (le bois clair), comme sur les voiliers
+// Le plancher de la timonerie : du teck et du houx (le bois clair), comme sur les voiliers
 // d'autrefois : 14 lattes de teck par mètre, séparées d'un filet de houx.
 // 1 texture = 1 m ; les lattes suivent v (la longueur du bateau).
 export function texturesSolCabine() {

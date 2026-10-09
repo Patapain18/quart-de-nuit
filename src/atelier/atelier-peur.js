@@ -23,7 +23,7 @@ const CONDITIONS = {
   eclairSilhouette: 'un éclair, l\'avant du bateau dans la vue',
   reflet: 'dans la timonerie, la lumière allumée, en regardant le pare-brise',
   forme: 'dehors, l\'eau le long de la coque au bord de la vue',
-  pas: 'dans le carré ou la timonerie, la porte fermée',
+  pas: 'dans la timonerie, la porte fermée',
   coupCoque: 'dedans, 40 s sans déferlante',
   nom: 'pendant le silence de Jos (ou à la fin de sa fenêtre)',
   echoSuiveur: 'un radar sous les yeux : à la barre ou dans la timonerie',

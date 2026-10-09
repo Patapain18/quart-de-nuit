@@ -2,23 +2,20 @@
 //
 // Chaque surface dit si un point (x, z) du bateau est sur elle et à quelle hauteur.
 // Le marin cherche, sous ses pieds, la surface la plus haute qu'il peut atteindre : on
-// monte une marche d'au plus 45 cm (du plancher du cockpit au banc, du banc à
-// l'hiloire, du passavant au toit du rouf) ; plus haut, c'est un mur.
+// monte une marche d'au plus 55 cm (du plancher du cockpit au banc, du banc à
+// l'hiloire, du passavant au toit du rouf, du cockpit à la timonerie) ; plus haut, c'est
+// un mur.
 //
 // Repère du bateau (voir bateau/forme.js) : -Z vers l'avant, +X tribord, y = 0 à la
 // flottaison. Les filières sont à 7 cm du bord : on ne peut pas aller plus loin que
 // 12 cm du livet (sauf… si le bateau se couche et qu'on n'est pas attaché).
 import {
-  COCKPIT, ROUF, MAT, TIMONERIE, PANNEAU_PONT, zDe, uDe, demiLargeur, hauteurPont, bordInterieur, hauteurRouf,
+  COCKPIT, ROUF, MAT, TIMONERIE, TRAPPE_CALE, zDe, uDe, demiLargeur, hauteurPont, bordInterieur, hauteurRouf,
   toitTimonerie,
 } from '../bateau/forme.js';
 
-export const MARCHE_MAX = 0.45;
+export const MARCHE_MAX = 0.55;
 const BORD = 0.12; // distance minimale au livet (les chandeliers et filières)
-// (la face avant du rouf penche vers l'arrière de 12 cm : la cloison avant de la cabine
-// est derrière son sommet)
-export const CARRE = { plancher: -0.3, zAvant: zDe(ROUF.uAvant) + 0.14, demiLargeur: 0.55 };
-export const TABLE = { demiLargeur: 0.22, z0: -1.15, z1: -0.35 };
 
 const dansCockpit = (u) => u >= COCKPIT.uArriere && u <= COCKPIT.uAvant;
 
@@ -30,18 +27,18 @@ const Z_AVANT_TOIT = zDe(ROUF.uAvant) + 0.12;
 const surLeToit = (x, z, u) => z < TIMONERIE.zAvant - 0.03 && z > Z_AVANT_TOIT - 0.02
   && Math.abs(x) <= bordInterieur(u) - ROUF.rentree;
 
-// La timonerie : son plancher surélevé, de la paroi arrière au pied du pare-brise, percé
-// à bâbord de la trémie de l'escalier (trois marches vers l'avant descendent au carré)
-export const TREMIE = { x0: -0.52, x1: -0.08, z0: TIMONERIE.zAvant, z1: 0.85 };
-export const MARCHES_TIMONERIE = [{ z0: 0.62, z1: 0.85, y: 0.27 }, { z0: 0.4, z1: 0.62, y: -0.01 }];
-const dansLaTremie = (x, z) => x > TREMIE.x0 && x < TREMIE.x1 && z > TREMIE.z0 - 0.01 && z < TREMIE.z1;
-const surLesMarches = (x) => x > TREMIE.x0 + 0.01 && x < TREMIE.x1 - 0.01;
-// le dedans de la timonerie, vu de dessus (entre ses parois)
-export const dansLaTimonerie = (x, z) => z > TIMONERIE.zAvant && z < Z_PORTE - 0.01
+// La timonerie : son plancher surélevé, de la paroi arrière à la cloison avant (sous le
+// pare-brise)
+export const dansLaTimonerie = (x, z) => z > TIMONERIE.zAvant + 0.03 && z < Z_PORTE - 0.01
   && Math.abs(x) < bordInterieur(uDe(z)) - 0.05;
-// le panneau de pont au-dessus de la table du carré (son cadre dépasse du toit de 4,5 cm)
-const Y_PANNEAU = hauteurRouf(uDe((PANNEAU_PONT.z0 + PANNEAU_PONT.z1) / 2), 0) + 0.045;
-const surLePanneau = (x, z) => Math.abs(x) <= PANNEAU_PONT.demiLargeur && z >= PANNEAU_PONT.z0 && z <= PANNEAU_PONT.z1;
+// La trappe de la cale, dans son plancher : ouverte, c'est un trou (et son couvercle, debout
+// sur son bord arrière) ; on n'y marche pas
+let trappeOuverte = false;
+export function ouvrirTrappe(ouverte) {
+  trappeOuverte = ouverte;
+}
+const dansLaTrappe = (x, z) => trappeOuverte && x > TRAPPE_CALE.x0 - 0.02 && x < TRAPPE_CALE.x1 + 0.02
+  && z > TRAPPE_CALE.z0 - 0.02 && z < TRAPPE_CALE.z1 + 0.15;
 
 // Les surfaces : nom, test d'appartenance, hauteur. (« ouverte » : l'état de la descente)
 const SURFACES = [
@@ -76,13 +73,8 @@ const SURFACES = [
   },
   {
     nom: 'rouf',
-    dans: (x, z, u) => surLeToit(x, z, u) && !surLePanneau(x, z),
+    dans: surLeToit,
     y: (x, z, u) => hauteurRouf(u, Math.min(Math.abs(x), bordInterieur(u) - ROUF.rentree)),
-  },
-  {
-    nom: 'rouf-panneau',
-    dans: surLePanneau,
-    y: () => Y_PANNEAU,
   },
   {
     nom: 'pont-avant',
@@ -91,22 +83,8 @@ const SURFACES = [
   },
   {
     nom: 'timonerie',
-    dans: (x, z) => dansLaTimonerie(x, z) && !dansLaTremie(x, z),
+    dans: (x, z) => dansLaTimonerie(x, z) && !dansLaTrappe(x, z),
     y: () => TIMONERIE.plancher,
-  },
-  {
-    // (l'escalier : on descend vers l'avant, sous le toit haut de la timonerie)
-    nom: 'marches',
-    dans: (x, z) => surLesMarches(x) && z >= MARCHES_TIMONERIE[1].z0 && z < TREMIE.z1,
-    y: (x, z) => (z >= MARCHES_TIMONERIE[0].z0 ? MARCHES_TIMONERIE[0].y : MARCHES_TIMONERIE[1].y),
-  },
-  {
-    // le carré, et le pied de l'escalier (sous la trémie)
-    nom: 'carre',
-    dans: (x, z) => z > CARRE.zAvant && ((Math.abs(x) < CARRE.demiLargeur && z < TIMONERIE.zAvant)
-      || (surLesMarches(x) && z < MARCHES_TIMONERIE[1].z0))
-      && !(Math.abs(x) < TABLE.demiLargeur && z > TABLE.z0 && z < TABLE.z1),
-    y: () => CARRE.plancher,
   },
 ];
 
@@ -139,8 +117,8 @@ export function bloqueParLaPorte(x0, z0, x1, z1) {
   return b > -PORTE_DEDANS && b < PORTE_DEHORS && Math.abs(b) < Math.abs(a);
 }
 
-// Obstacles ronds (le mât sur le rouf, l'épontille dans le carré) : [x, z, rayon, yMin, yMax]
-const OBSTACLES = [[0, zDe(MAT.u), 0.17, 1.0, 20], [0, zDe(MAT.u), 0.09, -1, 1.2]];
+// Obstacles ronds (le mât sur le rouf) : [x, z, rayon, yMin, yMax]
+const OBSTACLES = [[0, zDe(MAT.u), 0.17, 1.5, 20]];
 
 // Toutes les surfaces sous le point (x, z), de la plus haute à la plus basse
 export function surfacesEn(x, z) {
@@ -163,14 +141,14 @@ export function solEn(x, z, yPieds) {
   // la porte fermée barre le passage entre le cockpit et la timonerie (une bande de 12 cm
   // qu'on ne peut franchir d'un pas)
   if (!descenteOuverte && Math.abs(x) < TIMONERIE.porte.demiLargeur + 0.05 && Math.abs(z - Z_PORTE) < 0.06) return null;
-  // la timonerie est fermée : on n'y entre que par sa porte ou par l'escalier, pas d'en
-  // haut (le toit du rouf, à travers le pare-brise) ni d'à côté (le passavant, à travers
-  // une paroi). (Le modèle 3D arrête aussi le corps ; le plan le dit pour lui-même.)
+  // la timonerie est fermée : on n'y entre que par sa porte, pas d'en haut (le toit du
+  // rouf, à travers le pare-brise) ni d'à côté (le passavant, à travers une paroi). (Le
+  // modèle 3D arrête aussi le corps ; le plan le dit pour lui-même.)
   if (dansLaTimonerie(x, z) && yPieds > TIMONERIE.plancher + 0.25) return null;
   for (const s of surfacesEn(x, z)) {
-    // (le passavant s'atteint d'en haut — le banc, l'hiloire, le pont — jamais d'en bas,
-    // depuis la timonerie : sa paroi est entre les deux)
-    if (s.nom === 'passavant' && yPieds < 0.7) continue;
+    // (et on n'en sort pas par le côté : du plancher de la timonerie, le passavant n'est
+    // qu'à 30 cm plus haut, mais derrière la paroi ; on y monte du banc ou du pont)
+    if (s.nom === 'passavant' && Math.abs(yPieds - TIMONERIE.plancher) < 0.12 && z < Z_PORTE + 0.05) continue;
     if (s.y <= yPieds + MARCHE_MAX) return s;
   }
   return null;
@@ -178,10 +156,9 @@ export function solEn(x, z, yPieds) {
 
 // Hauteur du plafond au-dessus d'un point (dans la cabine) : pour baisser la tête
 export function plafondEn(x, z, yPieds) {
-  // la timonerie (et l'escalier, sous son toit) : le dessous du toit ; plus près des bords,
-  // le dessous des corniches (on ne s'y tient pas debout : ce sont des étagères) ; sous la
-  // porte, son linteau
-  if (dansLaTimonerie(x, z) || (x > TREMIE.x0 && x < TREMIE.x1 && z > TIMONERIE.zAvant - 0.02 && z < Z_PORTE)) {
+  // la timonerie : le dessous du toit ; tout contre les parois, le dessous des corniches ;
+  // sous la porte, son linteau
+  if (dansLaTimonerie(x, z)) {
     const u = uDe(z);
     if (Math.abs(x) < TIMONERIE.demiLargeur - 0.035) return toitTimonerie(u, x) - 0.06;
     return hauteurRouf(u, Math.abs(x)) - 0.06;

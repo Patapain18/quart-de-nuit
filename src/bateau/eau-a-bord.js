@@ -1,5 +1,6 @@
 // L'eau embarquée, qu'on voit : dans le cockpit (une vague l'a rempli ; elle s'écoule par
-// les nables) et dans la cabine (quand elle passe au-dessus des planchers).
+// les nables) et dans la cale (par la trappe du plancher de la timonerie ; quand elle est
+// pleine, l'eau passe sur ce plancher).
 //
 // Sa surface reste à plat quand le bateau penche : c'est un plan du MONDE, pas du bateau.
 // Elle court donc vers le côté qui penche. Et elle clapote : quand le bateau est secoué,
@@ -8,11 +9,14 @@
 // d'un bord à l'autre (un ressort amorti, d'une période de ~1,5 s).
 //
 // On dessine un grand rectangle horizontal, et la carte graphique efface tout ce qui
-// dépasse : du puits du cockpit, ou de l'intérieur de la coque (le carré).
+// dépasse : du puits du cockpit, ou de l'intérieur de la coque (la cale, puis la timonerie).
 import * as THREE from 'three';
-import { COCKPIT, COQUE, ROUF, zDe } from './forme.js';
-import { CARRE } from '../joueur/pont.js';
-import { GLSL_CABINE_DECLARATIONS, GLSL_CABINE } from './interieur.js';
+import { COCKPIT, COQUE, zDe } from './forme.js';
+import { GLSL_CABINE_DECLARATIONS, GLSL_CABINE, CALE } from './interieur.js';
+import { xLambris } from './interieur-timonerie.js';
+
+// (au-dessus du plancher de la timonerie, l'eau s'arrête à ses parois)
+const X_PAROIS = xLambris(0.3, CALE.plancher + 0.05) - 0.01;
 
 const f = (x) => (Number.isInteger(x) ? `${x}.0` : String(x));
 
@@ -53,10 +57,10 @@ float bruitE(vec3 p) {
 }
 `;
 
-// dedans : la cabine (éclairée par ses propres lampes) ; sinon le cockpit (dehors)
+// dedans : la cale (éclairée par les lampes de l'intérieur) ; sinon le cockpit (dehors)
 function materiauEau(uniforms, { dedans }) {
   const m = new THREE.MeshStandardMaterial({
-    color: dedans ? 0x1e1e12 : 0x0b1a1c, roughness: dedans ? 0.14 : 0.06, metalness: 0, transparent: true,
+    color: dedans ? 0x0e100d : 0x0b1a1c, roughness: dedans ? 0.07 : 0.06, metalness: 0, transparent: true,
   });
   if (dedans) m.envMapIntensity = 0.02;
   m.onBeforeCompile = (shader) => {
@@ -91,13 +95,15 @@ ${GLSL_BRUIT}`)
       .replace('#include <clipping_planes_fragment>', `#include <clipping_planes_fragment>
 float profondeurEau = 0.0;
 {
-  // on ne garde que l'eau dans le ${dedans ? 'carré' : 'puits du cockpit'}
+  // on ne garde que l'eau dans ${dedans ? 'la cale (et sur le plancher de la timonerie)' : 'le puits du cockpit'}
   vec3 p = (uMondeVersBateau * vec4(vPosMonde, 1.0)).xyz;
-  profondeurEau = p.y - ${f(dedans ? CARRE.plancher : COCKPIT.plancher)};
-${dedans ? `  if (p.z < ${f(CARRE.zAvant - 0.015)} || p.z > ${f(zDe(ROUF.uArriere) - 0.015)}) discard;
-  if (p.y < ${f(CARRE.plancher - 0.01)}) discard;
+  profondeurEau = p.y - ${f(dedans ? CALE.fond : COCKPIT.plancher)};
+${dedans ? `  if (p.z < ${f(CALE.zAvant)} || p.z > ${f(CALE.zArriere)}) discard;
   float u = (p.z - ${f(COQUE.zArriere)}) / ${f(COQUE.zAvant - COQUE.zArriere)};
-  if (abs(p.x) > largeurInterieure(u, p.y)) discard;`
+  if (abs(p.x) > largeurInterieure(u, p.y)) discard;
+  if (p.y > ${f(CALE.plancher)} && abs(p.x) > ${f(X_PAROIS)}) discard;
+  // (sur le plancher, sa profondeur se compte depuis le plancher)
+  if (p.y > ${f(CALE.plancher)}) profondeurEau = p.y - ${f(CALE.plancher)};`
     : `  if (p.z < ${f(zDe(COCKPIT.uAvant) + 0.02)} || p.z > ${f(zDe(COCKPIT.uArriere) - 0.02)}) discard;
   if (p.y < ${f(COCKPIT.plancher - 0.01)}) discard;
   float demi = p.y < ${f(COCKPIT.banc)} ? ${f(COCKPIT.demiLargeurPuits - 0.01)} : ${f(COCKPIT.demiLargeur - 0.02)};
@@ -119,7 +125,7 @@ ${dedans ? `  if (p.z < ${f(CARRE.zAvant - 0.015)} || p.z > ${f(zDe(ROUF.uArrier
       .replace('#include <color_fragment>', `#include <color_fragment>
 // l'eau est d'autant plus opaque qu'elle est profonde (2 cm : on voit le fond ; 30 cm :
 // presque plus)
-diffuseColor.a = 1.0 - exp(-max(profondeurEau, 0.0) * ${dedans ? '7.0' : '9.0'});
+diffuseColor.a = 1.0 - exp(-max(profondeurEau, 0.0) * ${dedans ? '5.0' : '9.0'});
 // des bulles et de l'écume quand l'eau vient d'arriver ou qu'elle est secouée
 {
   float b = bruitE(vec3(vPosMonde.xz * 9.0, uTemps * 2.0));
@@ -131,12 +137,12 @@ diffuseColor.a = 1.0 - exp(-max(profondeurEau, 0.0) * ${dedans ? '7.0' : '9.0'})
     if (dedans) {
       shader.fragmentShader = shader.fragmentShader
         .replace('#include <lights_fragment_end>', `${GLSL_CABINE}\n#include <lights_fragment_end>`)
-        // le reflet de la cabine éclairée (les boiseries) : d'autant plus qu'on la regarde
-        // en rasant la surface (Fresnel)
+        // le reflet de la cale (sa peinture grise, à peine éclairée) : d'autant plus qu'on la
+        // regarde en rasant la surface (Fresnel) ; l'eau de cale est noire, huileuse
         .replace('#include <opaque_fragment>', `{
   float nv = clamp(dot(normal, normalize(vViewPosition)), 0.0, 1.0);
   float fresnel = 0.02 + 0.98 * pow(1.0 - nv, 5.0);
-  outgoingLight += vec3(0.62, 0.38, 0.2) * uAmbianceCabine * 5.0 * fresnel;
+  outgoingLight += vec3(0.42, 0.4, 0.36) * uAmbianceCabine * 2.5 * fresnel;
   diffuseColor.a = max(diffuseColor.a, fresnel);
 }
 #include <opaque_fragment>`);
@@ -159,7 +165,7 @@ class Surface {
     };
     // (dans la cabine, la lumière de la cabine)
     if (dedans) {
-      for (const cle of ['uBateauVersMonde', 'uSourcePos', 'uSourceDir', 'uSourceCouleur', 'uSourceForme', 'uAmbianceCabine', 'uAmbianceTimonerie', 'uTableCabine']) {
+      for (const cle of ['uBateauVersMonde', 'uSourcePos', 'uSourceDir', 'uSourceCouleur', 'uSourceForme', 'uAmbianceCabine', 'uAmbianceTimonerie', 'uTrappe']) {
         this.uniforms[cle] = bateau.interieur.uniforms[cle];
       }
     }
@@ -214,25 +220,33 @@ export class EauABord {
     this.cockpit = new Surface(bateau, {
       dedans: false, largeur: COCKPIT.demiLargeur, z0: zDe(COCKPIT.uAvant), z1: zDe(COCKPIT.uArriere), y: COCKPIT.plancher,
     });
-    this.cabine = new Surface(bateau, {
-      dedans: true, largeur: 1.45, z0: CARRE.zAvant, z1: zDe(ROUF.uArriere), y: CARRE.plancher,
+    this.cale = new Surface(bateau, {
+      dedans: true, largeur: 2.1, z0: CALE.zAvant, z1: CALE.zArriere, y: CALE.fond,
     });
-    this.avant = { cockpit: 0, cabine: 0 };
-    this.mousse = { cockpit: 0, cabine: 0 };
+    this.avant = { cockpit: 0, cale: 0 };
+    this.mousse = { cockpit: 0, cale: 0 };
   }
 
-  // litresCockpit, litresCabine : l'eau au-dessus du plancher de chacun ; pesanteur : la
-  // pesanteur ressentie à bord (repère du bateau, m/s²)
-  maj(dt, groupe, { litresCockpit = 0, litresCabine = 0, pesanteur, temps = 0 }) {
+  // La hauteur de l'eau dans la cale (au-dessus de son fond), pour tant de litres : la coque
+  // s'évase en montant, l'eau monte de moins en moins vite ; à « plein » litres, elle arrive
+  // au plancher de la timonerie (et passe dessus)
+  static hauteurDansLaCale(litres, plein) {
+    return (CALE.plancher + 0.06 - CALE.fond) * Math.pow(Math.max(0, litres) / plein, 0.6);
+  }
+
+  // litresCockpit : l'eau au-dessus du plancher du cockpit ; litresCale, plein : l'eau dans la
+  // cale, et combien il en faut pour qu'elle arrive au plancher ; pesanteur : la pesanteur
+  // ressentie à bord (repère du bateau, m/s²)
+  maj(dt, groupe, { litresCockpit = 0, litresCale = 0, plein = 2000, pesanteur, temps = 0 }) {
     const g = pesanteur ?? new THREE.Vector3(0, -9.81, 0);
     // la mousse : quand l'eau arrive d'un coup, elle bouillonne, puis se calme
-    for (const [cle, litres] of [['cockpit', litresCockpit], ['cabine', litresCabine]]) {
+    for (const [cle, litres] of [['cockpit', litresCockpit], ['cale', litresCale]]) {
       const arrivee = Math.max(0, litres - this.avant[cle]) / Math.max(dt, 1e-3);
       this.mousse[cle] = Math.min(1, this.mousse[cle] * Math.exp(-dt * 0.6) + arrivee / 600);
       this.avant[cle] = litres;
     }
-    // (le puits du cockpit fait ~2,1 m² ; le plancher du carré ~4 m²)
+    // (le puits du cockpit fait ~2,1 m²)
     this.cockpit.maj(dt, groupe, litresCockpit / 2100, g, Math.max(0.25, this.mousse.cockpit), temps);
-    this.cabine.maj(dt, groupe, litresCabine / 4000, g, 0.15 + this.mousse.cabine * 0.85, temps);
+    this.cale.maj(dt, groupe, EauABord.hauteurDansLaCale(litresCale, plein), g, 0.15 + this.mousse.cale * 0.85, temps);
   }
 }

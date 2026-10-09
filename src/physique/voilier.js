@@ -29,8 +29,14 @@
 // il tourne aussi dans Node, pour les tests et la « polaire » (scripts/polaire.js).
 import { Vector3, Quaternion } from 'three';
 import {
-  COQUE, ROUF, MAT, COCKPIT, TIMONERIE, zDe, fondCoque, hauteurLivet, demiLargeurA, bordInterieur, hauteurRouf, hauteurPont,
+  COQUE, ROUF, MAT, COCKPIT, TIMONERIE, ECHELLE, zDe, fondCoque, hauteurLivet, demiLargeurA, bordInterieur, hauteurRouf, hauteurPont,
 } from '../bateau/forme.js';
+
+// (les mesures prises à la main sur l'ancien bateau de 9,40 m, mises à la taille de celui-ci :
+// L dans le sens de la longueur, B de la largeur, H de la hauteur)
+const L = ECHELLE.longueur;
+const B = ECHELLE.largeur;
+const H = ECHELLE.hauteur;
 
 const RHO_EAU = 1025;
 const RHO_AIR = 1.225;
@@ -38,8 +44,12 @@ const G = 9.81;
 const NOEUD = 0.5144;
 const HAUT = new Vector3(0, 1, 0);
 // La poussée d'une grosse déferlante (force 1) : de quoi coucher le bateau s'il la prend
-// de travers (~80 kN pendant 0,7 s, l'eau d'une crête de 2 m qui arrive à 7 m/s)
-const POUSSEE_DEFERLANTE = 80000;
+// de travers (l'eau d'une crête de 2 m qui arrive à 7 m/s : ~80 kN pendant 0,7 s sur l'ancien
+// bateau de 9,40 m). Elle trouve ici un bordé deux fois plus grand, et un bateau qui résiste
+// cinq fois plus au roulis (presque trois fois plus lourd, et plus large) : × 1,75 de plus,
+// pour que de travers elle le couche comme l'ancien — les crêtes de cette nuit ne sont pas
+// plus petites parce que le bateau est plus grand
+const POUSSEE_DEFERLANTE = 80000 * L * H * 1.75;
 // Le foc ne peut pas être bordé plus près de l'axe que ses rails, sur le pont (~10°)
 export const ANGLE_MIN_FOC = 0.17;
 
@@ -101,8 +111,8 @@ function decouperCoque() {
     }
   }
   // l'aileron de quille et le bulbe (toujours sous l'eau, sauf si le bateau chavire)
-  volumes.push({ c: new Vector3(0, -0.92, -0.15), v: 0.11, taille: new Vector3(0.12, 1.25, 1.0), surface: 0.12 });
-  volumes.push({ c: new Vector3(0, -1.6, -0.12), v: 0.091, taille: new Vector3(0.34, 0.3, 1.7), surface: 0.5 });
+  volumes.push({ c: new Vector3(0, -0.92 * H, -0.15 * L), v: 0.11 * L * B * H, taille: new Vector3(0.12 * B, 1.25 * H, 1.0 * L), surface: 0.12 * L * B });
+  volumes.push({ c: new Vector3(0, -1.6 * H, -0.12 * L), v: 0.091 * L * B * H, taille: new Vector3(0.34 * B, 0.3 * H, 1.7 * L), surface: 0.5 * L * B });
   return volumes;
 }
 
@@ -191,10 +201,14 @@ export class PhysiqueVoilier {
     this.deplacement = v0; // m³
     this.masse = RHO_EAU * v0; // kg
     this.centreCarene = carene.clone();
-    this.centreGravite = new Vector3(0, -0.24, carene.z);
-    // inertie (rayons de giration réalistes pour un croiseur de 9 m, mât compris)
+    this.centreGravite = new Vector3(0, -0.24 * H, carene.z);
+    // inertie (rayons de giration réalistes pour un voilier de 14 m, mât compris)
     const m = this.masse;
-    this.inertie = new Vector3(m * 2.25 ** 2, m * 2.15 ** 2, m * 1.32 ** 2); // tangage, lacet, roulis
+    this.inertie = new Vector3(m * (2.25 * L) ** 2, m * (2.15 * L) ** 2, m * (1.32 * B) ** 2); // tangage, lacet, roulis
+    // (les amortissements de l'ancien bateau, pour des mouvements semblables : un couple
+    // d'amortissement grandit comme l'inertie, divisée par le temps, qui s'allonge comme la
+    // racine de la taille)
+    this.echelleMasse = m / 4900;
     this.inertieInverse = new Vector3(1 / this.inertie.x, 1 / this.inertie.y, 1 / this.inertie.z);
 
     // état (repère du monde) : position du centre de gravité, vitesse, orientation, rotation
@@ -232,8 +246,12 @@ export class PhysiqueVoilier {
     this.grandVoileDechiree = false;
     this.focDechire = false;
 
-    // la grille de hauteurs d'eau autour du bateau (relevée une fois par image)
-    this.grille = { nx: 5, nz: 13, x0: -2.2, x1: 2.2, z0: -5.6, z1: 5.0, h: new Float32Array(65), avant: new Float32Array(65), pret: false };
+    // la grille de hauteurs d'eau autour du bateau (relevée une fois par image) : toute la
+    // coque, et 50 cm de plus de chaque côté (un point tous les 95 cm environ)
+    this.grille = {
+      nx: 5, nz: 17, x0: -COQUE.demiLargeurMax - 0.25, x1: COQUE.demiLargeurMax + 0.25, z0: COQUE.zAvant - 0.5, z1: COQUE.zArriere + 0.5,
+      h: new Float32Array(85), avant: new Float32Array(85), pret: false,
+    };
     this._tmp = { a: new Vector3(), b: new Vector3(), c: new Vector3(), d: new Vector3(), e: new Vector3(), f: new Vector3(), q: new Quaternion() };
   }
 
@@ -388,49 +406,51 @@ export class PhysiqueVoilier {
     const enEau = Math.min(1, this.immersion);
 
     // 4. Résistance de la coque vers l'avant (frottement + vagues)
-    const lFlottaison = 8.3;
+    const lFlottaison = 8.3 * L;
     const fn = avance / Math.sqrt(G * lFlottaison);
-    const frottement = 0.5 * RHO_EAU * 22 * 0.0042 * avance * Math.abs(avance);
+    const frottement = 0.5 * RHO_EAU * 22 * L * H * 0.0042 * avance * Math.abs(avance);
     const vagues = Math.sign(avance) * this.masse * G * resistanceVagues(fn);
     const resistance = new Vector3(0, 0, (frottement + vagues) * enEau); // +z = vers l'arrière
-    this.ajouterLocal(resistance, new Vector3(0, -0.2, this.centreGravite.z), force, couple);
+    this.ajouterLocal(resistance, new Vector3(0, -0.2 * H, this.centreGravite.z), force, couple);
 
     // 5. La quille (et la coque) contre la dérive, le safran pour tourner
     // (point d'appui « effectif » : la quille et l'avant de la coque, placé pour que le
     // bateau soit légèrement ardent, comme un voilier bien réglé)
-    const pointQuille = new Vector3(0, -0.75, -1.85);
+    const pointQuille = new Vector3(0, -0.75 * H, -1.85 * L);
     const wQuille = this.vitesseEauLocale(vLocal, rotLocal, pointQuille);
-    const fq = forceAile(wQuille, new Vector3(0, 0, 1), 2.9, 3.4, 0.012, new Vector3());
+    const fq = forceAile(wQuille, new Vector3(0, 0, 1), 2.9 * L * H, 3.4, 0.012, new Vector3());
     this.ajouterLocal(fq.multiplyScalar(enEau), pointQuille, force, couple);
-    const pointSafran = new Vector3(0, -0.8, 3.85);
+    const pointSafran = new Vector3(0, -0.8 * H, 3.85 * L);
     const wSafran = this.vitesseEauLocale(vLocal, rotLocal, pointSafran);
     const corde = new Vector3(Math.sin(this.barre), 0, Math.cos(this.barre));
-    const fs = forceAile(wSafran, corde, 0.52, 4.2, 0.012, new Vector3());
+    const fs = forceAile(wSafran, corde, 0.52 * L * H, 4.2, 0.012, new Vector3());
     // le safran ne tient que s'il est bien dans l'eau : quand le bateau gîte fort, ou que
     // l'arrière se soulève sur une vague, il remonte vers la surface, aspire de l'air (il
     // « ventile ») et ne tient plus rien : la barre devient molle, c'est le départ au lof
     const ps = pointSafran.clone().sub(this.centreGravite).applyQuaternion(q).add(cg);
     this.eauEn(ps.x, ps.z, eau);
-    const tenue = Math.min(1, Math.max(0, (eau.h - ps.y - 0.05) / 0.6)) ** 1.5;
+    const tenue = Math.min(1, Math.max(0, (eau.h - ps.y - 0.05) / (0.6 * H))) ** 1.5;
     this.tenueSafran = tenue;
     this.ajouterLocal(fs.multiplyScalar(enEau * tenue), pointSafran, force, couple);
     // la coque freine aussi les mouvements de travers et les rotations (amortissement)
-    const travers = -0.5 * RHO_EAU * 1.0 * 3.5 * vLocal.x * Math.abs(vLocal.x) * enEau;
-    this.ajouterLocal(new Vector3(travers, 0, 0), new Vector3(0, -0.3, 0), force, couple);
-    const amortiLacet = -rotLocal.y * 9000 * enEau - rotLocal.y * Math.abs(rotLocal.y) * 30000 * enEau;
-    const amortiRoulis = -rotLocal.z * 2500 * enEau;
-    const amortiTangage = -rotLocal.x * 4000 * enEau;
+    const travers = -0.5 * RHO_EAU * 1.0 * 3.5 * L * H * vLocal.x * Math.abs(vLocal.x) * enEau;
+    this.ajouterLocal(new Vector3(travers, 0, 0), new Vector3(0, -0.3 * H, 0), force, couple);
+    const M = this.echelleMasse;
+    const amortiLacet = -rotLocal.y * 9000 * M * L ** 1.5 * enEau - rotLocal.y * Math.abs(rotLocal.y) * 30000 * M * L * L * enEau;
+    const amortiRoulis = -rotLocal.z * 2500 * M * B * B / Math.sqrt(L) * enEau;
+    const amortiTangage = -rotLocal.x * 4000 * M * L ** 1.5 * enEau;
     couple.add(new Vector3(amortiTangage, amortiLacet, amortiRoulis).applyQuaternion(q));
 
     // 6. Les voiles
     this.forcesVoiles(dt, q, qInv, vLocal, rotLocal, force, couple);
-    // … et le « fardage » : le vent sur la coque, le rouf, le mât et le gréement. De face,
-    // il n'a prise que sur ~1,8 m² ; de travers, sur ~5 m² (toute la longueur de la coque).
+    // … et le « fardage » : le vent sur la coque, le rouf, la timonerie, le mât et le
+    // gréement. De face, il n'a prise que sur ~3,4 m² ; de travers, sur ~10 m² (toute la
+    // longueur de la coque).
     // Sans voile du tout, dans la tempête, c'est lui qui pousse le bateau (« fuir à sec de
     // toile »)
     const vf = T.e.copy(this.ventReel).applyQuaternion(qInv).sub(vLocal);
     const qf = 0.5 * RHO_AIR * Math.hypot(vf.x, vf.z);
-    this.ajouterLocal(new Vector3(qf * 5 * vf.x, 0, qf * 1.8 * vf.z), new Vector3(0, 2.2, -0.3), force, couple);
+    this.ajouterLocal(new Vector3(qf * 5 * L * H * vf.x, 0, qf * 1.8 * B * H * vf.z), new Vector3(0, 2.2 * H, -0.3 * L), force, couple);
 
     // 7. Une déferlante : elle monte et retombe en 0,7 s, et frappe la coque du côté d'où
     // elle vient, haut sur le bordé (au livet)
@@ -444,7 +464,7 @@ export class PhysiqueVoilier {
       // (de travers, la crête frappe plus haut : au livet et au rouf ; et elle trouve toute
       // la longueur de la coque, alors que par l'avant ou l'arrière, l'étrave ou le tableau
       // arrière la fendent : trois fois moins de prise)
-      const impact = new Vector3(-d.x * 1.3 * c.levier, 0.75 + 0.45 * Math.abs(d.x), -d.z * 3.4 * c.levier);
+      const impact = new Vector3(-d.x * 1.3 * B * c.levier, (0.75 + 0.45 * Math.abs(d.x)) * H, -d.z * 3.4 * L * c.levier);
       const exposition = 0.35 + 0.65 * Math.abs(d.x);
       this.ajouterLocal(d.multiplyScalar(POUSSEE_DEFERLANTE * c.force * exposition * profil), impact, force, couple);
       if (c.t >= c.duree) this.choc = null;
@@ -458,11 +478,11 @@ export class PhysiqueVoilier {
       // dans la cale (sous les planchers, au milieu du bateau) ; plus il y en a, plus
       // elle monte et s'étale d'un bord à l'autre
       if (this.eauCale > 1) {
-        const largeur = Math.min(1.1, 0.35 + this.eauCale / 1800);
+        const largeur = Math.min(1.1 * B, 0.35 * B + this.eauCale / 1800);
         const p = new Vector3(
-          Math.max(-largeur, Math.min(largeur, g.x * 1.6)),
-          -0.42 + Math.min(0.45, this.eauCale / 2600),
-          0.35 + Math.max(-1.2, Math.min(1.2, -g.z * 2.5)),
+          Math.max(-largeur, Math.min(largeur, g.x * 1.6 * B)),
+          (-0.42 + Math.min(0.45, this.eauCale / 2600)) * H,
+          (0.35 + Math.max(-1.2, Math.min(1.2, -g.z * 2.5))) * L,
         );
         this.ajouterLocal(g.clone().multiplyScalar(this.eauCale * G), p, force, couple);
       }
@@ -515,17 +535,17 @@ export class PhysiqueVoilier {
     const ventLocal = this.ventReel.clone().applyQuaternion(qInv);
     // (ris 3 : la grand-voile est affalée, roulée sur la bôme ; déchirée, il n'en reste
     // qu'un lambeau qui bat)
-    const surfaceGV = [21, 15.5, 10.5, 0][this.ris] * (this.grandVoileDechiree ? 0.4 : 1);
-    const surfaceFoc = 18 * this.deroule * (this.focDechire ? 0.5 : 1);
+    // (un 14 m porte ~105 m² de toile : 56 de grand-voile, 48 de foc)
+    const surfaceGV = [21, 15.5, 10.5, 0][this.ris] * L * L * 1.2 * (this.grandVoileDechiree ? 0.4 : 1);
+    const surfaceFoc = 18 * L * L * 1.2 * this.deroule * (this.focDechire ? 0.5 : 1);
     // centre de poussée de chaque voile = son barycentre (un triangle : au tiers de la
     // hauteur du guindant et au tiers de la bordure)
-    // (le vit-de-mulet : le pied de la bôme, rehaussé de 44 cm pour passer au-dessus de
-    // la timonerie ; le mât l'a été d'autant : les voiles gardent leur taille)
-    const vit = 2.64;
-    const guindantGV = [10.6, 9.15, 7.7, 0][this.ris];
+    // (le vit-de-mulet : le pied de la bôme, au-dessus du toit de la timonerie)
+    const vit = hauteurRouf(MAT.u, 0) + MAT.hauteurBome;
+    const guindantGV = [10.6, 9.15, 7.7, 0][this.ris] * L;
     const voiles = [
-      { cle: 'GV', surface: surfaceGV, pied: new Vector3(0, vit + guindantGV / 3, zDe(MAT.u) + 0.1), corde: 3.55 },
-      { cle: 'Foc', surface: surfaceFoc, pied: new Vector3(0, 1.23 + 9.1 / 3, zDe(0.97) + 3.4 / 3), corde: 3.3 * this.deroule },
+      { cle: 'GV', surface: surfaceGV, pied: new Vector3(0, vit + guindantGV / 3, zDe(MAT.u) + 0.1 * L), corde: 3.55 * L },
+      { cle: 'Foc', surface: surfaceFoc, pied: new Vector3(0, hauteurLivet(0.97) + 0.08 + (9.1 * L) / 3, zDe(0.97) + (3.4 * L) / 3), corde: 3.3 * L * this.deroule },
     ];
     this.mesures.forceVoiles = 0;
     for (const s of voiles) {
@@ -571,13 +591,13 @@ export class PhysiqueVoilier {
       // la bôme (ou le point d'écoute du foc) tourne sous la poussée, jusqu'à l'écoute
       const bras = s.corde * 0.45;
       const coupleBome = f.dot(new Vector3(c.z, 0, -c.x)) * bras; // composante perpendiculaire à la corde
-      const inertieBome = s.cle === 'GV' ? 260 : 60;
+      const inertieBome = (s.cle === 'GV' ? 260 : 60) * L ** 3;
       const cleAngle = s.cle === 'GV' ? 'angleBome' : 'angleFoc';
       const cleVit = s.cle === 'GV' ? 'vitesseBome' : 'vitesseFoc';
       // (écoute de foc cassée : plus rien ne retient le point d'écoute, le foc bat au vent)
       const limite = s.cle === 'GV' ? Math.max(0.02, this.ecouteGV)
         : this.ecouteFocLibre ? 2.6 : Math.max(ANGLE_MIN_FOC, this.ecouteFoc);
-      let wb = this[cleVit] + ((coupleBome - this[cleVit] * 120) / inertieBome) * dt;
+      let wb = this[cleVit] + ((coupleBome - this[cleVit] * 120 * L ** 3) / inertieBome) * dt;
       let a = this[cleAngle] + wb * dt;
       // le point d'écoute du foc ne passe pas en dedans de son rail (il reste à ~10° de
       // l'axe, d'un côté ou de l'autre, sauf quand il change de bord)
@@ -616,7 +636,7 @@ export class PhysiqueVoilier {
     m.angleVentApparent = (Math.atan2(-apparent.x, apparent.z) * 180) / Math.PI;
     m.angleVentReel = (Math.atan2(-ventLocal.x, ventLocal.z) * 180) / Math.PI;
     // l'étrave qui tape dans une vague : elle descend vite vers une eau qui monte
-    const etrave = new Vector3(0, 0.35, -4.1);
+    const etrave = new Vector3(0, 0.35 * H, -4.1 * L);
     const r = etrave.clone().sub(this.centreGravite).applyQuaternion(q);
     const p = r.clone().add(this.position);
     const v = new Vector3().crossVectors(this.rotation, r).add(this.vitesse);

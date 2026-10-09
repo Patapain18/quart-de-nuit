@@ -1,7 +1,5 @@
-// Le tableau électrique : sur le pupitre de la console de la timonerie, entre la commande
-// du pilote et le compas, tourné vers le siège de quart — on l'atteint assis comme debout,
-// et on le voit dès qu'on entre (sur la paroi tribord, sous la corniche, derrière le
-// siège, on ne le trouvait pas).
+// Le tableau électrique : sur le pupitre de la console de la timonerie, à droite du
+// traceur, tourné vers le siège de quart — on l'atteint assis comme debout.
 //
 // Six disjoncteurs à levier, chacun avec son nom et son voyant : les feux de navigation,
 // le pilote automatique (son disjoncteur saute quand il lâche : levier tombé, voyant rouge
@@ -92,7 +90,7 @@ export class TableauElectrique {
       this.groupe.add(voyant);
       this.voyants.push(voyant);
     }
-    poserSurPupitre(this.groupe, 0.27, 0.16, 0.008);
+    poserSurPupitre(this.groupe, 0.66, 0.36, 0.008);
     groupe.add(this.groupe);
     this.position = this.groupe.position.clone();
     this.temps = 0;

@@ -7,41 +7,38 @@
 //  - un saut des yeux (plus de 12 cm d'une image à l'autre : un « téléport ») ;
 //  - un blocage (il n'avance plus pendant une seconde alors qu'il marche).
 // (Outil de mise au point : window.__jeu.essayerLaMarche() dans le jeu.)
-import { zDe } from '../bateau/forme.js';
+import { zDe, TIMONERIE, COCKPIT } from '../bateau/forme.js';
 
 // Les tournées : des points de passage (x, z dans le repère du bateau), puis la chose à regarder
-function tournees(interieur) {
-  const radio = interieur.positionRadio;
-  const tableau = interieur.positionTableau;
-  const cire = interieur.positionCire;
+// (on part debout à côté du siège de quart)
+function tournees() {
   return [
-    { nom: 'la pompe de cale', chemin: [[-0.2, zDe(0.12)]], geste: 'pompe' },
-    { nom: 'la bosse d\'enrouleur', chemin: [[0.32, zDe(0.28)]], geste: 'enrouleur' },
-    { nom: 'la porte de la timonerie', chemin: [[0, zDe(0.24)]], geste: 'descente' },
+    // la timonerie : la pompe et la trappe (à bâbord), la porte
+    { nom: 'la pompe de cale, dans la timonerie', chemin: [[-0.6, 2.3], [-1.0, 2.95]], geste: 'pompe' },
+    { nom: 'la trappe de la cale', chemin: [[-0.3, 2.9]], geste: 'trappe' },
+    { nom: 'la porte de la timonerie', chemin: [[0, 3.3]], geste: 'descente' },
+    // dehors : l'enrouleur, puis le tour du pont
+    { nom: 'la bosse d\'enrouleur', chemin: [[0, 4.4], [0.6, 4.3]], geste: 'enrouleur' },
     {
       nom: 'le pied de l\'étai, par tribord',
-      chemin: [[0.6, zDe(0.2)], [1.12, zDe(0.2)], [1.15, zDe(0.42)], [1.0, zDe(0.68)], [0.35, zDe(0.88)], [0.12, zDe(0.93)]],
+      chemin: [[0.6, 4.4], [1.2, 4.4], [1.65, 4.4], [1.7, 2.4], [1.6, 0.5], [1.4, -1.5], [0.9, -3.5], [0.35, -5.3], [0.12, zDe(0.93)]],
       geste: 'etai',
     },
     {
       nom: 'retour au cockpit par bâbord',
-      chemin: [[-0.35, zDe(0.88)], [-0.95, zDe(0.68)], [-1.15, zDe(0.45)], [-1.12, zDe(0.2)], [-0.25, zDe(0.2)]],
+      chemin: [[-0.35, -5.3], [-0.9, -3.5], [-1.4, -1.5], [-1.6, 0.5], [-1.7, 2.4], [-1.65, 4.4], [-1.2, 4.4], [-0.3, 4.4]],
       geste: null,
     },
-    // la timonerie : on entre par la porte, on va à la radio, au tableau, au radar, au poste
-    { nom: 'la radio, dans la timonerie', chemin: [[0, zDe(0.27)], [-0.12, 1.25], [-0.15, 1.0]], geste: 'radio' },
-    { nom: 'le tableau électrique (sur la console)', chemin: [[-0.05, 0.85]], geste: 'tableau' },
-    { nom: 'le radar et le traceur', chemin: [[-0.15, 1.0]], geste: 'traceur' },
-    { nom: 'le pilote, au poste', chemin: [[-0.15, 0.98]], geste: 'poste' },
-    { nom: 'le siège de quart', chemin: [[-0.15, 1.1]], geste: 'siege' },
-    // en bas : l'escalier (à bâbord), le ciré au pied de l'escalier, le carré
-    { nom: 'descendre au carré', chemin: [[-0.18, 1.0], [-0.3, 0.88], [-0.3, 0.3], [-0.3, 0.0], [0.39, -0.25], [0.39, -1.05]], geste: null },
-    { nom: 'le ciré, au pied de l\'escalier', chemin: [[0.39, -0.2], [0.1, 0.0]], geste: 'cire' },
-    {
-      nom: 'remonter, et ressortir dans le cockpit',
-      chemin: [[-0.3, 0.0], [-0.3, 0.3], [-0.3, 0.6], [-0.25, 0.95], [-0.1, 1.3], [0, zDe(0.24)], [-0.2, zDe(0.12)]],
-      geste: 'pompe',
-    },
+    // on rentre : la radio (au plafond), le tableau, le radar et le traceur, le pilote, le siège
+    { nom: 'la radio, dans la timonerie', chemin: [[0, 3.3], [-0.45, 2.3], [-0.45, 1.6]], geste: 'radio' },
+    { nom: 'le tableau électrique (sur la console)', chemin: [[-0.45, 2.3], [0.45, 2.3], [0.45, 1.6]], geste: 'tableau' },
+    { nom: 'le radar et le traceur', chemin: [[0.45, 1.6]], geste: 'traceur' },
+    { nom: 'le pilote, au poste', chemin: [[0.45, 1.6]], geste: 'poste' },
+    { nom: 'le siège de quart', chemin: [[0.45, 1.6]], geste: 'siege' },
+    { nom: 'la commande des volets (au plafond)', chemin: [[0.45, 2.3], [0.15, 2.3]], geste: 'volets-tribord' },
+    { nom: 'le baromètre', chemin: [[0.75, 2.3]], geste: 'barometre' },
+    { nom: 'le ciré, contre la paroi arrière', chemin: [[0.55, 3.35]], geste: 'cire' },
+    { nom: 'ressortir dans le cockpit', chemin: [[0, 3.4], [0, 4.4]], geste: 'descente' },
   ];
 }
 
@@ -119,21 +116,17 @@ export async function essayerLaMarche(ctx, { dt = 1 / 60 } = {}) {
 export function essaisEntree(ZP) {
   const essais = [];
   const dedans = (m) => m.position.z < ZP - 0.4 && m.position.y > 0.5;
-  // du cockpit vers la timonerie : depuis la barre, le banc, les winchs
-  for (const [nom, depart] of [['de la barre', [0, 2.35]], ['du banc tribord', [0.32, 2.0]], ['du banc bâbord', [-0.32, 2.0]], ['du winch tribord', [0.36, 1.75]], ['du winch bâbord', [-0.36, 1.75]]]) {
-    // (à gauche du passage, au milieu, et devant le siège : là où l'on va vraiment)
-    for (const [xv, zv] of [[-0.2, 0.95], [0, 0.95], [0.08, 0.7]]) essais.push({ nom: `entrer ${nom}, visant (${xv}, ${zv})`, depart, vise: [xv, zv], arrivee: dedans });
+  // du cockpit vers la timonerie : d'à côté de la roue (droit derrière elle, on la contourne :
+  // elle fait un mètre de large), du cockpit, des winchs
+  for (const [nom, depart] of [['d\'à côté de la roue', [0.7, 5.75]], ['du cockpit, à tribord', [0.6, 4.6]], ['du cockpit, à bâbord', [-0.6, 4.6]], ['du winch tribord', [0.8, 4.15]], ['du winch bâbord', [-0.8, 4.15]]]) {
+    // (à gauche du passage, au milieu, et vers le siège : là où l'on va vraiment)
+    for (const [xv, zv] of [[-0.2, 3.0], [0, 3.0], [0.1, 2.4]]) essais.push({ nom: `entrer ${nom}, visant (${xv}, ${zv})`, depart, vise: [xv, zv], arrivee: dedans });
   }
-  // de la timonerie vers le cockpit : du siège, du haut de l'escalier, de la cuisine
+  // de la timonerie vers le cockpit : d'à côté du siège, de la trappe, du milieu
   const dehors = (m) => m.position.z > ZP + 0.35;
-  for (const [nom, depart] of [['du siège', [0.05, 0.82]], ['du haut de l\'escalier', [-0.3, 0.95]], ['du milieu', [0, 1.05]]]) {
-    for (const xv of [-0.25, 0, 0.25]) essais.push({ nom: `sortir ${nom}, visant ${xv}`, depart, vise: [xv, 2.3], arrivee: dehors });
+  for (const [nom, depart] of [['du siège', [-0.45, 1.91]], ['de la trappe', [-0.3, 3.0]], ['du milieu', [0, 2.6]]]) {
+    for (const xv of [-0.25, 0, 0.25]) essais.push({ nom: `sortir ${nom}, visant ${xv}`, depart, vise: [xv, 5.0], arrivee: dehors });
   }
-  // de la timonerie vers le carré (l'escalier), et du carré vers la timonerie
-  const enBas = (m) => m.position.y < 0 && m.position.z < 0.2;
-  for (const depart of [[0, 1.3], [0.05, 0.9], [-0.15, 1.3]]) essais.push({ nom: `descendre au carré depuis (${depart})`, depart, vise: [-0.3, -0.3], arrivee: enBas });
-  const enHaut = (m) => m.position.y > 0.5 && m.position.z > 0.95;
-  for (const depart of [[0.35, -0.6], [-0.3, -0.2], [0.3, -0.3]]) essais.push({ nom: `monter à la timonerie depuis (${depart})`, depart, vise: [-0.25, 1.3], arrivee: enHaut });
   return essais;
 }
 
@@ -143,7 +136,7 @@ export async function essayerLesEntrees(ctx, { dt = 1 / 60, tMax = 7, essais } =
   const resultats = [];
   for (const e of essais) {
     seLever();
-    const yDepart = e.depart[1] < 0.2 ? -0.3 : e.depart[1] < 1.48 ? 0.55 : 0.45;
+    const yDepart = e.depart[1] < TIMONERIE.zArriere ? TIMONERIE.plancher : COCKPIT.plancher;
     marin.placer(e.depart[0], yDepart + 0.05, e.depart[1]);
     uneImage(dt);
     const points = [[marin.position.x, marin.position.z]];
@@ -187,8 +180,8 @@ export function carteDesGestes({ marin, gestes, gesteVise, obstacle, surfacesEn 
   const dir = { x: 0, y: 0, z: 0 };
   const _o = new (gestes[0].point.constructor)();
   const _d = new (gestes[0].point.constructor)();
-  for (let z = -5.2; z <= 5.4; z += pas) {
-    for (let x = -1.6; x <= 1.6; x += pas) {
+  for (let z = -7.2; z <= 6.4; z += pas) {
+    for (let x = -2.1; x <= 2.1; x += pas) {
       for (const s of surfacesEn(x, z)) {
         for (const hYeux of [1.62, 1.1]) {
           const h = Math.min(hYeux, marin.yeuxEn(x, z, s.y));

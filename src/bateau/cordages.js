@@ -4,11 +4,12 @@
 //  - les écoutes de foc : du coin de la voile (le point d'écoute) au chariot sur le
 //    pont, puis au winch du cockpit. Celle sous le vent est tendue, l'autre pend ;
 //  - les drisses : elles hissent les voiles, descendent le long du mât et reviennent
-//    au cockpit sur le toit du rouf, puis le long de la timonerie, sur ses corniches.
+//    au cockpit sur le toit du rouf, puis par-dessus la timonerie, le long de ses bords.
 // Les morceaux droits sont des cylindres qu'on replace à chaque image (sans recréer
 // de géométrie) ; seule l'écoute qui pend est recalculée, et pas à chaque image.
 import * as THREE from 'three';
-import { zDe, uDe, hauteurPont, hauteurRouf, COCKPIT, TIMONERIE } from './forme.js';
+import { zDe, uDe, hauteurPont, hauteurRouf, COCKPIT, TIMONERIE, MAT } from './forme.js';
+import { UW_ECOUTE, UW_ENROULEUR } from './modele.js';
 
 const HAUT = new THREE.Vector3(0, 1, 0);
 
@@ -52,17 +53,21 @@ export class Cordages {
     // les drisses (fixes) : le long du mât, puis sur le toit du rouf, le long de la
     // timonerie sur sa corniche, jusqu'au winch du bout de l'hiloire
     const drisses = [];
-    const xCorniche = TIMONERIE.demiLargeur + 0.06;
+    // (les drisses descendent le mât, courent sur le rouf, montent sur le toit de la timonerie,
+    // le longent par ses bords, et redescendent au winch, contre la timonerie)
+    const xToit = TIMONERIE.demiLargeur - TIMONERIE.rentree - 0.12;
     const surLeToit = (x, z) => [x, hauteurRouf(uDe(z), Math.abs(x)) + 0.012, z];
+    const surLaTimonerie = (x, z) => [x, TIMONERIE.toit + 0.015, z];
     for (const [s, tete] of [[1, m.tete - 0.1], [-1, m.capelage - 0.3]]) {
       const pts = [
         [s * 0.03, tete, m.zMat - 0.075],
         [s * 0.03, m.piedMat + 0.25, m.zMat - 0.075],
         [s * 0.09, m.piedMat + 0.04, m.zMat + 0.12],
-        surLeToit(s * 0.4, -0.25),
-        surLeToit(s * xCorniche, TIMONERIE.zAvant + 0.05),
-        surLeToit(s * xCorniche, TIMONERIE.zArriere - 0.08),
-        [s * (COCKPIT.demiLargeur + 0.04), hauteurPont(0.302, COCKPIT.demiLargeur) + COCKPIT.hiloire + 0.1, zDe(0.302)],
+        surLeToit(s * 0.55, TIMONERIE.zAvant - 0.9),
+        surLeToit(s * xToit, TIMONERIE.zAvant - 0.15),
+        surLaTimonerie(s * xToit, TIMONERIE.zAvant + 0.4),
+        surLaTimonerie(s * xToit, TIMONERIE.zArriere - 0.1),
+        [s * (COCKPIT.demiLargeur + 0.04), hauteurPont(UW_ENROULEUR, COCKPIT.demiLargeur) + COCKPIT.hiloire + 0.1, zDe(UW_ENROULEUR)],
       ];
       const courbe = new THREE.CatmullRomCurve3(pts.map((p) => new THREE.Vector3(...p)), false, 'centripetal', 0.2);
       drisses.push(new THREE.TubeGeometry(courbe, 80, 0.005, 5, false));
@@ -74,8 +79,8 @@ export class Cordages {
     }
     bateau.groupe.add(groupe);
 
-    this.winchs = [1, -1].map((s) => new THREE.Vector3(s * (COCKPIT.demiLargeur + 0.04), hauteurPont(0.27, COCKPIT.demiLargeur) + COCKPIT.hiloire + 0.1, zDe(0.27)));
-    this.chariots = [1, -1].map((s) => new THREE.Vector3(s * 1.12, hauteurPont(0.42, 1.12) + 0.05, zDe(0.42)));
+    this.winchs = [1, -1].map((s) => new THREE.Vector3(s * (COCKPIT.demiLargeur + 0.04), hauteurPont(UW_ECOUTE, COCKPIT.demiLargeur) + COCKPIT.hiloire + 0.1, zDe(UW_ECOUTE)));
+    this.chariots = [1, -1].map((s) => new THREE.Vector3(s * 1.8, hauteurPont(0.43, 1.8) + 0.05, zDe(0.43)));
     this._a = new THREE.Vector3();
     this._b = new THREE.Vector3();
   }
@@ -84,9 +89,10 @@ export class Cordages {
     const b = this.bateau;
     const r = b.reglage;
     // écoute de grand-voile : du bout de la bôme au chariot sur le rail
-    const bout = new THREE.Vector3(0, -0.07, 3.45).applyAxisAngle(HAUT, r.angleBome).add(b.pivotBome.position);
-    const xChariot = THREE.MathUtils.clamp(Math.sin(r.angleBome) * 1.6, -0.7, 0.7);
-    const chariot = new THREE.Vector3(xChariot, hauteurPont(0.03, 0) + 0.08, zDe(0.03));
+    const bout = new THREE.Vector3(0, -0.09, MAT.bome * 0.85).applyAxisAngle(HAUT, r.angleBome).add(b.pivotBome.position);
+    const xChariot = THREE.MathUtils.clamp(Math.sin(r.angleBome) * 2.2, -0.9, 0.9);
+    // (le chariot, sur le rail du toit de la timonerie : modele.js)
+    const chariot = new THREE.Vector3(xChariot, TIMONERIE.toit + 0.1, TIMONERIE.zArriere - 0.2);
     this.brinsGV.forEach((brin, i) => {
       const e = (i - 1.5) * 0.022;
       this._a.set(bout.x + e, bout.y, bout.z);

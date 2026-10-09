@@ -9,7 +9,8 @@
 //    bordée : celui au vent se dresse et tourbillonne. Trop bordée : celui sous le vent
 //    s'affaisse et danse.
 import * as THREE from 'three';
-import { zDe, COCKPIT, ROUF, hauteurRouf } from './forme.js';
+import { COCKPIT, TIMONERIE } from './forme.js';
+import { ROUE } from './modele.js';
 
 // ---------- Les afficheurs (des écrans dessinés dans un canvas) ----------
 function ecran(taille = 256) {
@@ -189,31 +190,40 @@ export class Instruments {
     const groupe = new THREE.Group();
     groupe.name = 'instruments';
     this.groupe = groupe;
-    const zc = zDe(ROUF.uArriere) + 0.012;
+    const zc = TIMONERIE.zArriere + 0.012;
+    const yAff = COCKPIT.plancher + 1.12; // (les afficheurs, sur la paroi arrière de la timonerie)
 
     // afficheurs : écrans légèrement lumineux (on les lit aussi la nuit)
     this.ecrans = [ecran(), ecran()];
     this.materiauxEcrans = this.ecrans.map((e) => new THREE.MeshStandardMaterial({
       color: 0x000000, roughness: 0.18, metalness: 0, emissive: 0xffffff, emissiveMap: e.texture, emissiveIntensity: 0.9,
     }));
-    [[-0.52, 1.13], [-0.68, 1.13]].forEach(([x, y], i) => {
+    [[-0.62, yAff], [-0.78, yAff]].forEach(([x, y], i) => {
       const plan = new THREE.Mesh(new THREE.PlaneGeometry(0.115, 0.115), this.materiauxEcrans[i]);
       plan.position.set(x, y, zc + 0.027);
       groupe.add(plan);
     });
 
-    // le compas : un boîtier, la rose qui tourne, une ligne de foi orange
+    // le compas de route : sur le piédestal de la roue, au-dessus d'elle (le barreur le lit
+    // par-dessus la jante) — un boîtier, la rose qui tourne, une ligne de foi orange
+    const xc = 0;
+    const yc = ROUE.y + 0.24;
+    const zr = ROUE.z - 0.04;
     this.rose = new THREE.Mesh(new THREE.CircleGeometry(0.066, 48), new THREE.MeshStandardMaterial({ map: dessinerRose(), roughness: 0.4 }));
-    this.rose.position.set(0.58, 1.05, zc + 0.047);
+    this.rose.position.set(xc, yc, zr + 0.047);
     groupe.add(this.rose);
+    const boitier = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.08, 0.06, 32), bateau.materiaux.noir);
+    boitier.rotation.x = Math.PI / 2;
+    boitier.position.set(xc, yc, zr + 0.015);
+    groupe.add(boitier);
     const foi = new THREE.Mesh(new THREE.PlaneGeometry(0.006, 0.03), new THREE.MeshBasicMaterial({ color: 0xff8a1e }));
-    foi.position.set(0.58, 1.05 + 0.055, zc + 0.05);
+    foi.position.set(xc, yc + 0.055, zr + 0.05);
     groupe.add(foi);
     const verre = new THREE.Mesh(new THREE.SphereGeometry(0.07, 32, 16, 0, Math.PI * 2, 0, Math.PI / 2), new THREE.MeshStandardMaterial({
       color: 0xffffff, roughness: 0.02, metalness: 0, transparent: true, opacity: 0.12,
     }));
     verre.rotation.x = Math.PI / 2;
-    verre.position.set(0.58, 1.05, zc + 0.047);
+    verre.position.set(xc, yc, zr + 0.047);
     groupe.add(verre);
 
     // la girouette en tête de mât

@@ -136,7 +136,7 @@ function placeDeLaBete(ux, uz, V, v, ecart) {
 
 // ---------- L'eau à bord ----------
 export const EAU = {
-  planchers: 150, // litres dans la cale : au-delà, l'eau passe au-dessus des planchers
+  planchers: 150, // litres dans la cale : au-delà, on s'en inquiète (on la voit par la trappe)
   naufrage: 2000, // litres : le bateau s'enfonce, il faut l'abandonner
   seuil: 260, // litres dans le cockpit : au-delà, elle passe par-dessus le seuil de la porte
   cockpitMax: 750,
@@ -395,7 +395,7 @@ export class Nuit {
     this.stats.caleMax = Math.max(this.stats.caleMax, e.cale);
     ctx.physique.eauCale = e.cale;
     ctx.physique.eauCockpit = e.cockpit;
-    for (const [seuil, texte] of [[EAU.planchers, 'De l\'eau au-dessus des planchers.'], [700, 'L\'eau monte à l\'intérieur.'], [1300, 'Le bateau s\'alourdit dangereusement.']]) {
+    for (const [seuil, texte] of [[EAU.planchers, 'De l\'eau dans la cale.'], [700, 'L\'eau monte dans la cale.'], [1300, 'Le bateau s\'alourdit dangereusement.']]) {
       if (e.cale > seuil && !this.alertesEau.has(seuil)) {
         this.alertesEau.add(seuil);
         this.ecrire(texte);

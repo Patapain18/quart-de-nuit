@@ -8,17 +8,18 @@
 // chose à moins de 15 cm de ce point ? ») ne regarde que les triangles des boîtes voisines :
 // quelques dizaines au lieu de 40 000.
 //
-// Les pièces qui bougent (la bôme, la barre, la porte de la timonerie) n'y sont pas : le
-// marin les traite à part (marin.js, pont.js), là où elles sont à l'instant.
+// Les pièces qui bougent (la bôme, la porte de la timonerie, la trappe de la cale, les
+// volets) n'y sont pas : le marin les traite à part (marin.js, pont.js), là où elles sont à
+// l'instant.
 
 // Ce qui ne compte pas : les voiles, les câbles fins, l'eau, les cordages, et les pièces mobiles
 const IGNORER = new Set([
   'grand-voile', 'foc', 'haubans', 'filieres', 'lignes-de-vie', 'cordages', 'eau-cockpit', 'eau-cabine',
-  'pivot-bome', 'pivot-safran', 'voile-ferlee', 'porte-timonerie', 'essuie-glace', 'pompe',
+  'pivot-bome', 'pivot-safran', 'voile-ferlee', 'porte-timonerie', 'essuie-glace', 'pompe', 'trappe-cale', 'volets',
 ]);
 const IGNORER_TOUJOURS = new Set(['grand-voile', 'foc', 'haubans', 'filieres', 'lignes-de-vie', 'cordages', 'eau-cockpit', 'eau-cabine']);
-const Y_MIN = -0.7; // (sous le plancher de la cabine et au-dessus de la tête : inutile)
-const Y_MAX = 3.4;
+const Y_MIN = -0.7; // (sous le fond de la cale et au-dessus de la tête, debout sur le rouf : inutile)
+const Y_MAX = 4.2;
 
 // Distance au carré d'un point à un triangle (Ericson, « Real-Time Collision Detection », 5.1.5)
 function distance2(px, py, pz, t, i) {

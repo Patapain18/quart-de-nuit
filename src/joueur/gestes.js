@@ -10,16 +10,22 @@
 // Une action est soit instantanée (un appui), soit « maintenue » (tant qu'on tient la
 // touche : pomper, rouler le foc), soit « longue » (il faut tenir un certain temps pour
 // qu'elle aboutisse : passer une nouvelle écoute de foc demande 6 secondes, tout à l'avant).
+// (« dedans » : un geste qu'on ne fait que de l'intérieur de la timonerie)
 import { Vector3 } from 'three';
 import { COCKPIT, TIMONERIE, zDe, hauteurPont, hauteurLivet } from '../bateau/forme.js';
 import { SIEGE, surPupitre } from '../bateau/interieur-timonerie.js';
+import { UW_ENROULEUR } from '../bateau/modele.js';
 
-// jeu : l'objet qui sait agir (voir quart.js) ; interieur : pour placer radio et tableau
+const NOMS_COTES = { avant: 'à l\'avant', tribord: 'à tribord', babord: 'à bâbord', arriere: 'à l\'arrière' };
+
+// jeu : l'objet qui sait agir (voir quart.js) ; interieur : pour placer la radio, le
+// tableau, la pompe, la trappe et les volets
 export function creerGestes(jeu, interieur) {
   return [
     {
+      // la bosse d'enrouleur du foc, sur son winch, au bout avant de l'hiloire tribord
       id: 'enrouleur',
-      point: new Vector3(COCKPIT.demiLargeur + 0.04, hauteurPont(0.302, COCKPIT.demiLargeur) + COCKPIT.hiloire + 0.12, zDe(0.302)),
+      point: new Vector3(COCKPIT.demiLargeur + 0.04, hauteurPont(UW_ENROULEUR, COCKPIT.demiLargeur) + COCKPIT.hiloire + 0.12, zDe(UW_ENROULEUR)),
       rayon: 0.2,
       soi: ['accastillage', 'winchs'],
       titre: () => 'Bosse d\'enrouleur (le foc)',
@@ -46,8 +52,8 @@ export function creerGestes(jeu, interieur) {
     {
       // la porte coulissante de la timonerie (on l'atteint des deux côtés)
       id: 'descente',
-      point: new Vector3(0, 1.35, TIMONERIE.zArriere),
-      rayon: 0.34,
+      point: new Vector3(0, TIMONERIE.plancher + 0.85, TIMONERIE.zArriere),
+      rayon: 0.4,
       soi: ['timonerie', 'lambris-timonerie', 'timonerie-mains-courantes', 'timonerie-joints'],
       titre: () => 'La porte de la timonerie',
       principal: { texte: () => (jeu.bateau.descenteOuverte ? 'fermer la porte' : 'ouvrir la porte'), faire: () => jeu.basculerDescente() },
@@ -55,7 +61,7 @@ export function creerGestes(jeu, interieur) {
     {
       // le poste de pilotage : on s'assied, et l'on règle le cap du pilote automatique
       id: 'poste',
-      point: surPupitre(0.08, 0.14).position,
+      point: surPupitre(0, 0.2).position,
       rayon: 0.13,
       soi: ['noir', 'sans-nom', 'instruments'],
       titre: () => 'Le poste de pilotage : la commande du pilote',
@@ -64,19 +70,44 @@ export function creerGestes(jeu, interieur) {
     {
       id: 'siege',
       point: new Vector3(SIEGE.x, SIEGE.assise + 0.1, SIEGE.z),
-      rayon: 0.25,
+      rayon: 0.3,
       soi: ['coussins-timonerie', 'inox'],
       titre: () => 'Le siège de quart',
       principal: { texte: 't\'asseoir au poste (barrer au pilote)', faire: () => jeu.allerAuPoste() },
     },
     {
+      // la pompe de cale à main, sur la paroi bâbord de la timonerie (on tient son levier)
       id: 'pompe',
-      point: new Vector3(-COCKPIT.demiLargeurPuits, COCKPIT.plancher + 0.25, zDe(0.12)),
-      rayon: 0.25,
-      soi: ['accastillage'],
-      titre: () => 'Pompe de cale',
+      point: interieur.positionPompe.clone(),
+      rayon: 0.28,
+      dedans: true,
+      soi: ['pompe-corps', 'noir', 'lambris-timonerie'],
+      titre: () => 'Pompe de cale (à main)',
       principal: { texte: 'pomper', maintenir: true, faire: (dt) => jeu.pomper(dt) },
     },
+    {
+      // la trappe de la cale, dans le plancher : on la soulève pour voir l'eau
+      id: 'trappe',
+      point: interieur.positionTrappe.clone(),
+      rayon: 0.35,
+      dedans: true,
+      soi: ['plancher-timonerie', 'lambris-timonerie'],
+      titre: () => 'La trappe de la cale',
+      principal: { texte: () => (interieur.trappeOuverte ? 'refermer la trappe' : 'ouvrir la trappe'), faire: () => jeu.basculerTrappe() },
+    },
+    // les volets de tempête : un bouton par côté, sur la commande du plafond
+    ...Object.entries(interieur.boutonsVolets).map(([cote, point]) => ({
+      id: `volets-${cote}`,
+      point: point.clone(),
+      rayon: 0.024,
+      dedans: true,
+      soi: ['commande-volets', 'boiseries'],
+      titre: () => `Les volets de tempête ${NOMS_COTES[cote]}`,
+      principal: {
+        texte: () => (interieur.voletsFermes(cote) ? 'ouvrir les volets' : 'fermer les volets'),
+        faire: () => jeu.basculerVolets(cote),
+      },
+    })),
     {
       id: 'radio',
       point: interieur.positionRadio.clone(),

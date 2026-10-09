@@ -40,14 +40,15 @@ dans la grandeur du jeu ». Sa nouvelle direction, et ce qu'il a choisi parmi me
 
 ### La boucle
 
-Tu es dans la timonerie. Dehors, la nuit noire : tu ne vois la mer qu'à ta frontale et dans les
-éclairs. Les instruments sont tes caméras : le radar (ce qui arrive), le baromètre (le pire qui
-approche), le sondeur (ce qu'il y a dessous…), et bientôt les jauges de la cale et de la
-batterie. Les menaces arrivent, chacune avec ses signes et sa parade :
+Tu es dans la timonerie, assis au poste. Dehors, la nuit noire : tu ne vois la mer qu'à ta
+frontale et dans les éclairs. Les instruments sont tes caméras : le radar (ce qui arrive), le
+baromètre (le pire qui approche), le sondeur (ce qu'il y a dessous…), la trappe de la cale (l'eau
+qui monte), et bientôt la jauge de la batterie. Les menaces arrivent, chacune avec ses signes et
+sa parade :
 
 | La menace | Ses signes | La parade |
 |---|---|---|
-| L'eau qui monte (les fuites s'aggravent d'heure en heure, chaque vague en apporte) | l'alarme de cale, l'eau sur le plancher | pomper |
+| L'eau qui monte (les fuites s'aggravent d'heure en heure, chaque vague en apporte) | l'eau noire qu'on voit monter dans la cale, par la trappe, vers les batteries | pomper (la pompe à main, à côté de la trappe) |
 | Le pilote qui lâche (de plus en plus souvent) | son alarme, le bateau qui se met en travers | réarmer son disjoncteur au tableau |
 | Les déferlantes | leur grondement, de leur côté ; l'éclair qui les montre | fermer la porte ; se tenir (Maj) dehors |
 | Le foc qui bat (son écoute casse) | son claquement, le bateau qui part | sortir le rouler, harnais accroché |
@@ -56,11 +57,12 @@ batterie. Les menaces arrivent, chacune avec ses signes et sa parade :
 | La foudre | les éclairs, le tonnerre de plus en plus proche, le feu de Saint-Elme | réarmer ce qui a sauté |
 | L'inexpliqué | un écho qui suit, des pas sur le pont, une voix sur le 16, des coups sous la coque… | rien : ce n'est jamais confirmé |
 
-À venir (étape 3) : **la batterie**, comme le courant de FNAF — la pompe électrique, le radar,
-le projecteur, le pilote la vident ; le moteur la recharge mais couvre tous les bruits ; quand
-elle meurt, tout s'éteint — et **les volets des vitres**, comme les portes de FNAF : on les ferme
-quand une vague arrive de ce côté, sinon la vitre éclate ; mais volet fermé, on ne voit plus
-rien de ce côté.
+**Les volets de tempête** (étape 2) sont les portes de FNAF : on les ferme côté par côté, depuis
+le siège, quand une vague arrive de ce côté-là… mais volet fermé, on ne voit plus rien de ce
+côté. À venir (étape 3) : ce qui fait éclater une vitre sans volet, et **la batterie**, comme le
+courant de FNAF — la pompe électrique, les volets, le radar, le projecteur, le pilote la vident ;
+le moteur la recharge mais couvre tous les bruits ; si l'eau de la cale noie les batteries, ou
+quand elle meurt, tout s'éteint.
 
 ### Les heures
 
@@ -81,7 +83,8 @@ La nuit est gardée au début de chaque heure : après un naufrage, on reprend �
 
 Au clavier (français) et à la souris. La souris tourne la tête.
 - **Assis au poste** (au début de la nuit) : E agit sur ce que tu regardes et qui est à portée
-  de main (le radar, le traceur, la VHF, le tableau électrique) ; Espace pour se lever.
+  de main (le radar, le traceur, la VHF et la commande des volets au plafond, le tableau
+  électrique) ; Espace pour se lever.
 - **À pied** : Z Q S D pour marcher, E pour agir (Maj + E : l'action inverse), Maj pour se
   tenir, C pour s'accroupir, X le harnais (dehors).
 - **Partout** : F la lampe frontale, L le carnet de bord, H pour cacher l'aide, Échap la pause.
@@ -94,7 +97,7 @@ ligne reste l'ancien tant que le nouveau n'est pas jouable.
 1. ✅ **La nuit seule** — le jeu commence directement à minuit ; plus de journée, de Jos, de
    barre ni de navigation ; le pilote tient le cap ; six heures de deux minutes, de plus en plus
    dures ; plus de rideaux de pluie.
-2. **Le bateau de 14 m** — plus grand, sans carré, une grande timonerie vitrée : les volets des
+2. ✅ **Le bateau de 14 m** — plus grand, sans carré, une grande timonerie vitrée : les volets des
    vitres, la porte, la console, le tableau, la pompe à main, une trappe vers la cale.
 3. **Les systèmes du bord** — la batterie et ce qui la vide, le moteur qui la recharge mais couvre
    les bruits, l'eau qui monte et les deux pompes, le pilote qui chauffe et disjoncte, les volets
@@ -151,6 +154,65 @@ l'aube lui aussi : la nuit n'est pas encore assez dangereuse** — c'est le trav
 **À voir** : dans le noir, on ne voit pas la trombe ; à l'éclair, elle apparaît d'un coup, avec
 son nuage-mur, par la vitre de côté. `docs/nuit-seule-*.jpg`.
 
+### Étape 2 : le bateau de 14 m ✅ (10 octobre 2026)
+
+**Le bateau** (`bateau/forme.js`) : un voilier de 14 m (un « 46 pieds »), 4,30 m de large, 13,4 t.
+Ce qui avait été mesuré à la main sur l'ancien 9,40 m (la quille, le safran, les centres de
+poussée des voiles, les rayons de giration…) est mis à sa taille par trois rapports (`ECHELLE` :
+1,49 en longueur, 1,34 en largeur, 1,38 en hauteur) ; la masse vient de son déplacement. Plus de
+barre franche : une roue sur son piédestal, au milieu du cockpit (le pilote la fait tourner). Un
+mât de 17 m, deux étages de barres de flèche, 105 m² de toile.
+
+**La timonerie** (`bateau/timonerie.js`, `bateau/interieur-timonerie.js`) : 3 m de long sur 2,7 m
+de large, 2,15 m sous le toit ; son plancher est 22 cm au-dessus de celui du cockpit. Deux grandes
+fenêtres de chaque côté (1,15 m), un pare-brise de trois vitres (celle du milieu fait 84 cm : on
+l'a devant soi, assis), deux petites fenêtres à l'arrière, de part et d'autre de la porte. Dedans :
+- **la console** sous le pare-brise : sur son pupitre incliné, le radar (le plus grand écran), le
+  compas (sa rose s'éclaire en rouge la nuit), la commande du pilote, le traceur, le tableau
+  électrique ; au plafond, devant, la VHF, les répétiteurs du vent et de la vitesse, et **la
+  commande des volets** (un petit plan de la timonerie, un bouton par côté, son voyant : vert
+  ouvert, rouge fermé, orange qui clignote quand il bouge). Tout est à portée de main du siège ;
+- **le siège de quart**, haut, au milieu ; derrière lui, à tribord, la banquette, le baromètre et
+  la pendule au-dessus ; le ciré et le gilet pendus près de la porte ;
+- à bâbord, **la pompe de cale à main** sur la paroi (son levier monte et descend le long d'elle),
+  et à côté, **la trappe de la cale** dans le plancher ; tout à l'avant, **la petite porte basse de
+  la cabine avant**, peinte en vert sombre, fermée (pour plus tard) ;
+- **les volets de tempête** : un par vitre (sauf celles de la porte), des lames d'aluminium qui
+  descendent de leur coffre en 2,5 s ; fermés, ils coupent la lumière du dehors (et la vue) ;
+- deux plafonniers (blanc ou rouge) et des mains courantes au plafond.
+
+**La cale** (`bateau/interieur.js`), sous le plancher : le fond de la coque peint en gris, les
+varangues et les écrous des boulons de quille, la crépine de la pompe et son tuyau, **les batteries
+sur leur étagère, juste sous la trappe**, et une baladeuse qui s'allume quand on soulève la trappe.
+L'eau embarquée y monte (`bateau/eau-a-bord.js`) : noire, elle clapote quand le bateau roule ; au
+naufrage, elle arrive au plancher et passe dessus.
+
+**Le reste** : le plan où l'on marche (`joueur/pont.js` : plus de carré ni d'escalier ; la trappe
+ouverte est un trou ; on monte d'au plus 55 cm d'un pas — le toit du rouf est 50 cm au-dessus du
+passavant) ; les gestes (la pompe, la trappe, les quatre boutons des volets) ; les hublots de la
+cabine avant ont leurs rideaux tirés ; l'écume de la coque s'efface derrière la poupe.
+
+**Mesuré** : le bateau flotte et se redresse, 6,6 nœuds sous voiles dans 12 nœuds de vent
+(`test-physique`). Il est presque trois fois plus lourd et résiste cinq fois plus au roulis :
+avec les déferlantes de l'ancien, de travers, il ne se couchait presque plus (un coup à plus de
+60° en trois mers) ; elles poussent maintenant 1,75 fois plus fort. La grille qui lit la mer sous
+la coque couvre aussi toute sa longueur (elle s'arrêtait 1,8 m avant l'étrave et 1,6 m avant le
+tableau : l'avant et l'arrière flottaient sur une eau fausse, ce qui secouait le bateau au
+hasard). Résultat (`test-tempete`, 15 grosses déferlantes en trois mers) : de travers, 4 le
+couchent au-delà de 60° ; en fuite à deux ris, 2 ; sous un bout de foc (la toile de la nuit),
+aucune — se mettre en travers (le pilote qui lâche) est le danger. L'écart avec la fuite à deux
+ris est plus petit qu'avec l'ancien bateau : le test compare maintenant le travers à la toile de
+la nuit (au moins 3 coups de plus) et demande seulement « pire » face à la fuite à deux ris. Le marin automatique fait le tour du bord et manie
+chaque chose (15 tournées sur 15), on entre et on sort par la porte de partout (24 sur 24 ; on
+contourne la roue, d'un mètre de large), le plan du pont passe ses 27 vérifications. La nuit des
+trois veilleurs (`test-nuit`) : l'attentif voit l'aube avec 150 L d'eau à bord au plus, le
+distrait aussi (1 185 L), et **l'absent, qui ne fait rien, coule à 5 h 19** (2 000 L) — avec
+l'ancien bateau, même lui voyait l'aube. La vague scélérate se comporte comme avant
+(`test-scelerate` : droit derrière ça passe, de travers ou par la hanche elle couche le bateau).
+
+**À voir** : `docs/bateau-14m-*.jpg` (la timonerie, ses volets fermés, la cale par la trappe et du
+dedans, le bateau de dehors, la nuit, la vue au poste).
+
 ## 4. Le moteur (ce qu'on garde de l'ancien jeu)
 
 Tout ce qui fait l'image, le son et la physique reste, et sert la nouvelle nuit. Le détail de
@@ -166,8 +228,9 @@ chacun, étape par étape, est dans l'ancien cahier (étiquette `v1-journee-et-n
   d'orage, le tonnerre arrive à trois secondes par kilomètre, le feu de Saint-Elme, le mât qui
   attire la foudre.
 - **La trombe** (`src/rendu/trombe.js`) : la bête, en volume.
-- **Le voilier** (`src/bateau/`) et **sa physique** (`src/physique/voilier.js`) ; le marin qui
-  marche à bord (`src/joueur/`), les gestes (E), le radar, le traceur, le tableau électrique.
+- **Le voilier** (`src/bateau/`, un 14 m à timonerie depuis l'étape 2) et **sa physique**
+  (`src/physique/voilier.js`) ; le marin qui marche à bord (`src/joueur/`), les gestes (E), le
+  radar, le traceur, le tableau électrique.
 - **La peur** (`src/quart/peur.js`, `src/rendu/apparitions.js`) : ce qu'on voit du coin de l'œil
   et qui disparaît quand on le regarde.
 - **Le son** (`src/son/audio.js`) : de vrais enregistrements du domaine public, mélangés en direct.

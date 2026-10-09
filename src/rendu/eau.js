@@ -257,6 +257,8 @@ vec4 ecumeDuBateau(vec3 pMonde) {
     float proue = smoothstep(0.6, 0.97, u);
     float largeur = 0.3 + (0.5 + 1.2 * proue) * v;
     float bande = (1.0 - smoothstep(0.0, largeur, d)) * smoothstep(-0.6, 0.0, d + 0.3);
+    // (derrière le tableau arrière et devant l'étrave, elle s'efface : là, c'est le sillage)
+    bande *= smoothstep(-0.1, 0.0, u) * (1.0 - smoothstep(1.0, 1.08, u));
     force = saturer(bande * (0.25 + 0.9 * v) * (0.7 + 0.8 * proue));
     bulles = force;
     // des traînées qui filent vers l'arrière à la vitesse du bateau

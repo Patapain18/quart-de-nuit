@@ -15,7 +15,7 @@
 // Les réglages : la portée (0,75 ; 1,5 ; 3 ; 6 milles), le filtre de mer. (Le gain est
 // réglé tout seul.)
 import * as THREE from 'three';
-import { zDe, ROUF } from './forme.js';
+import { COCKPIT, TIMONERIE } from './forme.js';
 import { poserSurPupitre } from './interieur-timonerie.js';
 
 export const PORTEES = [0.75, 1.5, 3, 6]; // milles nautiques
@@ -66,23 +66,24 @@ export class Radar {
       color: 0x000000, roughness: 0.15, metalness: 0, emissive: 0xffffff, emissiveMap: this.texture, emissiveIntensity: 1,
     });
     const noir = bateau.materiaux.noir;
-    // l'écran principal : sur le pupitre de la console de la timonerie, à gauche du traceur,
-    // tourné vers le siège de quart
+    // l'écran principal : sur le pupitre de la console de la timonerie, à gauche du compas,
+    // tourné vers le siège de quart (le plus grand des écrans : on le regarde toute la nuit)
     const principal = new THREE.Group();
-    const boitier = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.2, 0.04), noir);
-    const vitre = new THREE.Mesh(new THREE.PlaneGeometry(0.165, 0.165), this.materiau);
-    vitre.position.z = 0.0205;
+    const boitier = new THREE.Mesh(new THREE.BoxGeometry(0.26, 0.26, 0.045), noir);
+    const vitre = new THREE.Mesh(new THREE.PlaneGeometry(0.22, 0.22), this.materiau);
+    vitre.position.z = 0.023;
     principal.add(boitier, vitre);
-    poserSurPupitre(principal, 0.1, 0.6, 0.02);
+    poserSurPupitre(principal, -0.3, 0.55, 0.022);
     interieur.groupe.add(principal);
     this.positionPrincipal = principal.position.clone();
-    // le répétiteur du cockpit, sur la cloison, au-dessus du compas
+    // le répétiteur du cockpit, sur la paroi arrière de la timonerie
     const repetiteur = new THREE.Group();
     const boitier2 = new THREE.Mesh(new THREE.BoxGeometry(0.19, 0.18, 0.03), noir);
     const vitre2 = new THREE.Mesh(new THREE.PlaneGeometry(0.15, 0.15), this.materiau);
     vitre2.position.z = 0.0155;
     repetiteur.add(boitier2, vitre2);
-    repetiteur.position.set(0.58, 1.255, zDe(ROUF.uArriere) + 0.03);
+    // (sur la paroi arrière de la timonerie, à tribord de la porte, à hauteur des yeux du barreur)
+    repetiteur.position.set(0.78, COCKPIT.plancher + 1.32, TIMONERIE.zArriere + 0.03);
     bateau.groupe.add(repetiteur);
     this.positionRepetiteur = repetiteur.position.clone();
     this.ageEcran = 1;

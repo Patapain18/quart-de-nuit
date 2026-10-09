@@ -20,7 +20,7 @@ console.log('1. Le bateau');
   const b = new PhysiqueVoilier();
   console.log(`  ${b.volumes.length} volumes, déplacement ${b.deplacement.toFixed(2)} m³, masse ${Math.round(b.masse)} kg`);
   console.log(`  centre de carène y ${b.centreCarene.y.toFixed(2)} z ${b.centreCarene.z.toFixed(2)} · centre de gravité y ${b.centreGravite.y.toFixed(2)}`);
-  verifier(b.masse > 3600 && b.masse < 5500, 'une masse de croiseur de 9 m (3,6 à 5,5 t)');
+  verifier(b.masse > 10000 && b.masse < 17000, 'une masse de voilier de 14 m à timonerie (10 à 17 t)');
 }
 
 console.log('2. Au repos sur une mer plate');
@@ -66,7 +66,8 @@ console.log('4. Sous voiles : 12 nœuds de vent, à 60° du vent');
   b.ecouteGV = 0.32;
   b.ecouteFoc = 0.3;
   const w = vent(12, 300); // cap 0, vent venant de 300° (bâbord, 60° de l'avant)
-  for (let i = 0; i < 60 * 40; i++) {
+  // (un bateau de 13 t met près de deux minutes à prendre sa vitesse)
+  for (let i = 0; i < 60 * 110; i++) {
     // pilote automatique simple : garder le cap 0
     const erreur = ((b.mesures.cap + 540) % 360) - 180;
     b.barre = Math.max(-0.5, Math.min(0.5, -erreur * 0.03 + b.rotation.y * 1.5));
@@ -74,7 +75,7 @@ console.log('4. Sous voiles : 12 nœuds de vent, à 60° du vent');
   }
   const m = b.mesures;
   console.log(`  vitesse ${m.vitesse.toFixed(2)} nds, gîte ${m.gite.toFixed(1)}°, dérive ${m.derive.toFixed(1)}°, vent apparent ${m.ventApparent.toFixed(1)} nds à ${m.angleVentApparent.toFixed(0)}°, bôme ${(b.angleBome * 57.3).toFixed(0)}°, incidence GV ${m.incidenceGV.toFixed(1)}° foc ${m.incidenceFoc.toFixed(1)}°, barre ${(b.barre * 57.3).toFixed(1)}°`);
-  verifier(m.vitesse > 4 && m.vitesse < 7.5, 'une vitesse plausible (4 à 7,5 nœuds)');
+  verifier(m.vitesse > 5 && m.vitesse < 8.5, 'une vitesse plausible pour un 14 m (5 à 8,5 nœuds)');
   verifier(Math.abs(m.gite) > 5 && Math.abs(m.gite) < 25, 'il gîte sous le vent (5 à 25°)');
   verifier(m.gite > 0, 'il penche sur tribord (le vent vient de bâbord)');
 }

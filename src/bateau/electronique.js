@@ -56,13 +56,14 @@ export class Electronique {
     const groupe = interieur.groupe;
     this.traceur = ecran(512, 384);
     this.pilote = ecran(256, 128);
-    const tr = poserEcran(groupe, noir, this.traceur, 0.2, 0.15, 0.37, 0.62);
-    const pi = poserEcran(groupe, noir, this.pilote, 0.11, 0.055, 0.08, 0.14);
+    // (le traceur à droite du compas, la commande du pilote en bas, au milieu)
+    const tr = poserEcran(groupe, noir, this.traceur, 0.24, 0.18, 0.27, 0.56);
+    const pi = poserEcran(groupe, noir, this.pilote, 0.11, 0.055, 0, 0.2);
     this.materiaux = [tr.materiau, pi.materiau];
     this.positionTraceur = tr.groupe.position.clone();
     this.positionPilote = pi.groupe.position.clone();
-    // les répétiteurs : sur la console du plafond, côte à côte
-    for (const [k, x] of [[0, 0.1], [1, 0.3]]) {
+    // les répétiteurs : sur la console du plafond, côte à côte (à tribord de la VHF)
+    for (const [k, x] of [[0, 0.1], [1, 0.28]]) {
       const g = new THREE.Group();
       g.add(new THREE.Mesh(new THREE.BoxGeometry(0.15, 0.15, 0.03), noir));
       const dalle = new THREE.Mesh(new THREE.PlaneGeometry(0.13, 0.13), instruments.materiauxEcrans[k]);
@@ -73,9 +74,12 @@ export class Electronique {
       g.quaternion.copy(quaternion);
       groupe.add(g);
     }
-    // le compas du pupitre : sa rose (la même que celle du cockpit) tourne avec le cap
-    this.rose = new THREE.Mesh(new THREE.CircleGeometry(0.047, 40), instruments.rose.material);
-    poserSurPupitre(this.rose, 0.45, 0.17, 0.03);
+    // le compas du pupitre : sa rose (la même que celle du cockpit) tourne avec le cap ; la
+    // nuit, elle est éclairée par en dessous, en rouge (comme les vrais compas de route)
+    const carte = instruments.rose.material.map;
+    this.materiauRose = new THREE.MeshStandardMaterial({ map: carte, roughness: 0.4, emissive: 0xff4422, emissiveMap: carte, emissiveIntensity: 0 });
+    this.rose = new THREE.Mesh(new THREE.CircleGeometry(0.047, 40), this.materiauRose);
+    poserSurPupitre(this.rose, -0.02, 0.64, 0.03);
     this.roseQuaternion = this.rose.quaternion.clone();
     groupe.add(this.rose);
     this.trajet = []; // les positions passées (une toutes les 10 s)
@@ -105,6 +109,7 @@ export class Electronique {
     }
     // (l'éclat des écrans : plus faible la nuit ; il hésite quand le courant hésite)
     for (const m of this.materiaux) m.emissiveIntensity = (1 - 0.78 * etat.nuit) * (etat.vacille ?? 1);
+    this.materiauRose.emissiveIntensity = 0.35 * etat.nuit * (etat.vacille ?? 1);
     if (this.age < 0.25) return;
     this.age = 0;
     this.dessinerTraceur(etat);

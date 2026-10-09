@@ -4,23 +4,26 @@
 // Les mesures sont dans forme.js (TIMONERIE). Les parois prolongent les côtés du rouf vers
 // le haut ; chaque surface est une grille dont certaines cases sont laissées vides : ce sont
 // les fenêtres, que bouchent des vitres posées juste derrière. L'intérieur (le plancher, la
-// console, le siège…) est dans interieur.js.
+// console, le siège, les volets de tempête…) est dans interieur-timonerie.js.
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import {
-  TIMONERIE, ROUF, DESCENTE_ROUF, COCKPIT, U_TIMONERIE, uDe, hauteurRouf, bordInterieur, piedTimonerie,
+  TIMONERIE, ROUF, DESCENTE_ROUF, COCKPIT, U_TIMONERIE, uDe, hauteurRouf, hauteurPont, bordInterieur, piedTimonerie,
   xParoiTimonerie, toitTimonerie, zPareBrise,
 } from './forme.js';
 
 const T = TIMONERIE;
 const Z_AR = T.zArriere;
-const Y_VITRE_BAS = 1.46; // le bas des vitres (un peu au-dessus du pied des parois)
+const Y_VITRE_BAS = 1.98; // le bas des vitres (20 cm au-dessus du pied des parois)
 const Y_VITRE_HAUT = T.vitreHaut;
 // les fenêtres des côtés, en fraction de la longueur de la paroi (0 : à l'arrière, 1 : au
-// pare-brise) : la fenêtre arrière, un montant, la fenêtre avant
+// pare-brise) : la fenêtre arrière, un montant, la fenêtre avant (chacune 1,15 m de long)
 const FENETRES_COTE = [[0.07, 0.47], [0.53, 0.93]];
-// le pare-brise : trois vitres, le montant central entre les deux du milieu
-const PARE_BRISE = { milieu: 0.29, montant: 0.06, bord: 0.06 };
+// le pare-brise : trois vitres, une large au milieu (84 cm : celle que l'on a devant soi,
+// assis au poste) et une de chaque côté, séparées par deux montants de 7 cm
+const PARE_BRISE = { milieu: 0.42, montant: 0.07, bord: 0.06 };
+// (le pare-brise penche et ses côtés rentrent un peu : on mesure ses vitres à mi-hauteur)
+const Y_MESURE_PB = (Y_VITRE_BAS + Y_VITRE_HAUT) / 2;
 
 // Une grille de points (colonnes i, rangs j) ; garder(i, j) : la case existe-t-elle ?
 function grilleTrouee(ni, nj, point, garder = () => true) {
@@ -70,7 +73,7 @@ function geometrieCotes() {
   const estFenetre = (a0, a1) => FENETRES_COTE.some(([f0, f1]) => a0 >= f0 - 1e-6 && a1 <= f1 + 1e-6);
   return [1, -1].map((s) => grilleTrouee(colonnes.length - 1, 3, (i, j) => {
     const a = colonnes[i];
-    const z = Z_AR + (zPareBrise(1.4) - Z_AR) * a;
+    const z = Z_AR + (zPareBrise(Y_VITRE_BAS) - Z_AR) * a;
     const y = RANGS(piedTimonerie(uDe(z)).y)[j];
     return pointParoi(s, a, y);
   }, (i, j) => !(j === 1 && estFenetre(colonnes[i], colonnes[i + 1]))));
@@ -93,8 +96,13 @@ function bornesPareBrise(y) {
   const b = 1 - PARE_BRISE.bord / w;
   return [-1, -b, -mt, -m, m, mt, b, 1];
 }
+// les trois vitres du pare-brise : leurs bords [c0, c1], de bâbord à tribord
+function vitresPareBrise() {
+  const b = bornesPareBrise(Y_MESURE_PB);
+  return [[b[1], b[2]], [b[3], b[4]], [b[5], b[6]]];
+}
 function geometriePareBrise() {
-  const bornes = bornesPareBrise(1.9);
+  const bornes = bornesPareBrise(Y_MESURE_PB);
   const colonnes = decouper(bornes, 2);
   const estVitre = (c0, c1) => [[bornes[1], bornes[2]], [bornes[3], bornes[4]], [bornes[5], bornes[6]]]
     .some(([v0, v1]) => c0 >= v0 - 1e-6 && c1 <= v1 + 1e-6);
@@ -141,7 +149,8 @@ function geometrieToit() {
 // La paroi arrière (face au cockpit), du plancher du cockpit au toit : en bas, la cloison
 // du cockpit sur toute la largeur du rouf ; au-dessus du toit du rouf, la timonerie. La
 // porte au milieu, une petite fenêtre de chaque côté
-const FENETRE_ARRIERE = { x0: 0.35, x1: 0.52, y0: 1.56, y1: 2.18 };
+// (au-dessus des afficheurs et du répétiteur du radar, que l'on regarde depuis le cockpit)
+const FENETRE_ARRIERE = { x0: 0.6, x1: 1.05, y0: 2.3, y1: 2.85 };
 function geometrieParoiArriere() {
   const u = ROUF.uArriere;
   const e = bordInterieur(u); // (le pied du côté du rouf, sur le pont)
@@ -150,7 +159,7 @@ function geometrieParoiArriere() {
   const forme = new THREE.Shape();
   forme.moveTo(-e, COCKPIT.plancher);
   forme.lineTo(e, COCKPIT.plancher);
-  forme.lineTo(e, 0.95);
+  forme.lineTo(e, hauteurPont(u, e));
   forme.lineTo(xR, hauteurRouf(u, xR));
   forme.lineTo(w, hauteurRouf(u, w));
   forme.lineTo(xParoiTimonerie(u, T.toit), T.toit);
@@ -161,7 +170,7 @@ function geometrieParoiArriere() {
   forme.lineTo(-xParoiTimonerie(u, T.toit), T.toit);
   forme.lineTo(-w, hauteurRouf(u, w));
   forme.lineTo(-xR, hauteurRouf(u, xR));
-  forme.lineTo(-e, 0.95);
+  forme.lineTo(-e, hauteurPont(u, e));
   forme.lineTo(-e, COCKPIT.plancher);
   const trou = (x0, x1, y0, y1) => {
     const t = new THREE.Path();
@@ -236,8 +245,7 @@ function geometrieVitres() {
     }
   }
   // le pare-brise
-  const b = bornesPareBrise(1.9);
-  for (const [c0, c1] of [[b[1], b[2]], [b[3], b[4]], [b[5], b[6]]]) {
+  for (const [c0, c1] of vitresPareBrise()) {
     vitres.push(grilleTrouee(6, 4, (i, j) => {
       const c = c0 + ((c1 - c0) * i) / 6;
       const y = Y_VITRE_BAS + 0.04 + ((Y_VITRE_HAUT - Y_VITRE_BAS - 0.04) * j) / 4;
@@ -278,8 +286,7 @@ function geometrieJoints() {
       bord(pts);
     }
   }
-  const b = bornesPareBrise(1.9);
-  for (const [c0, c1] of [[b[1], b[2]], [b[3], b[4]], [b[5], b[6]]]) {
+  for (const [c0, c1] of vitresPareBrise()) {
     const yb = Y_VITRE_BAS + 0.04;
     bord([pointPareBrise(c0, yb), pointPareBrise(c1, yb), pointPareBrise(c1, Y_VITRE_HAUT), pointPareBrise(c0, Y_VITRE_HAUT), pointPareBrise(c0, yb)]);
   }
@@ -308,34 +315,43 @@ function geometrieMainsCourantes() {
     }
     // à côté de la porte, dehors : une poignée verticale
     const x = s * (T.porte.demiLargeur + 0.07);
-    tube([[x, 1.05, Z_AR + 0.06], [x, 1.1, Z_AR + 0.07], [x, 1.85, Z_AR + 0.07], [x, 1.9, Z_AR + 0.06]], 0.015);
+    const y0 = COCKPIT.plancher + 0.35;
+    tube([[x, y0, Z_AR + 0.06], [x, y0 + 0.05, Z_AR + 0.07], [x, 2.45, Z_AR + 0.07], [x, 2.5, Z_AR + 0.06]], 0.015);
   }
   return mergeGeometries(tubes);
 }
 
-// La porte : deux battants (gelcoat, une vitre en haut), qui coulissent à l'intérieur,
-// contre la paroi, chacun de son côté. Le groupe garde ses deux battants : gauche, droite.
-function creerPorte(materiaux) {
+// Un battant de la porte, vu de face (dans son repère : x vers la droite, y vers le haut) :
+// sa largeur, sa hauteur, et sa vitre en haut
+export function formeBattant() {
   const P = T.porte;
-  const groupe = new THREE.Group();
-  groupe.name = 'porte-timonerie';
   const l = P.demiLargeur + 0.015;
   const h = P.haut - DESCENTE_ROUF.seuil + 0.03;
+  const forme = new THREE.Shape();
+  forme.moveTo(0, 0);
+  forme.lineTo(l, 0);
+  forme.lineTo(l, h);
+  forme.lineTo(0, h);
+  forme.lineTo(0, 0);
+  const trou = new THREE.Path();
+  trou.moveTo(0.06, h * 0.52);
+  trou.lineTo(l - 0.06, h * 0.52);
+  trou.lineTo(l - 0.06, h - 0.08);
+  trou.lineTo(0.06, h - 0.08);
+  trou.lineTo(0.06, h * 0.52);
+  forme.holes.push(trou);
+  return { forme, l, h };
+}
+
+// La porte : deux battants (gelcoat, une vitre en haut), qui coulissent à l'intérieur,
+// contre la paroi, chacun de son côté. Le groupe garde ses deux battants : gauche, droite.
+// (Leur face intérieure, en bois, est posée par l'intérieur : interieur.js.)
+function creerPorte(materiaux) {
+  const groupe = new THREE.Group();
+  groupe.name = 'porte-timonerie';
   const battants = [-1, 1].map((cote) => {
     const b = new THREE.Group();
-    const forme = new THREE.Shape();
-    forme.moveTo(0, 0);
-    forme.lineTo(l, 0);
-    forme.lineTo(l, h);
-    forme.lineTo(0, h);
-    forme.lineTo(0, 0);
-    const trou = new THREE.Path();
-    trou.moveTo(0.06, h * 0.52);
-    trou.lineTo(l - 0.06, h * 0.52);
-    trou.lineTo(l - 0.06, h - 0.08);
-    trou.lineTo(0.06, h - 0.08);
-    trou.lineTo(0.06, h * 0.52);
-    forme.holes.push(trou);
+    const { forme, l, h } = formeBattant();
     const panneau = new THREE.Mesh(new THREE.ExtrudeGeometry(forme, { depth: 0.025, bevelEnabled: false }), materiaux.gelcoat);
     panneau.castShadow = true;
     panneau.receiveShadow = true;
@@ -358,10 +374,9 @@ function creerPorte(materiaux) {
 // bas de sa vitre (côté axe du bateau pour les vitres de côté), couché le long du bas de la
 // vitre au repos, et balaye jusqu'à la verticale (un quart de cercle, dans la vitre)
 function creerEssuieGlaces(materiaux) {
-  const b = bornesPareBrise(1.9);
   const liste = [];
   // [bord gauche, bord droit, côté de l'axe (0 : gauche, 1 : droite)]
-  const vitres = [[b[1], b[2], 1], [b[3], b[4], 0], [b[5], b[6], 0]];
+  const vitres = vitresPareBrise().map(([c0, c1], k) => [c0, c1, k === 0 ? 1 : 0]);
   for (const [c0, c1, coin] of vitres) {
     const yb = Y_VITRE_BAS + 0.07;
     const gauche = new THREE.Vector3(...pointPareBrise(c0, yb));
@@ -405,6 +420,6 @@ export function construireTimonerie(materiaux) {
   };
 }
 
-export { FENETRES_COTE, FENETRE_ARRIERE, PARE_BRISE, Y_VITRE_BAS, Y_VITRE_HAUT, bornesPareBrise, pointPareBrise };
+export { FENETRES_COTE, FENETRE_ARRIERE, PARE_BRISE, Y_VITRE_BAS, Y_VITRE_HAUT, bornesPareBrise, pointPareBrise, vitresPareBrise };
 export { geometrieParoiArriere };
 export const LARGEUR_BATTANT = T.porte.demiLargeur + 0.015;

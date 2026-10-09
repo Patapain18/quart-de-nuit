@@ -1,8 +1,10 @@
 // La forme du voilier, en fonctions mathématiques.
 //
-// Un croiseur de 9,40 m (un « 31 pieds »), dessiné comme un architecte naval le fait
-// sur son « plan de formes » : on décrit, pour chaque tranche du bateau de l'arrière
-// à l'avant, sa largeur, la hauteur de son pont et la profondeur de sa coque.
+// Un voilier de 14 m (un « 46 pieds ») à grande timonerie, dessiné comme un architecte
+// naval le fait sur son « plan de formes » : on décrit, pour chaque tranche du bateau de
+// l'arrière à l'avant, sa largeur, la hauteur de son pont et la profondeur de sa coque.
+// (Jusqu'au 9 octobre 2026, c'était un croiseur de 9,40 m : ECHELLE, plus bas, met à la
+// taille de celui-ci ce qui avait été mesuré à la main sur l'ancien.)
 // Ces mêmes fonctions servent à fabriquer le modèle 3D (modele.js) et à calculer
 // la flottaison (combien de coque est sous l'eau, et où).
 //
@@ -11,43 +13,47 @@
 // Le paramètre u va de 0 (le tableau arrière) à 1 (l'étrave).
 
 export const COQUE = {
-  zArriere: 4.4, // le tableau arrière
-  zAvant: -5.0, // le haut de l'étrave
-  demiLargeurMax: 1.6, // au livet (le bord du pont)
-  uLargeurMax: 0.38,
-  demiLargeurTableau: 1.3,
-  livetArriere: 0.86, // hauteur du pont au-dessus de l'eau, à l'arrière…
-  livetAvant: 1.15, // … et à l'avant
-  creuxMax: 0.48, // profondeur de la coque sous la flottaison (sans la quille)
+  zArriere: 6.6, // le tableau arrière
+  zAvant: -7.4, // le haut de l'étrave
+  demiLargeurMax: 2.15, // au livet (le bord du pont)
+  uLargeurMax: 0.4,
+  demiLargeurTableau: 1.75,
+  livetArriere: 1.22, // hauteur du pont au-dessus de l'eau, à l'arrière…
+  livetAvant: 1.58, // … et à l'avant
+  creuxMax: 0.66, // profondeur de la coque sous la flottaison (sans la quille)
   uPiedEtrave: 0.9, // où l'étrave rejoint la flottaison
   bouchain: [2.8, 1.45], // forme des sections : en U à l'arrière, en V à l'avant
-  bouge: 0.07, // le pont est bombé (plus haut au milieu)
+  bouge: 0.1, // le pont est bombé (plus haut au milieu)
 };
+// Ce qui ailleurs avait été mesuré à la main sur l'ancien bateau de 9,40 m (la quille, le
+// safran, les centres de poussée, les rayons de giration…) : multiplié par ces rapports
+export const ECHELLE = { longueur: 14 / 9.4, largeur: 2.15 / 1.6, hauteur: 1.375 };
 
-// Le cockpit et le rouf (la cabine qui dépasse du pont)
+// Le cockpit (aussi large que la timonerie, devant lui) et le rouf (la cabine qui dépasse
+// du pont : la timonerie est posée sur son arrière ; devant elle, il couvre la cabine avant)
 export const COCKPIT = {
-  uArriere: 0.04, // paroi arrière du cockpit
-  uAvant: 0.31, // cloison de la descente (début du rouf)
-  demiLargeur: 0.85, // bord intérieur des hiloires
-  plancher: 0.45, // hauteur du plancher au-dessus de l'eau
-  banc: 0.82, // hauteur des bancs
-  demiLargeurPuits: 0.42, // le puits entre les bancs
-  hiloire: 0.2, // les hiloires dépassent du pont de 20 cm
+  uArriere: 0.035, // paroi arrière du cockpit
+  uAvant: 0.2, // la paroi arrière de la timonerie (et sa porte)
+  demiLargeur: 1.45, // bord intérieur des hiloires
+  plancher: 0.78, // hauteur du plancher au-dessus de l'eau
+  banc: 1.18, // hauteur des bancs
+  demiLargeurPuits: 0.95, // le puits entre les bancs
+  hiloire: 0.24, // les hiloires dépassent du pont de 24 cm
 };
 export const ROUF = {
-  uArriere: 0.31,
-  uAvant: 0.62,
-  demiLargeurAvant: 0.62,
-  hauteur: 0.42, // au-dessus du pont
-  bouge: 0.08,
+  uArriere: 0.2,
+  uAvant: 0.64,
+  demiLargeurAvant: 1.05,
+  hauteur: 0.48, // au-dessus du pont
+  bouge: 0.09,
   rentree: 0.1, // les côtés penchent vers l'intérieur
 };
-// (le mât et la bôme ont été rehaussés de 44 cm pour passer au-dessus de la timonerie)
-export const MAT = { u: 0.6, hauteur: 12.04, bome: 3.7, hauteurBome: 1.22 };
+// (le mât est posé sur le rouf, devant la timonerie ; la bôme passe au-dessus de son toit)
+export const MAT = { u: 0.56, hauteur: 17, bome: 5.6, hauteurBome: 1.75 };
 // L'entrée : la porte de la timonerie, dans la cloison du cockpit (son seuil est 6 cm
 // au-dessus du plancher du cockpit : l'eau du cockpit n'entre que s'il est bien plein)
 export const DESCENTE_ROUF = {
-  demiLargeur: 0.31,
+  demiLargeur: 0.4,
   seuil: COCKPIT.plancher + 0.06,
 };
 
@@ -117,11 +123,12 @@ export function hauteurPont(u, x) {
   return hauteurLivet(u) + COQUE.bouge * (1 - r * r);
 }
 
-// Bord intérieur du passavant (le chemin le long du rouf et du cockpit)
+// Bord intérieur du passavant (le chemin le long du rouf et du cockpit) : le rouf garde la
+// largeur du cockpit le long de la timonerie, puis se resserre devant elle
 export function bordInterieur(u) {
   if (u < COCKPIT.uArriere || u > ROUF.uAvant) return 0;
-  if (u <= COCKPIT.uAvant) return COCKPIT.demiLargeur;
-  const t = lisse(ROUF.uArriere, ROUF.uAvant, u);
+  if (u <= U_TIMONERIE) return COCKPIT.demiLargeur;
+  const t = lisse(U_TIMONERIE, ROUF.uAvant, u);
   return COCKPIT.demiLargeur + (ROUF.demiLargeurAvant - COCKPIT.demiLargeur) * t;
 }
 
@@ -160,28 +167,32 @@ export function xCoteRouf(u, y) {
 }
 
 // ---------- La timonerie ----------
-// Un étage vitré sur l'arrière du rouf, de la cloison du cockpit jusqu'à 1,24 m vers
-// l'avant. Elle est moins large que le rouf (1,16 m) : le barreur, assis au bord du banc,
-// voit devant lui le long de ses parois. Son pare-brise penche vers l'arrière. Dedans, le
-// plancher est surélevé (au niveau du seuil du cockpit : on y tient debout et l'on voit
-// dehors) ; en bas, l'intérieur garde toute la largeur du rouf (des étagères courent sous
-// les bords de son toit) ; trois marches descendent au carré, à bâbord.
+// Un grand étage vitré sur l'arrière du rouf, de la cloison du cockpit jusqu'à 3 m vers
+// l'avant, presque aussi large que lui (2,66 m) : tout se passe là, la nuit. Son pare-brise
+// penche vers l'arrière. Dedans, le plancher est surélevé (22 cm au-dessus de celui du
+// cockpit) : assis au poste, on voit dehors par-dessus la console. Il n'y a plus de carré :
+// sous le plancher, c'est la cale (on la voit par une trappe), et devant, derrière une
+// petite porte basse, la cabine avant.
 export const TIMONERIE = {
   zArriere: zDe(ROUF.uArriere), // la cloison du cockpit
-  zAvant: 0.25, // le pied du pare-brise, sur le toit du rouf
-  recul: 0.22, // le haut du pare-brise est 22 cm plus en arrière que son pied
-  demiLargeur: 0.58, // les parois, au pied
-  rentree: 0.03, // (elles penchent un peu vers l'intérieur)
-  toit: 2.42, // le toit, au bord (au-dessus de l'eau)
-  bouge: 0.04, // (il est bombé : 4 cm de plus au milieu)
-  plancher: 0.55,
-  vitreHaut: 2.3,
+  zAvant: 0.75, // le pied du pare-brise, sur le toit du rouf
+  recul: 0.32, // le haut du pare-brise est 32 cm plus en arrière que son pied
+  demiLargeur: 1.33, // les parois, au pied
+  rentree: 0.04, // (elles penchent un peu vers l'intérieur)
+  toit: 3.2, // le toit, au bord (au-dessus de l'eau)
+  bouge: 0.06, // (il est bombé : 6 cm de plus au milieu)
+  plancher: 1.0,
+  vitreHaut: 3.05,
   // la porte vers le cockpit, au milieu de la paroi arrière : deux battants qui coulissent
-  // à l'intérieur, contre la paroi, chacun de son côté (dehors, ils cacheraient le compas
-  // et les afficheurs du cockpit)
-  porte: { demiLargeur: 0.26, haut: 2.3 },
+  // à l'intérieur, contre la paroi, chacun de son côté
+  porte: { demiLargeur: 0.4, haut: 3.0 },
 };
 export const U_TIMONERIE = uDe(TIMONERIE.zAvant); // (sa tranche avant)
+// Dans son plancher, à bâbord, derrière le siège : la trappe de la cale (50 × 50 cm) ; on la
+// soulève pour voir l'eau, 1,6 m plus bas. Sous le pare-brise, à bâbord de la console, la
+// petite porte basse de la cabine avant (70 cm de haut : le toit du rouf passe au-dessus).
+export const TRAPPE_CALE = { x0: -0.9, x1: -0.4, z0: 2.65, z1: 3.15 };
+export const PORTE_AVANT = { x0: -1.33, x1: -0.87, y0: TIMONERIE.plancher + 0.02, y1: 1.72 };
 // Le pied de la paroi (sur le toit du rouf) dans la tranche u
 export function piedTimonerie(u) {
   const x = TIMONERIE.demiLargeur;
@@ -208,13 +219,3 @@ export function zPareBrise(y) {
 
 // Les tranches du toit du rouf (devant la timonerie) : 24, régulières
 export const trancheToit = (i) => U_TIMONERIE + (ROUF.uAvant - U_TIMONERIE) * (i / 24);
-// Le panneau de pont (le « hublot » du toit) au-dessus de la table du carré : son
-// ouverture tombe sur deux tranches du toit (15 et 10) et deux de ses colonnes (±22 cm) ;
-// son cadre d'aluminium la déborde de 4 cm
-const TROU_PANNEAU = { demiLargeur: 0.22, z0: zDe(trancheToit(15)), z1: zDe(trancheToit(10)) };
-export const PANNEAU_PONT = {
-  trou: TROU_PANNEAU,
-  demiLargeur: TROU_PANNEAU.demiLargeur + 0.04,
-  z0: TROU_PANNEAU.z0 - 0.04,
-  z1: TROU_PANNEAU.z1 + 0.04,
-};
