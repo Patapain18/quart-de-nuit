@@ -1275,6 +1275,134 @@ la bête existent quelque part, et tout ce qui les entoure en dépend.
     (`radio`).
     Images : `docs/etape31-la-bete-nait-de-son-grain.jpg`, `docs/etape31-le-crochet.png`.
 
+### Le retour à Port-Kervalen (octobre 2026) : « propose-moi le prochain chantier »
+
+Ce que je lui ai proposé, et qu'il a choisi le 9 octobre 2026 (contre « Le quart » — le
+froid, la fatigue, dormir vingt minutes — et le jeu au doigt). La nuit finit aujourd'hui par
+« tu as tenu », puis un fondu. Tout ce qu'il faut pour en faire un vrai voyage existe déjà,
+mais ne sert à rien la nuit : la côte de Kervalen et son port, le phare de la pointe du Bec,
+le sémaphore de Jos, la carte marine du carré. Et le monde connecté donne le bon moment pour
+rentrer : après le passage du front, vers 3 h 20, le baromètre remonte, le vent tourne à
+l'ouest et faiblit.
+
+**La contrainte** : le bateau avance à sa vraie vitesse (un mille en dix minutes) et la
+nuit entière dure vingt minutes : le prudent ne fait que deux milles de toute la nuit, et le
+port est à six. D'où un saut dans le temps (« trois heures plus tard ») jusqu'à un
+demi-mille de l'entrée : la partie ne s'allonge que de trois ou quatre minutes.
+
+32. ✅ **Les feux** : le faisceau du phare qui balaie la pluie et qu'on perd dans les grains,
+    les feux vert et rouge de l'entrée du port, une bouée sur les roches ; le livre des feux
+    dans la timonerie ; Jos qui les montre.
+33. **Faire le point** : le traceur donne la position ; si la foudre tombe sur le mât, il
+    saute avec le reste : relever deux feux au compas et les reporter sur la carte.
+34. **Le retour** : le front passé, Jos donne la route ; puis le saut jusqu'au petit matin.
+35. **L'entrée du port** : la houle qui brise sur les roches de chaque côté, deux feux à
+    garder alignés pour passer, la jetée, le quai ; Jos attend au bout de la jetée — la
+    vraie fin.
+36. **La carte de ta nuit** : sa route sur la carte, et chaque événement là où il est
+    arrivé (la bête et son grain, le cargo, les scélérates, la foudre). Une image à garder.
+
+32. ✅ **Les feux** (`src/monde/feux.js`, `src/rendu/feux.js`, `src/jeu/livre-des-feux.js`,
+    `atelier-feux.html`) — La lumière du phare n'était qu'une boule qui clignotait en haut
+    de la tour ; la nuit, on ne voyait rien d'autre de la côte. Elle a maintenant les feux
+    d'une vraie côte, chacun avec sa signature, écrite dans le livre des feux :
+    - *le phare de la pointe du Bec* (« Fl(3) W 12s » : à éclats, groupés par trois, blancs,
+      toutes les douze secondes ; 100 m au-dessus de la mer, portée 20 milles) : une optique
+      de trois lentilles qui tourne en douze secondes ; chacune envoie un faisceau étroit, à
+      30° de la suivante — d'où que l'on soit, on voit passer trois éclats d'un septième de
+      seconde, à une seconde d'écart, puis neuf secondes de nuit ;
+    - *la Basse du Bec* (« Q(6)+LFl W 15s ») : une bouée cardinale sud (jaune sur noir, deux
+      cônes pointe en bas) sur les roches au sud de la pointe ; six éclats rapides puis un
+      long, toutes les quinze secondes (six, comme six heures sur une montre : le sud) ; elle
+      monte et descend avec la houle ;
+    - *l'entrée de Port-Kervalen* : le musoir de la jetée (« Fl G 4s », un mât vert) et la
+      Roche Rouge (« Fl R 4s », une tourelle rouge sur son rocher), qui alternent — le rouge
+      s'allume quand le vert s'éteint ; en entrant, le vert à tribord, le rouge à bâbord ;
+    - *la fenêtre du sémaphore* : une lumière jaune, fixe, qui n'est pas dans le livre : c'est
+      Jos qui veille.
+    Ils s'allument quand le soleil se couche et s'éteignent quand il se lève.
+    **Ce qu'on en voit, d'ici** (`lumiereRecue`) : la lumière qui arrive jusqu'à nos yeux, en
+    multiples du seuil de l'œil la nuit (2·10⁻⁷ lux, la valeur de l'AISM pour les feux : 1,
+    tout juste visible ; 100, un feu franc ; 10 000, il éblouit). L'intensité de chaque feu
+    se déduit de sa portée nominale (à cette distance, par dix milles de visibilité, il est
+    juste au seuil : 111 000 candelas pour le phare, 149 pour la jetée) ; puis la loi
+    d'Allard, E = I·T^d/d² : l'air en éteint en chemin la brume du moment (la visibilité se
+    calcule maintenant en un seul endroit, `visibilite` dans `monde/meteo.js`, pour la mer
+    comme pour les feux) et la pluie des grains entre lui et nous, mesurée en douze points
+    le long de la ligne — un feu se perd dans un grain ; la Terre est ronde : un feu passe
+    sous l'horizon au-delà de 2,08 milles × (√H + √h) ; les vagues : dans un creux, la
+    crête la plus proche cache les feux, on les voit du haut des vagues.
+    **À l'écran** (`rendu/feux.js`) :
+    - *chaque feu* : un point de lumière de sa couleur, de taille fixe (5 pixels), d'autant
+      plus vif que la lumière reçue est forte (en racine carrée : l'œil compresse), avec une
+      auréole dans l'air humide ; il s'éteint dans un grain, il disparaît derrière la crête
+      d'une vague ;
+    - *les faisceaux du phare* : trois pinceaux qui balaient la nuit. On les voit là où il y
+      a de l'eau dans l'air pour renvoyer leur lumière : un peu dans la brume, beaucoup dans
+      la pluie des grains qu'ils traversent (les mêmes rideaux que le ciel et la mer : ils
+      s'allument au passage du faisceau). Ce qu'on en voit se calcule d'un coup, pour chaque
+      pixel d'un ruban tourné vers nous, aussi large que le faisceau : la lumière du phare à
+      s mètres de lui (en 1/s²), la part que l'air renvoie vers nous — surtout vers l'avant :
+      un faisceau qui vient vers nous est bien plus brillant que celui qui s'en va —, et ce
+      que l'air éteint, du phare à cet air, puis de cet air à nous ;
+    - *le décor* : la bouée de la Basse du Bec, qui flotte (`bouees.js`), le mât vert de la
+      jetée, la Roche Rouge et sa tourelle (`cote.js`, qui donne aussi où sont les choses de
+      la côte : `LIEUX`).
+    **Les reconnaître** (`suivreFeux` dans `jeu.js`) : quand on regarde un feu (à moins de 6°
+    du centre de la vue : le bateau roule, on le garde à peu près au milieu), on compte ses
+    éclats — « Un feu blanc : compte ses éclats… » ; au bout d'une période entière et une
+    seconde, si on l'a vu briller, on l'a reconnu : l'écran le dit (« Trois éclats blancs
+    toutes les douze secondes : le phare de la pointe du Bec. »), le journal le note, Jos le
+    confirme, une fois. Chaque feu a son propre compte : vus du large, plusieurs sont
+    presque dans la même direction (la bouée est juste sous le phare), on les compte
+    ensemble ; les perdre de vue moins d'une seconde et demie (une vague, un coup de roulis)
+    ne remet pas le compte à zéro. La fenêtre du sémaphore se reconnaît en quatre secondes,
+    la lumière étrange aussi : « Un feu blanc, fixe, qui vacille. Aucun feu du livre ne lui
+    ressemble. »
+    **Le livre des feux** (`jeu/livre-des-feux.js`) : le livre bleu sur l'étagère tribord de
+    la timonerie (E pour l'ouvrir, E ou C pour le refermer). À gauche, la petite carte de la
+    côte — la pointe du Bec, l'île Brune, Port-Kervalen, et leurs feux : la goutte magenta
+    des cartes marines et leur signature — et ce que veulent dire les signes (Fl, Fl(3), Q,
+    LFl, W · R · G, la période) ; à droite, chaque feu : son nom, sa signature, le dessin de
+    ses éclats sur une période, ce qui le porte, sa hauteur, sa portée, et comment s'en
+    servir.
+    **Ce qui en dépend aussi** :
+    - *Jos* : le soir, une étape de plus dans la leçon « Préparer la nuit » (« Cette nuit, tu
+      ne verras plus la côte : seulement ses feux, et chacun a sa signature. ») ; vers 21 h 30,
+      s'il est libre et qu'on n'a pas encore reconnu le phare, il le montre (« Regarde au nord, entre
+      les grains : le phare de la pointe du Bec. Trois éclats, puis neuf secondes de nuit. ») ;
+      à chaque feu reconnu, une phrase (la Basse du Bec : « De nuit, passe toujours au
+      sud » ; la jetée : « Pas cette nuit : on n'entre pas dans un port par ce temps » ; sa
+      fenêtre : « Tu vois ma fenêtre ? C'est moi. Je ne dors pas. ») ;
+    - *la lumière étrange* : elle n'est ni dans le livre ni sur la carte, et Jos le dit (« Il
+      n'y a aucun feu de ce côté-là, ni dans le livre, ni sur ma carte. ») ;
+    - *le traceur* : les feux, la goutte magenta et leur signature (quand elle a la place) ;
+    - *le radar* : la jetée, la tourelle et la bouée font un écho (le phare est sur la terre,
+      dans l'écho de la côte).
+    **Mesuré** (`npm run test-feux`) : le phare, trois éclats par groupe d'où qu'on le
+    regarde, à 1,00 s d'écart, toutes les 12,00 s, chacun de 0,14 s ; la Basse du Bec, six
+    rapides et un long de 2,0 s toutes les 15 s ; le vert et le rouge jamais ensemble ; à sa
+    portée nominale, chaque feu au seuil de l'œil ; vus de 2,5 m, le phare passe sous
+    l'horizon à 24,1 milles, la jetée à 9,0. Cette nuit, au départ (à cinq milles du phare) :
+    entre les grains, on le voit toute la nuit (au plus faible, au plus fort de la tempête,
+    1 189 fois le seuil ; 2 888 au coucher) ; les feux du port, à six milles, tout juste au
+    coucher, perdus ensuite. Un grain entre lui et nous : 1 570 fois le seuil sans lui, 0,72
+    derrière lui (1,3 km de cœur de grain traversé) — perdu. Les vagues : dans la tempête
+    (5,4 m de creux), le phare est caché 13 % du temps ; devant le port, à l'accalmie
+    (4,6 m), le feu de la jetée 14 %, le phare 1 % ; par mer plate, jamais. Dans le jeu, le
+    phare est reconnu en 13 s.
+    **Ce que ça coûte** : les feux, 34 µs par image (sur le processeur) ; l'image entière,
+    8,11 ms au lieu de 7,74 (à deux milles du phare, les faisceaux dans l'image).
+    **Les outils** : l'atelier des feux (`atelier-feux.html` : l'heure, du coucher à l'aube,
+    et sept moments ; six points de vue — au départ de la nuit, à deux milles du phare,
+    devant l'entrée du port, près de la Basse du Bec, de côté (pour voir tourner les
+    faisceaux), d'en haut ; un grain entre nous et le phare, de la brume en plus, une mer
+    plate ; ce qu'on voit de chaque feu, d'ici — la lumière reçue, la distance, la pluie
+    traversée, la crête qui le cache — et les vingt dernières secondes, en bandes ; le livre
+    des feux ; `__feux.photo({ eclat })` (attend un éclat pour déclencher), `planche()`,
+    `film()`, `mesurer()`).
+    Images : `docs/etape32-les-feux.jpg`, `docs/etape32-le-livre-des-feux.png`.
+
 ## 4. Pistes graphiques notées pour plus tard
 
 Toutes celles du grand chantier sont faites (étapes 13 à 17).

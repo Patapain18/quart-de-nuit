@@ -511,6 +511,17 @@ export const LECONS = [
         }],
         bravo: 'Tout est paré. Je n\'aurais pas mieux fait.',
       },
+      {
+        id: 'nuit.feux',
+        // (la nuit, on ne voit plus la côte : seulement ses feux, et chacun a sa signature —
+        // monde/feux.js ; le livre des feux est dans la timonerie)
+        dire: [
+          'Une dernière chose. Cette nuit, tu ne verras plus la côte : seulement ses feux, et chacun a sa signature.',
+          'Le phare de la pointe du Bec : trois éclats blancs, toutes les douze secondes. Au sud de la pointe, la bouée jaune et noire de la Basse du Bec garde des roches : six éclats rapides, puis un long.',
+          'Ils sont tous dans le livre des feux, le livre bleu sur l\'étagère de la timonerie. Et la petite lumière jaune, fixe, au-dessus de la pointe, c\'est ma fenêtre.',
+        ],
+        verifier: () => true,
+      },
     ],
     fin: [
       'Le soleil se couche. Ton bateau est prêt, et toi aussi.',

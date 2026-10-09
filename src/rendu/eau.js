@@ -21,6 +21,7 @@ import { LONGUEUR as LONGUEUR_CARGO, GLSL_CARGO } from './forme-cargo.js';
 import { GLSL_SCELERATE, reglerUniformsScelerate } from '../mer/scelerate.js';
 import { glslGrains } from './glsl/grains.js';
 import { RiseesRendu, GLSL_RISEES } from './risees.js';
+import { visibilite } from '../monde/meteo.js';
 
 const N_SILLAGE = 24; // points du sillage (le premier : la poupe ; puis un toutes les 2,5 s)
 const N_CARGO = 24; // ceux du cargo (un toutes les 7 s : près de trois minutes, plus d'un kilomètre)
@@ -959,9 +960,8 @@ export class Eau {
     u.uSeuilEcume.value = Math.max(0.12, 0.018 * meteo.vent - 0.06);
     const a = this.houle.mer?.directionVent ?? 0;
     u.uDirVent.value.set(Math.cos(a), Math.sin(a));
-    // visibilité : 60 km par beau temps, 1,5 km sous la pluie battante
-    const visibilite = THREE.MathUtils.lerp(60000, 6000, meteo.brume) * THREE.MathUtils.lerp(1, 0.25, pluie);
-    this.brumeDeBase = 3 / visibilite;
+    // visibilité : 60 km par beau temps, 1,5 km sous la pluie battante (monde/meteo.js)
+    this.brumeDeBase = 3 / visibilite(meteo, pluie);
     u.uBrume.value = this.brumeDeBase;
   }
 }

@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Atelier des feux · Quart de nuit</title>
+  <meta name="description" content="Les feux de la côte de Kervalen : le phare de la pointe du Bec et ses faisceaux, la bouée de la Basse du Bec, les feux du port ; ce qu'on en voit d'où l'on est, selon la distance, la brume, la pluie des grains et les vagues ; le livre des feux.">
+  <link rel="stylesheet" href="./src/atelier-mer.css">
+  <link rel="stylesheet" href="./src/atelier-trombe.css">
+  <link rel="stylesheet" href="./src/atelier-feux.css">
+</head>
+<body>
+  <canvas id="scene" aria-label="La côte de Kervalen, la nuit, et ses feux"></canvas>
+  <p id="legende" aria-live="polite"></p>
+  <aside id="panneau" aria-label="Réglages de l'atelier">
+    <header>
+      <h1>Atelier des feux</h1>
+      <button type="button" id="replier" aria-expanded="true" aria-controls="contenu">Replier</button>
+    </header>
+    <div id="contenu">
+      <section aria-labelledby="titre-heure">
+        <h2 id="titre-heure">L'heure</h2>
+        <div class="curseur">
+          <label for="heure">Du coucher du soleil à l'aube</label><output for="heure" id="heure-texte"></output>
+          <input type="range" id="heure" min="18.4" max="30.6" step="0.05" value="21.5">
+        </div>
+        <div id="moments" class="grille-boutons"></div>
+      </section>
+      <section aria-labelledby="titre-vue">
+        <h2 id="titre-vue">D'où on les voit</h2>
+        <div id="vues" class="grille-boutons"></div>
+        <p class="aide">Glisse sur l'image pour regarder autour de toi.</p>
+      </section>
+      <section aria-labelledby="titre-temps">
+        <h2 id="titre-temps">Le temps</h2>
+        <div class="grille-boutons">
+          <button type="button" id="grain" aria-pressed="false">Un grain entre nous et le phare</button>
+          <button type="button" id="brume" aria-pressed="false">De la brume en plus</button>
+          <button type="button" id="mer-plate" aria-pressed="false">Une mer plate (sans vagues devant)</button>
+        </div>
+      </section>
+      <section aria-labelledby="titre-vus">
+        <h2 id="titre-vus">Ce qu'on en voit, d'ici</h2>
+        <table id="vus"></table>
+        <div id="eclats" role="img" aria-label="Les vingt dernières secondes : ce qui arrive de chaque feu"></div>
+        <p class="aide">En multiples du seuil de l'œil, la nuit : 1, tout juste visible ; 100, un feu franc ; 10 000, il éblouit.</p>
+      </section>
+      <section aria-labelledby="titre-livre">
+        <h2 id="titre-livre">Le livre des feux</h2>
+        <div id="livre"></div>
+      </section>
+      <section aria-labelledby="titre-mesures">
+        <h2 id="titre-mesures">Mesures</h2>
+        <dl id="mesures"></dl>
+        <div class="grille-boutons">
+          <button type="button" id="photo">Photo</button>
+        </div>
+        <p id="etat" class="aide" role="status"></p>
+      </section>
+    </div>
+  </aside>
+  <script type="module" src="./src/atelier-feux.js"></script>
+</body>
+</html>

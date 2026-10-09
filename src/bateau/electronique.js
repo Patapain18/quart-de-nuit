@@ -1,6 +1,7 @@
 // L'électronique de la timonerie, sur le pupitre de la console (à côté de l'écran du radar) :
 //  - le traceur de cartes : la carte électronique, le nord en haut, centrée sur le bateau ;
-//    la côte de Kervalen et l'île Brune, le trajet parcouru, les bouées, la ligne du cap ;
+//    la côte de Kervalen et l'île Brune, ses feux (une goutte magenta et leur signature,
+//    comme sur les cartes : monde/feux.js), le trajet parcouru, les bouées, la ligne du cap ;
 //    en bas, la vitesse et la route sur le fond, et la sonde (la profondeur sous la quille) ;
 //  - la commande du pilote automatique : son mode (veille, auto, ALARME), le cap voulu, le
 //    cap suivi, et l'angle de la barre ;
@@ -8,6 +9,7 @@
 //    même image, sur la cloison de la console.
 import * as THREE from 'three';
 import { rivage, COTE, distanceALaTerre } from '../rendu/cote.js';
+import { FEUX } from '../monde/feux.js';
 import { poserSurPupitre, surPlafonnier } from './interieur-timonerie.js';
 
 const MILLE = 1852;
@@ -159,6 +161,28 @@ export class Electronique {
     }
     for (let gy = ((cy - e.z * echelle) % m + m) % m; gy < hc; gy += m) {
       ctx.beginPath(); ctx.moveTo(0, gy); ctx.lineTo(L, gy); ctx.stroke();
+    }
+    // les feux de la côte : la goutte magenta des cartes, et leur signature (quand elle a la
+    // place : à petite échelle, les feux du port se touchent presque)
+    ctx.font = '600 11px ui-monospace, Menlo, monospace';
+    const etiquettes = [];
+    for (const f of FEUX) {
+      const x = px(f.x);
+      const y = py(f.z);
+      if (x < -40 || x > L + 40 || y < -20 || y > hc + 20) continue;
+      ctx.fillStyle = 'rgba(222, 70, 170, 0.85)';
+      ctx.beginPath();
+      ctx.moveTo(x, y);
+      ctx.lineTo(x + 10, y - 8);
+      ctx.arc(x + 7, y - 11, 4, 0.8, 0.8 + Math.PI * 1.6, true);
+      ctx.closePath();
+      ctx.fill();
+      const l = ctx.measureText(f.caractere).width;
+      const r = [x + 14, y - 7, x + 14 + l, y + 6];
+      if (etiquettes.some((e) => r[0] < e[2] && r[2] > e[0] && r[1] < e[3] && r[3] > e[1])) continue;
+      etiquettes.push(r);
+      ctx.fillStyle = '#f0c8e4';
+      ctx.fillText(f.caractere, x + 14, y + 4);
     }
     // les bouées
     for (const b of e.bouees ?? []) {

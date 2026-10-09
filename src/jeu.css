@@ -272,6 +272,37 @@ button.principal:hover { background: #f6c47a; }
 #carnet .fermer { margin: 8px 0 0; text-align: right; font: 12.5px/1 var(--texte); color: #7a6440; }
 #carnet kbd { font: 600 11px/1 var(--chiffres); background: #1b2538; color: var(--papier); border-radius: 3px; padding: 2px 5px; }
 
+/* le livre des feux : un livre imprimé, ouvert devant la scène (jeu/livre-des-feux.js) */
+#livre-feux {
+  position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
+  width: min(940px, 94vw); height: min(600px, 86vh);
+  display: grid; grid-template-columns: 1fr 1fr;
+  background: #f4efe1; color: #26323a;
+  border-radius: 6px;
+  box-shadow: 0 28px 70px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(60, 70, 90, 0.35);
+}
+#livre-feux .page { padding: 22px 28px 18px; overflow: hidden; }
+#livre-feux .gauche { box-shadow: inset -22px 0 26px -24px rgba(40, 50, 70, 0.5); border-right: 1px solid rgba(60, 70, 90, 0.25); }
+#livre-feux .droite { box-shadow: inset 22px 0 26px -24px rgba(40, 50, 70, 0.5); display: grid; grid-template-rows: 1fr auto; }
+#livre-feux h2 { margin: 0; font: 600 26px/1.1 var(--titre); color: #1b2538; }
+#livre-feux .bateau { margin: 2px 0 10px; font: italic 13.5px/1.4 var(--titre); color: #5d5240; }
+#livre-feux .carte-feux { display: block; width: auto; height: 230px; max-width: 100%; border: 1px solid #c8b98e; }
+#livre-feux h3 { margin: 12px 0 4px; font: 600 11px/1.6 var(--texte); letter-spacing: 0.12em; text-transform: uppercase; color: #5d6a78; }
+#livre-signes { margin: 0; padding: 0; list-style: none; font: 13px/1.45 var(--texte); }
+#livre-signes li { display: grid; grid-template-columns: 6.2em 1fr; margin-bottom: 2px; }
+#livre-signes b { font: 600 12.5px/1.45 var(--chiffres); color: #7a2350; }
+#livre-feux .conseil { margin: 10px 0 0; font: italic 13px/1.45 var(--titre); color: #5d5240; }
+#livre-entrees { overflow: hidden; }
+#livre-feux .feu { border-top: 1px solid #d8cba3; padding: 7px 0 5px; }
+#livre-feux .feu:first-child { border-top: none; padding-top: 0; }
+#livre-feux h4 { margin: 0; font: 600 14px/1.3 var(--titre); color: #1b2538; }
+#livre-feux .caractere { margin: 2px 0 4px; font: 600 15px/1.2 var(--chiffres); color: #7a2350; }
+#livre-feux .rythme { display: block; }
+#livre-feux .details, #livre-feux .explication { margin: 3px 0 0; font: 12.5px/1.4 var(--texte); }
+#livre-feux .details { color: #6d6250; }
+#livre-feux .fermer { margin: 8px 0 0; text-align: right; font: 12.5px/1 var(--texte); color: #5d6a78; }
+#livre-feux kbd { font: 600 11px/1 var(--chiffres); background: #1b2538; color: #f4efe1; border-radius: 3px; padding: 2px 5px; }
+
 #sous-titres {
   position: absolute; left: 50%; bottom: 96px; transform: translateX(-50%);
   max-width: min(720px, 90vw); margin: 0; text-align: center; text-wrap: balance;

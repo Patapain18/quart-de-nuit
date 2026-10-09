@@ -32,6 +32,8 @@ import { creerGestes, gesteVise } from './joueur/gestes.js';
 import { Radio } from './jeu/radio.js';
 import { Journee, meteoDuJour, heureEnTexte, JOS, NOM_BATEAU } from './jeu/journee.js';
 import { LECONS } from './jeu/lecons.js';
+import { pageDesFeux, SIGNES } from './jeu/livre-des-feux.js';
+import { FEUX, rythme, allumage } from './monde/feux.js';
 import { Nuit, DIFFICULTES, EAU, HEURE_LEVER, directionRelative } from './jeu/nuit.js';
 import { positionCrete } from './mer/scelerate.js';
 import { Apparitions } from './rendu/apparitions.js';
@@ -121,6 +123,7 @@ const etat = {
   majCiel: 0,
   majMer: 0,
   carnet: false,
+  livre: false, // (le livre des feux est ouvert)
 };
 const siege = { x: -0.76 }; // à la barre, assis au vent (au bord du banc)
 
@@ -188,6 +191,10 @@ const jeu = {
     if (dp !== null && dp < 0 && recente > 1.5) mots = `, il remonte depuis peu (${nombre(dp)} en 3 h : le fond est passé)`;
     else if (dp !== null && dp > 0 && recente < -1.5) mots = `, il redescend depuis peu (${nombre(dp)} en 3 h)`;
     afficherMessage(`Baromètre : ${Math.round(p)} hPa${mots}${depuis}`);
+  },
+  // le livre des feux : on l'ouvre (E pour le refermer)
+  ouvrirLivreFeux() {
+    if (!etat.livre) basculerLivre();
   },
   titreBarometre() {
     const t = barometre.calee !== null ? ` · aiguille témoin ${Math.round(barometre.temoin)}` : '';
@@ -394,6 +401,9 @@ function touchesAppuyees() {
       etat.lampe = !etat.lampe;
       if (etat.lampe) etat.lampeEssayee = true;
       afficherMessage(etat.lampe ? 'Lampe frontale allumée' : 'Lampe frontale éteinte');
+    } else if (etat.livre && (code === TOUCHES.agir.code || code === TOUCHES.carnet.code)) {
+      // (le livre des feux ouvert : E ou L le referme)
+      basculerLivre();
     } else if (code === TOUCHES.carnet.code) {
       basculerCarnet();
     } else if (code === TOUCHES.passerPhrase.code) {
@@ -708,6 +718,7 @@ function simuler(dt) {
   r.angleSafran = physique.barre;
   bateau.instruments.maj(dt, m, monde.ecl.nuit);
   majRadar(dt);
+  suivreFeux(dt);
   // le traceur de cartes et la commande du pilote, sur la console de la timonerie
   const fond = physique.vitesse;
   bateau.electronique.maj(dt, {
@@ -1201,6 +1212,9 @@ function majRadar(dt) {
   r.temps = monde.temps;
   r.cibles.length = 0;
   for (const b of journee?.bouees?.values() ?? []) r.cibles.push({ x: b.x, z: b.z, rayon: 6, force: 0.75 });
+  // (les marques de la côte : la bouée de la Basse du Bec, la tourelle de la Roche Rouge, le
+  // musoir de la jetée — un écho net, plus fort pour ce qui est en dur)
+  for (const f of FEUX) if (f.id !== 'phare') r.cibles.push({ x: f.x, z: f.z, rayon: f.flottant ? 6 : 9, force: f.flottant ? 0.75 : 0.95 });
   if (nuit?.cargo) r.cibles.push({ x: nuit.cargo.x, z: nuit.cargo.z, rayon: 90, force: 1 });
   // (la trombe : sous son grain, un écho serré au bout du crochet de pluie qui s'enroule
   // autour d'elle — monde/grains.js)
@@ -1359,6 +1373,9 @@ let resumeJourneeNuit = null; // (la journée qui a précédé la nuit, pour le 
 let bateauDebutNuit = null; // (pour « rejouer la nuit » avec le bateau du coucher du soleil)
 function commencerNuit({ depuisJournee = false, bateau: bateauGarde = null, reprise = null, resumeJournee = null } = {}) {
   jeu.radio.taire();
+  // (une nouvelle nuit : les feux sont à reconnaître de nouveau)
+  feuxReconnus.clear();
+  regards.clear();
   if (journee) journeeFaite = journee;
   journee = null;
   resumeJourneeNuit = resumeJournee ?? reprise?.resumeJournee ?? (journeeFaite ? resumer(journeeFaite) : null);
@@ -1785,6 +1802,97 @@ function afficherCible() {
   repere.dataset.bord = bord;
   repere.style.transform = `translate(${Math.round(x)}px, ${Math.round(y)}px) translate(-50%, -100%)`;
   repere.hidden = false;
+}
+
+// Le livre des feux (on le prend sur l'étagère de la timonerie, E) : les feux de la côte, leur
+// signature, le dessin de leurs éclats, leur place sur la carte
+function basculerLivre() {
+  etat.livre = !etat.livre;
+  const livre = document.getElementById('livre-feux');
+  if (etat.livre && !livre.dataset.rempli) {
+    const { entrees, carte } = pageDesFeux();
+    document.getElementById('livre-carte').innerHTML = carte;
+    document.getElementById('livre-signes').innerHTML = SIGNES.map(([a, b]) => `<li><b>${a}</b> ${b}</li>`).join('');
+    document.getElementById('livre-entrees').innerHTML = entrees;
+    livre.dataset.rempli = '1';
+  }
+  livre.hidden = !etat.livre;
+  if (etat.livre && etat.carnet) basculerCarnet();
+}
+
+// Les feux de la côte : les reconnaître. Quand on regarde un feu (à moins de 6° du centre de
+// la vue : le bateau roule, on le garde à peu près au milieu), on compte ses éclats : au bout
+// d'une période entière et une seconde, si on l'a vu briller, on l'a reconnu — le journal le
+// note, l'écran le dit, Jos le confirme (une fois). Chaque feu a son compte : vus d'ici,
+// plusieurs feux sont presque dans la même direction (la bouée de la Basse du Bec est juste
+// sous le phare), on les compte ensemble. Le perdre de vue moins d'une seconde et demie (une
+// vague, un coup de roulis) ne remet pas son compte à zéro. La fenêtre du sémaphore se
+// reconnaît en quatre secondes ; la lumière étrange, aussi : aucun feu du livre ne lui
+// ressemble.
+const regards = new Map(); // id → { depuis, hors, vu, feu }
+const feuxReconnus = new Set();
+let dernierConseilFeu = -Infinity;
+const _dirFeu = new THREE.Vector3();
+const _avant = new THREE.Vector3();
+const DESCRIPTION_FEUX = {
+  phare: 'trois éclats blancs toutes les douze secondes : le phare de la pointe du Bec',
+  'basse-du-bec': 'six éclats rapides et un long, toutes les quinze secondes : la bouée cardinale de la Basse du Bec',
+  jetee: 'un éclat vert toutes les quatre secondes : le musoir de la jetée de Port-Kervalen',
+  'roche-rouge': 'un éclat rouge toutes les quatre secondes : la Roche Rouge, à l\'entrée de Port-Kervalen',
+  semaphore: 'une lumière jaune, fixe, au-dessus de la pointe : la vigie du sémaphore. Jos veille',
+  etrange: 'un feu blanc, fixe, qui vacille. Aucun feu du livre ne lui ressemble',
+};
+function suivreFeux(dt) {
+  if (etat.mode === 'accueil' || etat.mode === 'pause' || allumage(monde.ecl.hauteurSoleil) < 0.5) {
+    regards.clear();
+    return;
+  }
+  const cam = monde.camera;
+  cam.getWorldDirection(_avant);
+  const cone = (6 * Math.PI) / 180;
+  const dedans = new Map();
+  for (const v of monde.feux.vus) {
+    _dirFeu.set(v.feu.x - cam.position.x, v.feu.y - cam.position.y, v.feu.z - cam.position.z).normalize();
+    if (!v.horizon && _avant.angleTo(_dirFeu) < cone) dedans.set(v.feu.id, { feu: v.feu, recu: v.recu });
+  }
+  // (la lumière étrange, quand elle est là)
+  const le = monde.lumiereEtrange;
+  if (le.sprite.visible) {
+    _dirFeu.copy(le.sprite.position).sub(cam.position).normalize();
+    if (_avant.angleTo(_dirFeu) < cone) dedans.set('etrange', { feu: { id: 'etrange' }, recu: le.sprite.material.opacity * 20 });
+  }
+  for (const [id, c] of dedans) {
+    const r = regards.get(id) ?? { depuis: 0, hors: 0, vu: false, feu: c.feu };
+    r.hors = 0;
+    if (c.recu > 1) r.vu = true;
+    regards.set(id, r);
+  }
+  for (const [id, r] of regards) {
+    if (!dedans.has(id)) {
+      r.hors += dt;
+      if (r.hors > 1.5) {
+        regards.delete(id);
+        continue;
+      }
+    }
+    r.depuis += dt;
+    const cle = id === 'etrange' ? `etrange-${Math.round((nuit?.heure ?? 0) * 10)}` : id;
+    if (feuxReconnus.has(cle)) continue;
+    const duree = id === 'semaphore' || id === 'etrange' ? 4 : rythme(r.feu).periode + 1;
+    // (on commence à compter : l'écran le dit, pas plus d'une fois toutes les quinze secondes)
+    if (r.vu && r.depuis > 1.2 && r.feu.couleur && id !== 'semaphore' && monde.temps - dernierConseilFeu > 15) {
+      dernierConseilFeu = monde.temps;
+      afficherMessage(`Un feu ${{ blanc: 'blanc', vert: 'vert', rouge: 'rouge' }[r.feu.couleur]} : compte ses éclats…`);
+    }
+    if (r.depuis >= duree && r.vu) {
+      feuxReconnus.add(cle);
+      const texte = DESCRIPTION_FEUX[id];
+      const phrase = `${texte.charAt(0).toUpperCase()}${texte.slice(1)}.`;
+      afficherMessage(phrase);
+      (nuit ?? journee)?.ecrire(id === 'etrange' ? phrase : `Reconnu : ${texte}.`);
+      nuit?.feuReconnu(id, contexteNuit(0));
+    }
+  }
 }
 
 // Le carnet de bord (touche L) : les leçons, les réflexes, le journal
@@ -2397,6 +2505,8 @@ window.__jeu = {
   monde, physique, bateau, etat, marin, jeu, gestes, embarquer, choisirAmbiance, photographier, avancer, commandes, Audio, seLever, finir,
   commencerJournee, get journee() { return journee; }, passer: () => journee?.passer(contexteJournee(0)), bouees,
   commencerNuit, get nuit() { return nuit; }, contexteNuit, regarder, profiler,
+  // (les feux qu'on regarde, et ceux qu'on a reconnus)
+  regards, feuxReconnus,
   uneImage: (dt = 1 / 60) => monde.image(dt, { simuler, placerCamera }),
   // (l'inspection du pont : le plan où l'on marche colle-t-il au modèle 3D ?)
   // (l'étrange, à la demande, pour l'entendre et le voir : 'lumiere', 'voix16', 'coups', 'sansReponse')

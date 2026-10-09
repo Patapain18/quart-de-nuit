@@ -404,6 +404,7 @@ export class Nuit {
     this.suivreBateau(dt, ctx);
     if (this.etat !== 'nuit') return;
     this.suivreMoments();
+    this.suivreFeux(ctx);
     this.conseiller(dt, ctx);
     if (this.heure >= HEURE_AUBE) this.leverDuJour();
   }
@@ -476,6 +477,34 @@ export class Nuit {
       ? `Le soleil se couche. Vent ${directionEnMots(m.directionVent)} ${Math.round(m.vent)} nœuds, ${baro} : le front orageux approche.`
       : `${ch.titre}. Vent ${directionEnMots(m.directionVent)} ${Math.round(m.vent)} nœuds, ${baro}.`);
     this.emettre('chapitre', ch, this.c);
+  }
+
+  // Les feux de la côte (monde/feux.js) : quand le crépuscule a fini de tomber, Jos montre le
+  // phare (si on ne l'a pas déjà reconnu soi-même) ; et quand on reconnaît un feu, il le
+  // confirme — une fois chacun
+  suivreFeux(ctx) {
+    if (this.faits.has('feux') || this.heure < 21.45 || this.trombe || !this.radio.libre || this.silence) return;
+    this.faits.add('feux');
+    if (this.faits.has('feu-phare')) return;
+    this.dire([
+      'Regarde au nord, entre les grains : le phare de la pointe du Bec. Trois éclats, puis neuf secondes de nuit.',
+      'Tant que tu le vois, tu sais où est la côte. Les autres feux sont dans le livre des feux, sur l\'étagère de la timonerie.',
+    ], { siLibre: true });
+  }
+
+  feuReconnu(id, ctx) {
+    const cle = `feu-${id}`;
+    if (this.faits.has(cle) || id === 'etrange') return;
+    this.faits.add(cle);
+    if (this.silence || !this.radio.libre) return;
+    const PHRASES = {
+      phare: ['C\'est ça, le phare du Bec. Tant que tu le vois, tu sais où est la côte : au nord, à cinq ou six milles.'],
+      'basse-du-bec': ['La Basse du Bec : une cardinale sud. Les roches sont au nord d\'elle. De nuit, passe toujours au sud.'],
+      jetee: ['L\'entrée de Port-Kervalen : le vert à tribord, le rouge à bâbord, quand on entre. Pas cette nuit : on n\'entre pas dans un port par ce temps.'],
+      'roche-rouge': ['La Roche Rouge, à l\'entrée du port : en entrant, tu la laisses à bâbord.'],
+      semaphore: ['Tu vois ma fenêtre ? C\'est moi. Je ne dors pas.'],
+    };
+    if (PHRASES[id]) this.dire(PHRASES[id], { siLibre: true });
   }
 
   suivreMoments() {
@@ -1408,7 +1437,7 @@ export class Nuit {
     if (e && this.heure - e.heure < 0.5 && !e.explique) {
       e.explique = true;
       const explications = {
-        lumiere: ['Une lumière ? Le cargo est loin dans le nord, maintenant. Sur mon radar, il n\'y a que toi.', 'Un reflet, sans doute. Ou la fatigue. Garde les yeux sur tes vagues.'],
+        lumiere: ['Une lumière ? Il n\'y a aucun feu de ce côté-là, ni dans le livre, ni sur ma carte. Et le cargo est loin dans le nord, maintenant : sur mon radar, il n\'y a que toi.', 'Un reflet, sans doute. Ou la fatigue. Garde les yeux sur tes vagues.'],
         voix16: ['Un appel sur le seize ? Non… Je n\'ai rien reçu, moi. Et il n\'y a aucun bateau signalé dans le secteur, à part toi.', 'La fatigue joue des tours, la nuit. Reste concentré, matelot.'],
         coups: ['Des coups contre la coque ? Un tronc, une épave… ça arrive, par gros temps.', 'Regarde si tu ne prends pas l\'eau à l\'avant. Et écoute si ça recommence.'],
         echoSuiveur: ['Un écho qui te suit, sur ton radar ? Sur le mien, il n\'y a que toi.', 'Un grain qui file avec le vent, sans doute. Ne te laisse pas impressionner, matelot.'],

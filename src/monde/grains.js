@@ -32,6 +32,9 @@ export const REGLAGES_GRAINS = {
   naissance: 90, // s pour se former
   mort: 110, // s pour se dissiper
   bondPression: 2.5, // hPa : le bond du baromètre sous un grain de force 1, quand arrive sa rafale
+  // la pluie au cœur d'un grain de force 1 éteint la lumière à 0,6 % par mètre : on n'y voit pas
+  // à plus de 500 m (rendu/grains.js : ses rideaux ; monde/feux.js : les feux qu'elle cache)
+  extinctionPluie: 0.006,
 };
 
 // Le grain qui porte une trombe (celui de la bête : jeu/nuit.js). Pas un grain comme les

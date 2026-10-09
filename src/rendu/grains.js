@@ -4,11 +4,11 @@
 // d'eux (lue par les nuages).
 import * as THREE from 'three';
 import { N_RIDEAUX, N_GRAINS } from './glsl/grains.js';
-import { bordDeLaRafale, paquetsDuCrochet } from '../monde/grains.js';
+import { bordDeLaRafale, paquetsDuCrochet, REGLAGES_GRAINS } from '../monde/grains.js';
 
 // La pluie au cœur d'un grain de force 1 éteint la lumière à 0,6 % par mètre : on n'y voit
 // pas à plus de 500 m (et de loin, le rideau est presque opaque)
-export const DENSITE_PLUIE = 0.006;
+export const DENSITE_PLUIE = REGLAGES_GRAINS.extinctionPluie;
 const LOIN = 6000; // (au-delà, une seule colonne de pluie par grain)
 const TAILLE_CARTE = 128;
 const DEMI_COTE = 16000; // (la carte du ciel bouché couvre 32 km autour de nous)

@@ -89,6 +89,14 @@ export function interpoler(a, b, t) {
   };
 }
 
+// La visibilité (m) : 60 km par beau temps, 6 km dans la brume, jusqu'à quatre fois moins sous
+// la pluie de partout (pluie : celle qui voile l'air partout, sans celle des grains). La lumière
+// s'y éteint à 3/visibilité par mètre : à cette distance, il en reste 5 % (rendu/eau.js : la
+// brume ; monde/feux.js : ce qu'on voit des feux de la côte)
+export function visibilite(meteo, pluie = meteo.pluie) {
+  return (60000 + (6000 - 60000) * (meteo.brume ?? 0)) * (1 + (0.25 - 1) * pluie);
+}
+
 // Angle (radians, dans le plan horizontal du monde) VERS lequel avance quelque chose
 // qui vient du cap « depuis » (degrés compas).
 export function angleVers(depuis) {

@@ -2,7 +2,9 @@
 // (balisage IALA, région A, celle de l'Europe) :
 //  - jaune : une marque spéciale, avec une croix jaune au sommet ;
 //  - rouge : une marque bâbord, avec un cylindre rouge au sommet ;
-//  - verte : une marque tribord, avec un cône vert au sommet.
+//  - verte : une marque tribord, avec un cône vert au sommet ;
+//  - cardinale-sud : jaune sur noir, deux cônes noirs pointe en bas (les dangers sont au nord
+//    d'elle : on passe au sud) — celle de la Basse du Bec (rendu/feux.js), feu blanc.
 // Chacune : un flotteur, un pylône en treillis, la marque de tête, un réflecteur radar et
 // un feu qui s'allume au crépuscule (il clignote : un éclat toutes les 4 secondes pour la
 // jaune, 3 pour la rouge, 2,5 pour la verte).
@@ -10,8 +12,8 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 
-const TEINTES = { jaune: 0xe8b512, rouge: 0xb51f1a, verte: 0x17803a };
-const FEUX = { jaune: [0xffd86a, 4], rouge: [0xff4a3a, 3], verte: [0x5dff8a, 2.5] };
+const TEINTES = { jaune: 0xe8b512, rouge: 0xb51f1a, verte: 0x17803a, 'cardinale-sud': 0xe8b512 };
+const FEUX = { jaune: [0xffd86a, 4], rouge: [0xff4a3a, 3], verte: [0x5dff8a, 2.5], 'cardinale-sud': [0xfff0d8, 15] };
 
 // Un cylindre entre deux points
 function barre(a, b, rayon) {
@@ -24,17 +26,20 @@ function barre(a, b, rayon) {
   return g;
 }
 
-function construire(couleur) {
+export function construireBouee(couleur) {
   const peinture = new THREE.MeshStandardMaterial({ color: TEINTES[couleur], roughness: 0.5, metalness: 0.05 });
   const metal = new THREE.MeshStandardMaterial({ color: 0x9aa1a6, roughness: 0.35, metalness: 0.85 });
   const sombre = new THREE.MeshStandardMaterial({ color: 0x1c1f22, roughness: 0.8 });
   const groupe = new THREE.Group();
   const peint = [];
+  // (la cardinale : le flotteur noir, le pylône jaune — jaune sur noir —, et la marque noire)
+  const cardinale = couleur === 'cardinale-sud';
+  const noir = [];
   // le flotteur : large et bas, la moitié dans l'eau ; une jupe plus sombre (les algues…)
   const flotteur = new THREE.LatheGeometry([
     [0, -0.9], [0.75, -0.9], [1.05, -0.55], [1.1, 0.1], [1.05, 0.55], [0.55, 0.75], [0, 0.75],
   ].map(([r, y]) => new THREE.Vector2(r, y)), 36);
-  peint.push(flotteur);
+  (cardinale ? noir : peint).push(flotteur);
   const jupe = new THREE.Mesh(new THREE.CylinderGeometry(1.115, 1.08, 0.5, 36, 1, true), sombre);
   jupe.position.y = -0.45;
   groupe.add(jupe);
@@ -58,7 +63,18 @@ function construire(couleur) {
   plateau.translate(0, 3.04, 0);
   peint.push(plateau);
   // la marque de tête
-  if (couleur === 'jaune') {
+  if (cardinale) {
+    // deux cônes noirs, pointe en bas, l'un au-dessus de l'autre
+    for (const h of [3.42, 3.98]) {
+      const cone = new THREE.ConeGeometry(0.3, 0.46, 20);
+      cone.rotateX(Math.PI);
+      cone.translate(0, h, 0);
+      noir.push(cone);
+    }
+    const tige = new THREE.CylinderGeometry(0.04, 0.04, 1.05, 8);
+    tige.translate(0, 3.6, 0);
+    noir.push(tige);
+  } else if (couleur === 'jaune') {
     for (const s of [1, -1]) {
       const bras = new THREE.BoxGeometry(0.12, 0.85, 0.12);
       bras.rotateZ(s * Math.PI / 4);
@@ -90,13 +106,14 @@ function construire(couleur) {
   const lanterne = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.12, 0.2, 14), new THREE.MeshStandardMaterial({
     color: 0x202020, emissive: teinteFeu, emissiveIntensity: 0, roughness: 0.3,
   }));
-  lanterne.position.set(0, couleur === 'jaune' ? 4.28 : couleur === 'rouge' ? 4.0 : 4.08, 0);
+  lanterne.position.set(0, cardinale ? 4.36 : couleur === 'jaune' ? 4.28 : couleur === 'rouge' ? 4.0 : 4.08, 0);
   groupe.add(lanterne);
-  const corps = new THREE.Mesh(mergeGeometries(peint.map((g) => {
+  const fusion = (geos) => mergeGeometries(geos.map((g) => {
     g.deleteAttribute('uv');
     return g.index ? g.toNonIndexed() : g;
-  })), peinture);
-  groupe.add(corps);
+  }));
+  groupe.add(new THREE.Mesh(fusion(peint), peinture));
+  if (noir.length) groupe.add(new THREE.Mesh(fusion(noir), sombre));
   for (const o of groupe.children) {
     o.castShadow = false;
     o.receiveShadow = false;
@@ -118,7 +135,7 @@ export class Bouees {
     for (const [id, b] of liste ?? []) {
       let o = this.objets.get(id);
       if (!o) {
-        o = construire(b.couleur);
+        o = construireBouee(b.couleur);
         o.groupe.name = `bouee-${id}`;
         this.scene.add(o.groupe);
         this.objets.set(id, o);

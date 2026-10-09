@@ -4,9 +4,9 @@
 // la colline, et l'île Brune au large. C'est la côte de la carte marine du carré.
 //
 // De si loin, ce qui compte, c'est la silhouette, les couleurs et la brume : la côte se
-// fond dans l'horizon exactement comme la mer (même calcul, même couleur du ciel). Le
-// feu du phare s'allume au crépuscule : trois éclats toutes les douze secondes, Fl(3) 12s,
-// comme sur la carte.
+// fond dans l'horizon exactement comme la mer (même calcul, même couleur du ciel). Ses feux
+// (le phare : trois éclats toutes les douze secondes, Fl(3) 12s, comme sur la carte ; le
+// port ; la bouée de la Basse du Bec) : monde/feux.js et rendu/feux.js.
 //
 // Repère du monde : -Z = nord, +X = est ; y = 0 au niveau de la mer.
 import * as THREE from 'three';
@@ -92,6 +92,31 @@ function terrainEmerge(x, v) {
   const butte = 55 * Math.exp(-(((x - (COTE.pointe.x - 900)) / 520) ** 2) - (((v - 420) / 380) ** 2));
   return bord + rocher + collines + butte;
 }
+
+// ---------- Les lieux de la côte (on y met des feux : monde/feux.js) ----------
+// Le phare de la pointe du Bec (le pied de sa tour, et sa lanterne) ; la jetée de
+// Port-Kervalen et son musoir (le bout, au large) ; la Roche Rouge, de l'autre côté de
+// l'entrée du port ; la Basse du Bec, des roches au sud de la pointe, et sa bouée ; le
+// sémaphore de Jos, sur la colline, et la fenêtre de sa vigie
+export const LIEUX = (() => {
+  const px = COTE.pointe.x;
+  const pv = 45;
+  const pied = hauteurTerrain(px, pv) - 1;
+  const phare = { x: px, z: rivage(px) - pv, pied, y: pied + 29.6 };
+  const jx = COTE.anse.x + 90;
+  const jz = rivage(jx) + 50;
+  const jetee = { x: jx, z: jz, angle: 0.5, longueur: 140, musoir: { x: jx + Math.sin(0.5) * 66, z: jz + Math.cos(0.5) * 66 } };
+  const rx = COTE.anse.x - 190;
+  const roche = { x: rx, z: rivage(rx) + 150 };
+  const bx = px + 40;
+  const basse = { x: bx, z: rivage(bx) + 460 };
+  const sx = px - 900;
+  const sv = 400;
+  const semaphore = { x: sx, z: rivage(sx) - sv, sol: hauteurTerrain(sx, sv) - 0.5 };
+  // (la vigie : la tourelle sur le toit ; sa fenêtre regarde la mer, au sud)
+  semaphore.vigie = { x: sx + 4, y: semaphore.sol + 9.4, z: semaphore.z + 2.56 };
+  return { phare, jetee, roche, basse, semaphore };
+})();
 
 // ---------- Les couleurs (linéaires) ----------
 // (la végétation renvoie peu de lumière : 10 à 15 % ; le granit un peu plus)
@@ -221,6 +246,7 @@ const BLANC = [0.78, 0.77, 0.74];
 const ARDOISE = [0.07, 0.075, 0.085];
 const PIERRE = [0.36, 0.33, 0.31];
 const ROUGE = [0.5, 0.06, 0.04];
+const VERT = [0.04, 0.3, 0.12];
 
 // Une maison bretonne : murs blancs, toit d'ardoise à deux pentes
 function maison(x, y, z, angle, l = 9, p = 6, h = 4.5) {
@@ -242,10 +268,8 @@ function batiments() {
   const geos = [];
   const sol = (x, v) => hauteurTerrain(x, v);
   // le phare de la pointe du Bec : une tour blanche, le haut rouge, la lanterne
-  const px = COTE.pointe.x;
+  const { x: px, z: pz, pied: py } = LIEUX.phare;
   const pv = 45;
-  const pz = rivage(px) - pv;
-  const py = sol(px, pv) - 1;
   const tour = new THREE.CylinderGeometry(2.6, 3.4, 24, 20);
   tour.translate(px, py + 12, pz);
   const haut = new THREE.CylinderGeometry(2.7, 2.6, 4, 20);
@@ -256,12 +280,8 @@ function batiments() {
   coupole.translate(px, py + 32.2, pz);
   geos.push(teinte(tour, BLANC), teinte(haut, ROUGE), teinte(galerie, ARDOISE), teinte(coupole, ARDOISE));
   geos.push(maison(px - 14, sol(px - 14, pv + 6), pz - 6, 0.2, 11, 7, 4));
-  const phare = new THREE.Vector3(px, py + 29.6, pz);
   // le sémaphore, sur la colline : le bâtiment blanc, le grand mât et sa vergue
-  const sx = COTE.pointe.x - 900;
-  const sv = 400;
-  const sz = rivage(sx) - sv;
-  const sy = sol(sx, sv) - 0.5;
+  const { x: sx, z: sz, sol: sy } = LIEUX.semaphore;
   const batiment = new THREE.BoxGeometry(16, 7, 8);
   batiment.translate(sx, sy + 3.5, sz);
   const tourelle = new THREE.BoxGeometry(5, 4, 5);
@@ -287,12 +307,28 @@ function batiments() {
   const nef = new THREE.BoxGeometry(9, 9, 22);
   nef.translate(ax + 20, sol(ax + 20, cv) + 4.5, rivage(ax + 20) - cv - 14);
   geos.push(teinte(clocher, PIERRE), teinte(fleche, PIERRE), teinte(nef, PIERRE));
-  // la jetée du port
-  const jetee = new THREE.BoxGeometry(6, 3, 140);
-  jetee.rotateY(0.5);
-  jetee.translate(ax + 90, 1, rivage(ax + 90) + 50);
+  // la jetée du port, et au musoir, le mât vert de son feu
+  const J = LIEUX.jetee;
+  const jetee = new THREE.BoxGeometry(6, 3, J.longueur);
+  jetee.rotateY(J.angle);
+  jetee.translate(J.x, 1, J.z);
   geos.push(teinte(jetee, PIERRE));
-  return { geometrie: mergeGeometries(geos), phare };
+  const matFeu = new THREE.CylinderGeometry(0.35, 0.45, 4.2, 10);
+  matFeu.translate(J.musoir.x, 2.5 + 2.1, J.musoir.z);
+  const cone = new THREE.ConeGeometry(0.6, 0.9, 12);
+  cone.translate(J.musoir.x, 2.5 + 4.65, J.musoir.z);
+  geos.push(teinte(matFeu, VERT), teinte(cone, VERT));
+  // la Roche Rouge : une roche, et sa tourelle rouge (une marque bâbord, un cylindre au sommet)
+  const R = LIEUX.roche;
+  const roche = new THREE.DodecahedronGeometry(9, 1);
+  roche.scale(1.3, 0.45, 1);
+  roche.translate(R.x, -1, R.z);
+  const tourRouge = new THREE.CylinderGeometry(1.5, 2.1, 8, 14);
+  tourRouge.translate(R.x, 1.5 + 4, R.z);
+  const marque = new THREE.CylinderGeometry(0.7, 0.7, 1.2, 14);
+  marque.translate(R.x, 1.5 + 8 + 0.9, R.z);
+  geos.push(teinte(roche, [0.12, 0.11, 0.1]), teinte(tourRouge, ROUGE), teinte(marque, ROUGE));
+  return mergeGeometries(geos);
 }
 
 // ---------- La brume, comme sur la mer ----------
@@ -338,24 +374,13 @@ export class Cote {
     this.groupe.name = 'cote-de-kervalen';
     const materiau = brumeCommeLaMer(new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.95, metalness: 0 }), eau);
     const terre = new THREE.Mesh(mergeGeometries([geometrieCote(), geometrieIle()]), materiau);
-    const { geometrie, phare } = batiments();
-    const maisons = new THREE.Mesh(geometrie, brumeCommeLaMer(new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.8 }), eau));
-    // le feu du phare : une petite boule très lumineuse (le halo de l'image fait le reste)
-    this.feu = new THREE.Mesh(new THREE.SphereGeometry(1.6, 12, 8), new THREE.MeshBasicMaterial({ color: 0x000000 }));
-    this.feu.position.copy(phare);
-    for (const m of [terre, maisons, this.feu]) {
+    const maisons = new THREE.Mesh(batiments(), brumeCommeLaMer(new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.8 }), eau));
+    // (les feux — le phare, le port, la bouée, la fenêtre du sémaphore — : rendu/feux.js)
+    for (const m of [terre, maisons]) {
       m.frustumCulled = false;
       this.groupe.add(m);
     }
     scene.add(this.groupe);
-  }
-
-  // Le feu du phare : trois éclats toutes les 12 secondes, quand le jour baisse
-  maj(temps, nuit) {
-    const t = temps % 12;
-    const eclat = (t < 0.4 || (t > 1.6 && t < 2.0) || (t > 3.2 && t < 3.6)) ? 1 : 0;
-    const allume = Math.min(1, Math.max(0, (nuit - 0.1) / 0.3));
-    this.feu.material.color.setRGB(1, 0.92, 0.75).multiplyScalar(eclat * allume * 3000);
   }
 }
 

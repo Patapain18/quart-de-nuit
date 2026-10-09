@@ -11,6 +11,7 @@ import { Pluie } from './pluie.js';
 import { EclairsRendu } from './eclairs.js';
 import { Foudre, lumiereEclair } from '../monde/foudre.js';
 import { Cote } from './cote.js';
+import { FeuxRendu } from './feux.js';
 import { Embruns } from './embruns.js';
 import { Deferlantes3D } from './deferlantes.js';
 import { Scelerate3D } from './scelerate.js';
@@ -51,8 +52,9 @@ export class Monde3D {
     this.eau = new Eau(this.renderer, this.houle, this.ciel);
     this.post = new Post(this.renderer);
     this.scene.add(this.ciel.fond, this.eau.mesh);
-    // la côte de Kervalen, au nord, à l'horizon
+    // la côte de Kervalen, au nord, à l'horizon, et ses feux (le phare, le port, la bouée)
     this.cote = new Cote(this.scene, this.eau);
+    this.feux = new FeuxRendu(this.scene, this.houle, this.ciel.grains.uniforms);
 
     // La lumière directe (le soleil le jour, la lune la nuit) : elle seule fait des
     // ombres nettes, calculées sur une petite zone autour du bateau
@@ -158,7 +160,7 @@ export class Monde3D {
         o.visible = true;
       }
     };
-    for (const o of [this.cargo.groupe, this.trombe.groupe, this.embruns.mesh, this.lumiereEtrange.sprite, this.scelerate.mesh, this.eclairs.groupe, this.saintElme.maille, ...this.aPrecompiler, ...this.deferlantes.cretes.map((c) => c.mesh)]) montrer(o);
+    for (const o of [this.cargo.groupe, this.trombe.groupe, this.embruns.mesh, this.lumiereEtrange.sprite, this.scelerate.mesh, this.eclairs.groupe, this.saintElme.maille, ...this.aPrecompiler, ...this.deferlantes.cretes.map((c) => c.mesh), ...this.feux.faisceaux, ...this.feux.feux.flatMap((f) => [f.point, f.aureole])]) montrer(o);
     if (this.bateau) {
       montrer(this.bateau.eauABord.cockpit.mesh);
       montrer(this.bateau.eauABord.cabine.mesh);
@@ -413,7 +415,6 @@ export class Monde3D {
     this.ciel.deriver(dt, m.vent * NOEUD * 1.6 + 3, angleVers(m.directionVent));
     this.majEclairs(dt);
     this.post.reglages.uTemps.value = this.temps;
-    this.cote.maj(this.temps, this.ecl.nuit);
 
     if (this.bateau) {
       this.mesurer('simulation', () => {
@@ -433,6 +434,9 @@ export class Monde3D {
     }
     placerCamera?.(dt);
     this.camera.updateMatrixWorld();
+    // les feux de la côte : ce qu'on en voit d'ici (la distance, la brume, la pluie entre eux
+    // et nous, la crête des vagues devant)
+    this.mesurer('feux', () => this.feux.maj(dt, { temps: this.temps, camera: this.camera, meteo: m, grains: this.etatGrains, hauteurSoleil: this.ecl.hauteurSoleil }));
     // le feu de Saint-Elme, en tête de mât : sous un nuage d'orage, dans le noir
     const s = THREE.MathUtils.smoothstep;
     this.saintElme.maj(dt, this.temps, s(this.foudre.champ, 0.55, 0.85) * s(this.ecl.nuit, 0.3, 0.8), this.teteDeMat(), this.camera);

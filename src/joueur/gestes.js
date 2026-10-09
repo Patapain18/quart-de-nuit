@@ -163,6 +163,15 @@ export function creerGestes(jeu, interieur) {
       principal: { texte: 'tapoter le verre, caler l\'aiguille témoin', faire: () => jeu.lireBarometre() },
     },
     {
+      // le livre des feux, sur l'étagère tribord de la timonerie (le livre bleu)
+      id: 'livre-feux',
+      point: interieur.positionLivreFeux.clone(),
+      rayon: 0.09,
+      soi: ['objets', 'boiseries'],
+      titre: () => 'Le livre des feux',
+      principal: { texte: 'l\'ouvrir', faire: () => jeu.ouvrirLivreFeux() },
+    },
+    {
       id: 'cire',
       point: interieur.positionCire.clone(),
       rayon: 0.3,

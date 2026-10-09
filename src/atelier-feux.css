@@ -1,0 +1,20 @@
+/* Atelier des feux : ce qu'on voit de chaque feu, leurs éclats, le livre (le reste : les
+   ateliers de la mer et de la trombe) */
+#vus { width: 100%; border-collapse: collapse; font-size: 12px; font-variant-numeric: tabular-nums; }
+#vus th, #vus td { padding: 3px 4px; text-align: left; border-bottom: 1px solid var(--bordure); }
+#vus th { font-weight: 600; color: var(--texte-doux); }
+#vus td.nombre { text-align: right; }
+#vus .pastille { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 5px; vertical-align: 0; }
+#eclats { margin-top: var(--espace-2); }
+#eclats svg { display: block; width: 100%; height: auto; }
+#eclats .nom { fill: var(--texte-doux); font-size: 9px; }
+#livre { background: #f4efe1; color: #26323a; border-radius: 6px; padding: 10px 12px; }
+#livre .carte-feux { display: block; width: 100%; height: auto; border: 1px solid #c8b98e; margin-bottom: 8px; }
+#livre .feu { border-top: 1px solid #d8cba3; padding: 6px 0 4px; }
+#livre h4 { margin: 0; font: 600 13px/1.3 Georgia, serif; }
+#livre .caractere { margin: 2px 0 4px; font: 600 14px/1.2 ui-monospace, Menlo, monospace; color: #7a2350; }
+#livre .details, #livre .explication { margin: 3px 0 0; font-size: 12px; line-height: 1.35; }
+#livre .details { color: #6d6250; }
+#livre .signes { margin: 0 0 6px; font-size: 11.5px; line-height: 1.4; }
+#livre .carte-feux { width: auto; max-width: 100%; height: 190px; }
+#livre .signes b { font-family: ui-monospace, Menlo, monospace; color: #7a2350; }

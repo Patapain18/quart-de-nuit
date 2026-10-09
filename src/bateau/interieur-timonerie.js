@@ -171,7 +171,8 @@ function geometrieLambris(s) {
 }
 
 // Les étagères sous les corniches : une planche et son rebord (le « violon »), et quelques
-// objets dessus (des livres à tribord, une lampe torche et des jumelles à bâbord)
+// objets dessus (des livres à tribord — le bleu, c'est le livre des feux —, une lampe torche
+// et des jumelles à bâbord). Rend la place du livre des feux (à tribord)
 function geometrieEtageres(s, boisGeos, objets) {
   const yEtagere = (z) => {
     const [, , p2, p3] = profilBas(uDe(z));
@@ -188,12 +189,15 @@ function geometrieEtageres(s, boisGeos, objets) {
   if (s > 0) {
     const couleurs = [0x7a1f1f, 0x1f3a5f, 0x2f5233, 0xb8892b, 0x222222, 0x8a4f2a];
     let z = 1.3;
+    let livre = null;
     for (let k = 0; k < 6; k++) {
       const ep = 0.025 + ((k * 7) % 5) * 0.006;
       const h = 0.15 + ((k * 3) % 4) * 0.012;
       objets.push(teinter(boite(0.13, h, ep, x, y + h / 2, z), couleurs[k]));
+      if (k === 1) livre = new THREE.Vector3(x, y + h / 2, z);
       z -= ep + 0.003;
     }
+    return livre;
   } else {
     objets.push(teinter(new THREE.CylinderGeometry(0.022, 0.022, 0.2, 12).rotateX(Math.PI / 2).translate(x, y + 0.022, 1.05), 0x2b2b2b));
     objets.push(teinter(new THREE.CylinderGeometry(0.03, 0.026, 0.035, 12).rotateX(Math.PI / 2).translate(x, y + 0.022, 0.94), 0x8f8f8f));
@@ -358,7 +362,9 @@ export function construireInterieurTimonerie(i, { mat, garder, ajouter, boisGeos
     geometrieLambris(1), geometrieLambris(-1), geometrieLambrisPareBrise(), geometrieLambrisArriere(), geometrieEmbrasures(),
   ].map((g) => (g.index ? g.toNonIndexed() : g))), mat.bois, 'lambris-timonerie');
   ajouter(geometriePlafond(), mat.plafond, 'plafond-timonerie');
-  for (const s of [1, -1]) geometrieEtageres(s, boisGeos, objets);
+  // (le livre des feux : là où l'on vise pour le prendre, dans le repère du bateau)
+  i.positionLivreFeux = geometrieEtageres(1, boisGeos, objets);
+  geometrieEtageres(-1, boisGeos, objets);
 
   // --- la trémie et l'escalier (à bâbord) ---
   const { x0, x1 } = TREMIE;
