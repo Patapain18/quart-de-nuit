@@ -1360,7 +1360,7 @@ demi-mille de l'entrée : la partie ne s'allonge que de trois ou quatre minutes.
     la lumière étrange aussi : « Un feu blanc, fixe, qui vacille. Aucun feu du livre ne lui
     ressemble. »
     **Le livre des feux** (`jeu/livre-des-feux.js`) : le livre bleu sur l'étagère tribord de
-    la timonerie (E pour l'ouvrir, E ou C pour le refermer). À gauche, la petite carte de la
+    la timonerie (E pour l'ouvrir, E ou L pour le refermer). À gauche, la petite carte de la
     côte — la pointe du Bec, l'île Brune, Port-Kervalen, et leurs feux : la goutte magenta
     des cartes marines et leur signature — et ce que veulent dire les signes (Fl, Fl(3), Q,
     LFl, W · R · G, la période) ; à droite, chaque feu : son nom, sa signature, le dessin de
