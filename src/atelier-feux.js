@@ -12,7 +12,7 @@ import { meteoDeLaNuit } from './jeu/nuit.js';
 import { heureEnTexte } from './jeu/journee.js';
 import { Bateau } from './bateau/bateau.js';
 import { Grains } from './monde/grains.js';
-import { FEUX, SEMAPHORE, COULEURS, MILLE } from './monde/feux.js';
+import { FEUX, SEMAPHORE, COULEURS, MILLE, rythme } from './monde/feux.js';
 import { LIEUX } from './rendu/cote.js';
 import { pageDesFeux, SIGNES } from './jeu/livre-des-feux.js';
 import { REGLAGES_FEUX } from './rendu/feux.js';
@@ -213,12 +213,15 @@ document.getElementById('livre').innerHTML = `${carte}<p class="signes">${SIGNES
 
 // Ce qu'on voit de chaque feu, d'ici
 const css = (c) => `rgb(${c.map((v) => Math.round(255 * Math.min(1, v) ** (1 / 2.2))).join(',')})`;
-function etatDuFeu(v) {
+// (pic : la lumière reçue au plus fort de son dernier éclat ; entre deux éclats, il ne nous
+// arrive rien, mais le feu n'en est pas moins visible)
+function etatDuFeu(v, pic) {
   if (v.eclat === 0 && monde.ecl.hauteurSoleil > 0.035) return 'éteint (le jour)';
   if (v.horizon) return 'sous l\'horizon';
   if (v.transmission < 0.002) return 'perdu dans la pluie';
   if (v.cache > 0.9) return 'caché par une vague';
-  return v.recu >= 1 ? 'visible' : 'trop faible';
+  if (pic < 1) return 'trop faible';
+  return v.eclat < 0.05 ? 'entre deux éclats' : 'visible';
 }
 const tableVus = document.getElementById('vus');
 const zoneEclats = document.getElementById('eclats');
@@ -227,11 +230,14 @@ function afficherVus() {
   const lignes = vus.map((v) => {
     const h = historique.get(v.feu.id);
     const cache = h.length ? Math.round((100 * h.filter((x) => x.cache > 0.5).length) / h.length) : 0;
+    // (au plus fort de la dernière période : son dernier éclat)
+    const depuis = monde.temps - rythme(v.feu).periode - 0.2;
+    const pic = h.reduce((m, x) => (x.t >= depuis ? Math.max(m, x.recu) : m), v.recu);
     return `<tr><td><span class="pastille" style="background:${css(COULEURS[v.feu.couleur])}"></span>${v.feu.caractere ?? 'fixe'}</td>`
       + `<td class="nombre">${(v.distance / MILLE).toFixed(1).replace('.', ',')} M</td>`
-      + `<td class="nombre">${v.recu >= 10 ? Math.round(v.recu) : v.recu.toFixed(1).replace('.', ',')}</td>`
+      + `<td class="nombre">${pic >= 10 ? Math.round(pic) : pic.toFixed(1).replace('.', ',')}</td>`
       + `<td class="nombre">${Math.round(v.transmission * 100)} %</td>`
-      + `<td class="nombre">${cache} %</td><td>${etatDuFeu(v)}</td></tr>`;
+      + `<td class="nombre">${cache} %</td><td>${etatDuFeu(v, pic)}</td></tr>`;
   });
   tableVus.innerHTML = `<tr><th>Feu</th><th>Distance</th><th>Reçu</th><th>Air</th><th>Vagues</th><th></th></tr>${lignes.join('')}`;
   // les éclats des vingt dernières secondes (échelle logarithmique : de 1 à 10 000 fois le seuil)
