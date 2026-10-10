@@ -18,6 +18,7 @@
       <button type="button" id="reprendre-partie" class="principal deux-lignes" hidden>Reprendre la nuit<small id="reprendre-detail"></small></button>
       <button type="button" id="prendre-le-quart" class="principal">Prendre le quart</button>
       <p class="note">Le pilote automatique tient le bateau vent arrière, les vagues dans le dos. Toi, tu le gardes en vie : l'eau qui entre, le pilote qui lâche, la porte, le foc… Chaque heure est pire que la précédente.</p>
+      <p class="note">Il y a un an, jour pour jour, on a retrouvé <em>Morgane</em> à la dérive au large de Kervalen : le pilote enclenché, la timonerie vide. Le livre de bord de son ancien propriétaire, Yves Le Bihan, est toujours à bord.</p>
       <div class="liens-bas">
         <button type="button" id="ouvrir-options">Options</button>
         <button type="button" id="ouvrir-apropos">À propos</button>
@@ -34,11 +35,11 @@
     <div id="colonne">
       <p id="etat-bord"><span id="harnais" hidden></span></p>
     </div>
-    <aside id="carnet" hidden aria-label="Carnet de bord">
+    <aside id="carnet" hidden aria-label="Le livre de bord">
       <div class="page gauche">
-        <h2>Carnet de bord</h2>
-        <p class="bateau">Voilier <em>Morgane</em> · au large de Kervalen</p>
-        <h3>Ce qu'il faut surveiller</h3>
+        <h2>Le livre de bord</h2>
+        <p class="bateau">Voilier <em>Morgane</em> · tenu par Yves Le Bihan</p>
+        <h3>Ses consignes, pour qui prendra le quart</h3>
         <ul id="carnet-consignes">
           <li><strong>Chaque heure est pire.</strong> Les déferlantes viennent de plus en plus souvent, et de plus en plus grosses. On les entend gronder avant qu'elles frappent, <em>du côté d'où elles viennent</em> ; la nuit, un éclair montre parfois leur crête.</li>
           <li><strong>Le courant.</strong> La batterie (sa jauge est au tableau électrique, sur la console, et sous l'heure) : tout ce qui est électrique la vide, le pilote surtout. Coupe au tableau ce dont tu peux te passer. Vide, tout s'éteint.</li>
@@ -50,11 +51,13 @@
           <li><strong>Le foc.</strong> S'il se met à battre, il secoue le bateau et le pilote force : sors le rouler (la bosse d'enrouleur est dans le cockpit, à tribord). Dehors, accroche toujours ton harnais (X), et tiens-toi (Maj) quand une vague arrive.</li>
           <li><strong>Les dalots du cockpit.</strong> S'ils se bouchent, le cockpit ne se vide plus : son eau passe sous la porte, et l'arrière alourdi fait forcer le pilote. Sors les dégager, aux coins arrière du cockpit, derrière la roue.</li>
         </ul>
+        <h3>Sa dernière nuit · du 9 au 10 octobre 2025</h3>
+        <ol id="carnet-pages"></ol>
       </div>
       <div class="page droite">
-        <h3>Journal de la nuit</h3>
+        <h3>Ta nuit</h3>
         <ol id="carnet-journal"></ol>
-        <p class="fermer">molette : faire défiler les consignes · <kbd>L</kbd> fermer le carnet</p>
+        <p class="fermer">molette : tourner les pages · <kbd>L</kbd> fermer le livre</p>
       </div>
     </aside>
     <p id="annonce" aria-hidden="true"></p>

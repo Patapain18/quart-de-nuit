@@ -47,15 +47,17 @@ verifier(nuit.stats.grains >= 3, `les grains passent sur le bateau (${nuit.stats
 const trombe = attentif.journal.find((j) => j.texte.startsWith('Une trombe'));
 verifier(trombe && trombe.heure > 27.2 && trombe.heure < 27.8, `la trombe naît vers 3 h 30 (${trombe ? heureEnTexte(trombe.heure) : 'pas vue'}), et passe à ${Math.round(nuit.stats.trombeDistance)} m`);
 const scelerates = attentif.journal.filter((j) => j.texte.startsWith('Un grondement énorme'));
-verifier(scelerates.length === 2 && scelerates[0].heure > 26.3 && scelerates[0].heure < 26.9 && scelerates[1].heure > 29 && scelerates[1].heure < 29.7,
-  `deux vagues scélérates : ${scelerates.map((j) => heureEnTexte(j.heure)).join(' et ')}`);
+verifier(scelerates.length === 2 && scelerates[0].heure > 26.3 && scelerates[0].heure < 26.9 && scelerates[1].heure > 29 && scelerates[1].heure < 29.4,
+  `deux vagues scélérates : on les entend à ${scelerates.map((j) => heureEnTexte(j.heure)).join(' et ')}`);
+const chocs = attentif.scelerates.map((c) => c.heure);
+verifier(chocs.length === 2 && chocs[1] > 29.4 && chocs[1] < 29.85, `et elles frappent : à ${chocs.map((h) => heureEnTexte(h)).join(' et ')} (la seconde au plus fort, avant l'aube)`);
 verifier(attentif.avaries.some((a) => a.nom === 'pilote') && attentif.avaries.some((a) => a.nom === 'ecouteFoc'), 'le pilote lâche, l\'écoute de foc casse');
 const pilotes = attentif.avaries.filter((a) => a.nom === 'pilote');
 verifier(pilotes.length >= 2 && pilotes.every((a) => a.heure > 26), `le pilote lâche dans la seconde moitié de la nuit (${pilotes.length} fois : ${pilotes.map((a) => heureEnTexte(a.heure)).join(', ')})`);
 const chaud = resultats.some((r) => r.journal.some((j) => j.texte.startsWith('Le pilote a trop chauffé')));
 verifier(chaud, 'le pilote finit par trop chauffer, et disjoncte');
 verifier(nuit.stats.eclairs > 100, `la foudre : ${nuit.stats.eclairs} éclairs, le plus proche à ${Math.round(nuit.stats.eclairPlusPres)} m`);
-const etrange = ['Une voix sur le 16', 'Des coups contre la coque'].filter((t) => resultats.some((r) => r.journal.some((j) => j.texte.startsWith(t))));
+const etrange = ['Une voix sur le 16', 'Trois coups, derrière la porte'].filter((t) => resultats.some((r) => r.journal.some((j) => j.texte.startsWith(t))));
 verifier(etrange.length === 2, `l'étrange : ${etrange.join(', ').toLowerCase()}`);
 const absent = resultats.find((r) => r.cle === 'absent');
 // chaque heure plus dure : les déferlantes (toutes, et les grosses) des deux premières heures et

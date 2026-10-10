@@ -37,12 +37,14 @@ import {
 } from './quart/nuit.js';
 import { TOILE_DE_NUIT, ANGLE_PILOTE, piloter } from './quart/veilleurs.js';
 import { positionCrete } from './mer/scelerate.js';
+import { angleVu, PORTE_CABINE } from './quart/peur.js';
 import { Apparitions } from './rendu/apparitions.js';
 import { distanceALaTerre } from './rendu/cote.js';
 import { lireOptions, changerOptions, quandOptionsChangent } from './quart/options.js';
 import { COCKPIT, MAT, TIMONERIE } from './bateau/forme.js';
 import { SIEGE, YEUX_POSTE, COTES_VOLETS } from './bateau/interieur-timonerie.js';
 import { NOMS_DISJONCTEURS, BATTERIE, PILOTE, EAU_BATTERIES } from './quart/systemes.js';
+import { pagesLisibles, PROPRIETAIRE } from './quart/livre-de-bord.js';
 
 const parametres = new URLSearchParams(location.search);
 const canvas = document.getElementById('scene');
@@ -136,7 +138,7 @@ const jeu = {
     audio.parasites?.(2.2, 0.5);
     afficherMessage('Canal 16 : rien que des parasites.');
   },
-  appelerJos() {
+  appelerLe16() {
     audio.parasites?.(3, 0.6);
     afficherMessage('Tu appelles sur le 16. Personne ne répond.');
   },
@@ -213,6 +215,18 @@ const jeu = {
       audio.coupDePompe(litres > 0.1);
     }
     bateau.pomper(Math.sin(etat.phasePompe) * 0.7);
+  },
+  // le livre de bord de l'ancien propriétaire (comme la touche L)
+  lireLivre() {
+    if (!etat.carnet) basculerCarnet();
+  },
+  // la porte basse de la cabine avant : on l'ouvre (pour regarder dedans), on la referme
+  basculerPorteAvant() {
+    const i = bateau.interieur;
+    const fermer = i.porteAvantEtat !== 'fermee';
+    if (fermer && i.porteAvantEtat === 'entrouverte' && nuit) nuit.ecrire('Refermé la porte de la cabine avant.');
+    i.ouvrirPorteAvant(fermer ? 'fermee' : 'ouverte');
+    audio.porteAvant?.(!fermer, panVers(i.positionPorteAvant));
   },
   // la trappe de la cale : on la soulève pour voir l'eau (la baladeuse s'allume avec elle)
   basculerTrappe() {
@@ -660,6 +674,7 @@ function simuler(dt) {
     heure: nuit ? nuit.heure % 24 : meteo.heure,
     vacille,
     nuit: monde.ecl.nuit,
+    gite: m.gite,
     dt,
   });
   const dedans = (etat.mode === 'pied' && !marin.dehors) || etat.mode === 'poste';
@@ -785,6 +800,8 @@ function contexteNuit(dt) {
       gilet: etat.gilet,
       descenteOuverte: bateau.descenteOuverte,
       trappeOuverte: bateau.interieur.trappeOuverte,
+      porteAvant: bateau.interieur.porteAvantEtat,
+      voletsFermes: nuit ? Object.fromEntries(COTES_VOLETS.map((c) => [c, nuit.systemes.volets[c].fraction > 0.95])) : null,
 
       attache: marin.attache,
       dehors: etat.mode === 'pied' && marin.dehors,
@@ -836,6 +853,17 @@ function vivreLaNuit(dt) {
     secousse(0.35);
   }
   etat.eauCale = nuit.eau.cale;
+  // la porte de la cabine avant s'est entrouverte dans ton dos : quand tu la vois (debout : assis
+  // au poste, la console la cache), le journal le note (et le cœur cogne)
+  if (bateau.interieur.porteAvantEtat === 'entrouverte' && !etat.porteAvantVue && etat.mode === 'pied') {
+    const { lieu, yeux, regard } = regardDansLeBateau();
+    if (lieu === 'timonerie' && angleVu(yeux, regard, PORTE_CABINE) < 28) {
+      etat.porteAvantVue = true;
+      etat.porteAvantFois = (etat.porteAvantFois ?? 0) + 1;
+      nuit.ecrire(etat.porteAvantFois === 1 ? 'La porte de la cabine avant est entrouverte.' : 'La porte de la cabine avant est de nouveau entrouverte. Je l\'avais refermée.');
+      audio.battement?.(0.8);
+    }
+  }
   // le temps qu'il fait suit l'heure (le ciel dix fois par seconde, la mer toutes les trois
   // secondes)
   etat.majCiel += dt;
@@ -925,8 +953,15 @@ function vivreEtrange(nom) {
   } else if (nom === 'voix16') {
     jeu.radio.fantome('Canal 16 : une voix, très faible, noyée dans les parasites… « …ayday… mayday… ici… » … puis plus rien.', { duree: 7.5 });
   } else if (nom === 'coups') {
-    audio.coupsCoque?.();
+    audio.coupsCoque?.(panVers(bateau.interieur.positionPorteAvant));
   }
+}
+
+// D'où vient un point du bateau (repère du bateau), vu d'où l'on est : -1 à gauche → 1 à droite
+const _point = new THREE.Vector3();
+function panVers(pointBateau) {
+  _point.copy(pointBateau).applyMatrix4(bateau.groupe.matrixWorld).sub(monde.camera.position);
+  return panDepuis(_point);
 }
 
 // La peur (quart/peur.js, par la nuit) : ce qu'on entend, ce qui secoue. (Ce qu'on voit :
@@ -935,10 +970,18 @@ function vivrePeur(e) {
   const p = nuit?.peur;
   if (e === 'gemissement') audio.gemissement?.((Math.random() - 0.5) * 1.6);
   else if (e === 'pas') {
-    // (le monde se tait un instant : on les entend d'autant mieux ; la lumière hésite)
+    // (le monde se tait un instant : on les entend d'autant mieux ; la lumière hésite ; la porte
+    // de la cabine avant ouverte, ils viennent de là)
     audio.etouffer?.(5.5, 0.55);
-    audio.pasSurLePont?.();
+    audio.pasSurLePont?.(bateau.interieur.porteAvantEtat === 'fermee' ? 0 : panVers(bateau.interieur.positionPorteAvant));
     etat.vacille = 1.2;
+  } else if (e === 'porteAvant') {
+    // (dans ton dos : le loquet qui saute, les gonds qui grincent ; on ne la voit qu'en se
+    // retournant)
+    bateau.interieur.ouvrirPorteAvant('entrouverte');
+    audio.porteAvant?.(true, panVers(bateau.interieur.positionPorteAvant));
+    etat.porteAvantVue = false;
+    etat.vacille = Math.max(etat.vacille ?? 0, 0.6);
   } else if (e === 'nom') {
     audio.etouffer?.(4, 0.5);
     etat.vacille = 2;
@@ -1086,6 +1129,8 @@ function remettreLaTimonerie() {
   ouvrirDescente(false);
   bateau.interieur.ouvrirTrappe(false);
   ouvrirTrappe(false);
+  bateau.interieur.ouvrirPorteAvant('fermee');
+  etat.porteAvantVue = true;
   if (nuit) {
     nuit.systemes.baladeuse = false;
     etat.eclairage = nuit.systemes.eclairage;
@@ -1110,7 +1155,7 @@ function commencerNuit({ reprise = null, heure = null } = {}) {
   Object.assign(physique, { eauCale: 0, eauCockpit: 0, ecouteFocLibre: false, grandVoileDechiree: false, focDechire: false, ecouteGV: 0.8, ecouteFoc: 0.6 }, TOILE_DE_NUIT);
   Object.assign(etat, {
     pilote: true, feux: true, gilet: true, lampe: false, eclairage: 'rouge', evenements: new Set(), majCiel: 0, majMer: 0,
-    aubeEnAttente: false, eauCale: 0, calme: 0, danger: 0,
+    aubeEnAttente: false, eauCale: 0, calme: 0, danger: 0, pagesLues: 0, pageNouvelle: false, porteAvantFois: 0,
   });
   bateau.interieur.cire.visible = false;
   remettreLaTimonerie();
@@ -1134,10 +1179,20 @@ function commencerNuit({ reprise = null, heure = null } = {}) {
     jeu.meteo = meteo;
     monde.regler(meteo);
   }
+  // (une nuit reprise : les pages des heures déjà passées sont lues)
+  etat.pagesLues = nuit.heure > HEURE_DEBUT ? pagesLisibles(nuit.heure).length : 0;
   nuit
     .on('journal', majCarnet)
     .on('heure', (h, signe) => {
       if (h > HEURE_DEBUT || reprise) annoncer(h === HEURE_DEBUT ? 'Minuit' : signe, heureRonde(h));
+      // (une page de plus du livre de bord se lit, maintenant que son heure est venue)
+      const pages = pagesLisibles(h).length;
+      if (pages > (etat.pagesLues ?? 0)) {
+        afficherMessage(etat.pagesLues ? `Une page de plus dans le livre de bord : ${heureRonde(h)}, la nuit d'${PROPRIETAIRE} (L)`
+          : `Sur la banquette, le livre de bord de Morgane : les consignes d'${PROPRIETAIRE}, son ancien propriétaire, et sa dernière nuit (L)`);
+        etat.pagesLues = pages;
+        etat.pageNouvelle = true;
+      }
       majCarnet();
       // (la partie est gardée au début de chaque heure)
       garderPartie({ heure: h, graine: nuit.graine, sauvegarde: nuit.instantaneAGarder(), journal: nuit.journal.slice(-40) });
@@ -1249,7 +1304,7 @@ function commencerNuit({ reprise = null, heure = null } = {}) {
   marin.site = -0.18;
   embarquer();
   majCarnet();
-  if (!reprise) annoncer('Minuit', 'Six heures avant l\'aube');
+  if (!reprise && heure === null) annoncer('Minuit', 'Six heures avant l\'aube');
 }
 
 // Après un naufrage : on reprend au début de l'heure (l'heure, l'eau, les avaries d'alors)
@@ -1391,7 +1446,13 @@ function afficherHeure() {
 function basculerCarnet() {
   etat.carnet = !etat.carnet;
   document.getElementById('carnet').hidden = !etat.carnet;
-  if (etat.carnet) majCarnet();
+  if (!etat.carnet) return;
+  majCarnet();
+  // (une page qu'on n'a pas encore lue : le livre s'ouvre sur elle)
+  if (etat.pageNouvelle) {
+    etat.pageNouvelle = false;
+    document.querySelector('#carnet-pages li:last-child')?.scrollIntoView({ block: 'start' });
+  }
 }
 // (ses consignes se déroulent à la molette — même quand la souris est prise par le jeu)
 document.addEventListener('wheel', (e) => {
@@ -1401,6 +1462,12 @@ document.addEventListener('wheel', (e) => {
 function majCarnet() {
   const journal = document.getElementById('carnet-journal');
   journal.innerHTML = (nuit?.journal ?? []).slice(-16).map((e) => `<li><span class="h">${heureEnTexte(e.heure)}</span><span>${e.texte}</span></li>`).join('');
+  // les pages de sa dernière nuit, jusqu'à l'heure qu'il est
+  const pages = document.getElementById('carnet-pages');
+  const lisibles = nuit ? pagesLisibles(nuit.heure) : [];
+  if (pages.childElementCount !== lisibles.length) {
+    pages.innerHTML = lisibles.map((p) => `<li${p.inachevee ? ' class="inachevee"' : ''}>${p.texte}</li>`).join('');
+  }
 }
 
 // ---------- La caméra ----------

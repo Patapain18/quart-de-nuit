@@ -604,6 +604,91 @@ function construireVolets(i, garder) {
 // ---------- La construction ----------
 
 // i : l'intérieur (interieur.js) ; outils : ses matériaux et ses listes de géométries
+// La cabine avant, derrière sa porte basse : on n'y descend pas (une marche de 45 cm, la
+// couchette en V tout de suite devant), on ne fait qu'y regarder. Elle n'a pas de lumière :
+// ses matériaux ne prennent pas celle de la timonerie (qui passerait à travers la cloison) —
+// seulement la frontale, et les éclairs. Par la porte (70 cm de haut), on ne voit que le pied
+// de la marche : un ciré jaune y est tombé, en tas, ses bandes réfléchissantes qui renvoient la
+// frontale dans le noir — de la porte, on croirait quelqu'un, recroquevillé. Sur la couchette,
+// un sac de couchage défait.
+function construireCabineAvant(i, groupe) {
+  const PA = PORTE_AVANT;
+  const zFond = -1.9;
+  const zCloison = Z_AV - 0.04; // (juste derrière la cloison)
+  const sol = 0.55;
+  const plafond = 1.78;
+  const x0 = -1.45;
+  const x1 = 1.2;
+  const bois = new THREE.MeshStandardMaterial({ color: 0x2b1e15, roughness: 0.82, side: THREE.DoubleSide });
+  const plancher = new THREE.MeshStandardMaterial({ color: 0x231912, roughness: 0.9 });
+  const coussin = new THREE.MeshStandardMaterial({ color: 0x2c3138, roughness: 0.95 });
+  const nylon = new THREE.MeshStandardMaterial({ color: 0x1c2a29, roughness: 0.5, metalness: 0.05 });
+  const cabine = new THREE.Group();
+  cabine.name = 'cabine-avant';
+  // ses parois (vues de dedans) : le fond, les deux côtés, le plafond, le plancher
+  const parois = [
+    entre(x0, x1, sol, plafond, zFond - 0.02, zFond),
+    entre(x0 - 0.02, x0, sol, plafond, zFond, zCloison),
+    entre(x1, x1 + 0.02, sol, plafond, zFond, zCloison),
+    entre(x0, x1, plafond, plafond + 0.02, zFond, zCloison),
+  ];
+  cabine.add(new THREE.Mesh(mergeGeometries(parois.map((g) => preparer(g, []))), bois));
+  const p = new THREE.Mesh(entre(x0, x1, sol - 0.02, sol, zFond, zCloison), plancher);
+  cabine.add(p);
+  // la couchette en V : son coffre, et son matelas (le bord arrière à 70 cm de la porte)
+  const zCouchette = zCloison - 0.7;
+  cabine.add(new THREE.Mesh(entre(x0, x1, sol, sol + 0.42, zFond, zCouchette), bois));
+  cabine.add(new THREE.Mesh(entre(x0 + 0.03, x1 - 0.03, sol + 0.42, sol + 0.54, zFond + 0.03, zCouchette - 0.02), coussin));
+  // le sac de couchage, en tas, du côté de la porte : une forme allongée, bosselée
+  const sac = new THREE.CapsuleGeometry(0.22, 1.1, 6, 14);
+  sac.rotateX(Math.PI / 2);
+  const pos = sac.attributes.position;
+  for (let k = 0; k < pos.count; k++) {
+    const x = pos.getX(k);
+    const y = pos.getY(k);
+    const z = pos.getZ(k);
+    // (aplati sur le matelas, une épaule plus haute du côté de la tête, des plis)
+    const tete = Math.max(0, -z - 0.25) * 0.35;
+    pos.setXYZ(k, x * 1.15, y * (0.62 + tete) + 0.03 * Math.sin(z * 9 + x * 5), z);
+  }
+  sac.computeVertexNormals();
+  const tas = new THREE.Mesh(sac, nylon);
+  tas.position.set((PA.x0 + PA.x1) / 2 + 0.12, sol + 0.54 + 0.12, zCouchette - 0.75);
+  tas.rotation.y = 0.18;
+  cabine.add(tas);
+  // le ciré, en tas au pied de la marche, juste derrière la porte : une forme bosselée, une
+  // manche qui dépasse, et ses bandes réfléchissantes (elles ne brillent que sous la lampe)
+  const cire = new THREE.SphereGeometry(0.3, 18, 12);
+  const pc = cire.attributes.position;
+  for (let k = 0; k < pc.count; k++) {
+    const x = pc.getX(k);
+    const y = pc.getY(k);
+    const z = pc.getZ(k);
+    pc.setXYZ(k, x * 1.05, Math.max(0, y) * 0.42 + 0.02 * Math.sin(x * 17 + z * 11), z * 0.8);
+  }
+  cire.computeVertexNormals();
+  const jaune = new THREE.MeshStandardMaterial({ color: 0x7a5c12, roughness: 0.62 });
+  const bande = new THREE.MeshStandardMaterial({ color: 0xc8ccd0, roughness: 0.18, metalness: 0.2 });
+  const tasCire = new THREE.Group();
+  tasCire.add(new THREE.Mesh(cire, jaune));
+  const manche = new THREE.Mesh(new THREE.CapsuleGeometry(0.055, 0.42, 4, 8).rotateZ(Math.PI / 2 - 0.3), jaune);
+  manche.position.set(0.26, 0.05, 0.12);
+  tasCire.add(manche);
+  // (ses bandes : une autour du torse, une autour de la manche)
+  const bandeTorse = new THREE.Mesh(new THREE.TorusGeometry(0.2, 0.012, 6, 20), bande);
+  bandeTorse.rotation.set(Math.PI / 2 - 0.2, 0.4, 0);
+  bandeTorse.position.set(-0.05, 0.1, 0.02);
+  const bandeManche = new THREE.Mesh(new THREE.TorusGeometry(0.058, 0.012, 6, 20), bande);
+  bandeManche.rotation.set(Math.PI / 2 - 0.2, 1.25, 0);
+  bandeManche.position.set(0.3, 0.05, 0.13);
+  tasCire.add(bandeTorse, bandeManche);
+  tasCire.position.set((PA.x0 + PA.x1) / 2 - 0.05, sol, zCloison - 0.4);
+  tasCire.rotation.y = 0.5;
+  cabine.add(tasCire);
+  groupe.add(cabine);
+  i.cabineAvant = cabine;
+}
+
 export function construireInterieurTimonerie(i, { mat, garder, ajouter, boisGeos, inoxGeos, noirGeos, objets, cadrans }) {
   const groupe = i.groupe;
   ajouter(geometriePlancher(), mat.sol, 'plancher-timonerie');
@@ -756,6 +841,21 @@ export function construireInterieurTimonerie(i, { mat, garder, ajouter, boisGeos
     coussins.push(teinter(new THREE.BoxGeometry(0.1, 0.26, B.z1 - B.z0 - 0.04).translate(xD, yD + 0.13, (B.z0 + B.z1) / 2), 0x1d2a3a));
   }
   objets.push(teinter(new THREE.BoxGeometry(0.36, 0.07, 0.3).translate(B.x0 + 0.24, B.haut + 0.125, B.z1 - 0.25), 0x5a1f1d));
+  // le livre de bord de l'ancien propriétaire, posé à l'avant de la banquette : une reliure de
+  // toile bleue, la tranche des pages qui a jauni, un crayon glissé dans la reliure
+  {
+    const x = B.x0 + 0.19;
+    const y = B.haut + 0.09;
+    const z = B.z0 + 0.3;
+    const livre = [
+      teinter(new THREE.BoxGeometry(0.22, 0.006, 0.3).translate(0, 0.003, 0), 0x1f2f4a),
+      teinter(new THREE.BoxGeometry(0.21, 0.024, 0.29).translate(0.003, 0.018, 0), 0xd2c6a4),
+      teinter(new THREE.BoxGeometry(0.22, 0.006, 0.3).translate(0, 0.033, 0), 0x1f2f4a),
+      teinter(new THREE.CylinderGeometry(0.004, 0.004, 0.16, 6).rotateX(Math.PI / 2).translate(-0.1, 0.04, 0.02), 0x8a6a2a),
+    ];
+    for (const g of livre) objets.push(g.rotateY(0.25).translate(x, y, z));
+    i.positionLivre = new THREE.Vector3(x, y + 0.03, z);
+  }
   ajouter(mergeGeometries(coussins.map((g) => g.toNonIndexed())), garder(new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.92 })), 'coussins-timonerie');
 
   // --- sur la paroi tribord, au-dessus de l'avant de la banquette : le baromètre et la pendule ---
@@ -893,15 +993,21 @@ export function construireInterieurTimonerie(i, { mat, garder, ajouter, boisGeos
     inoxGeos.push(new THREE.CylinderGeometry(0.008, 0.008, 0.08, 6).rotateX(Math.PI / 2).translate(xC, yC + 0.02, Z_AR - 0.04));
   }
 
-  // --- la porte basse de la cabine avant (fermée), dans la cloison, à bâbord de la console :
-  // peinte d'un vert sombre, un panneau mouluré, un loquet de laiton et sa serrure, une
-  // grille d'aération en bas ---
+  // --- la porte basse de la cabine avant, dans la cloison, à bâbord de la console : peinte
+  // d'un vert sombre, un panneau mouluré, un loquet de laiton et sa serrure, une grille
+  // d'aération en bas. Elle pivote sur ses gonds (côté coque) et s'ouvre vers l'avant, dans la
+  // cabine (i.porteAvant ; interieur.js : ouvrirPorteAvant). Derrière : la cabine avant ---
   {
     const PA = PORTE_AVANT;
     const z = Z_AV - 0.02; // (un peu en retrait de la cloison)
     const xm = (PA.x0 + PA.x1) / 2;
     const peinture = garder(new THREE.MeshStandardMaterial({ color: 0x313b34, roughness: 0.78 }));
     const laiton = garder(new THREE.MeshStandardMaterial({ color: 0xb08d57, roughness: 0.35, metalness: 0.85 }));
+    // (tout ce qui bouge avec elle est bâti dans le repère du bateau, puis ramené à ses gonds)
+    const pivot = new THREE.Group();
+    pivot.name = 'porte-cabine-avant';
+    pivot.position.set(PA.x0, 0, z);
+    const auxGonds = (g) => g.translate(-PA.x0, 0, -z);
     const porte = [entre(PA.x0, PA.x1, PA.y0, PA.y1, z - 0.025, z)];
     // (la moulure de son panneau : quatre baguettes ; en dessous, la grille d'aération)
     for (const [y0, y1] of [[PA.y0 + 0.24, PA.y1 - 0.06]]) {
@@ -910,10 +1016,8 @@ export function construireInterieurTimonerie(i, { mat, garder, ajouter, boisGeos
       porte.push(entre(x0, x1, y0, y0 + 0.015, z, z + 0.008), entre(x0, x1, y1 - 0.015, y1, z, z + 0.008));
       porte.push(entre(x0, x0 + 0.015, y0, y1, z, z + 0.008), entre(x1 - 0.015, x1, y0, y1, z, z + 0.008));
     }
-    const mesh = new THREE.Mesh(mergeGeometries(porte.map((g) => preparer(g, []))), peinture);
-    mesh.name = 'porte-cabine-avant';
+    const mesh = new THREE.Mesh(auxGonds(mergeGeometries(porte.map((g) => preparer(g, [])))), peinture);
     mesh.receiveShadow = true;
-    groupe.add(mesh);
     // le chambranle : trois baguettes de bois verni sur la face de la cloison, et l'embrasure
     boisGeos.push(uvBois(entre(PA.x0 - 0.03, PA.x0, PA.y0 - 0.02, PA.y1 + 0.03, Z_AV, Z_AV + 0.018)));
     boisGeos.push(uvBois(entre(PA.x1, PA.x1 + 0.025, PA.y0 - 0.02, PA.y1 + 0.03, Z_AV, Z_AV + 0.018)));
@@ -926,17 +1030,23 @@ export function construireInterieurTimonerie(i, { mat, garder, ajouter, boisGeos
       entre(PA.x1 - 0.13, PA.x1 - 0.1, yL - 0.025, yL + 0.025, z, z + 0.008),
       entre(PA.x1 - 0.06, PA.x1 - 0.035, yL - 0.09, yL - 0.04, z, z + 0.004),
     ];
-    const mL = new THREE.Mesh(mergeGeometries(laitons.map((g) => preparer(g, []))), laiton);
+    const mL = new THREE.Mesh(auxGonds(mergeGeometries(laitons.map((g) => preparer(g, [])))), laiton);
     mL.name = 'loquet-cabine-avant';
-    groupe.add(mL);
-    noirGeos.push(entre(PA.x1 - 0.051, PA.x1 - 0.044, yL - 0.08, yL - 0.06, z + 0.004, z + 0.005));
-    // la grille d'aération, en bas : des lamelles devant un fond sombre
-    noirGeos.push(entre(xm - 0.12, xm + 0.12, PA.y0 + 0.06, PA.y0 + 0.17, z + 0.0005, z + 0.001));
+    // (la serrure, et la grille d'aération : des lamelles devant un fond sombre)
+    const noirs = [entre(PA.x1 - 0.051, PA.x1 - 0.044, yL - 0.08, yL - 0.06, z + 0.004, z + 0.005)];
+    noirs.push(entre(xm - 0.12, xm + 0.12, PA.y0 + 0.06, PA.y0 + 0.17, z + 0.0005, z + 0.001));
+    const lamelles = [];
     for (let k = 0; k < 4; k++) {
       const y = PA.y0 + 0.07 + k * 0.025;
-      boisGeos.push(uvBois(entre(xm - 0.12, xm + 0.12, y, y + 0.012, z + 0.001, z + 0.008)));
+      lamelles.push(uvBois(entre(xm - 0.12, xm + 0.12, y, y + 0.012, z + 0.001, z + 0.008)));
     }
+    const mN = new THREE.Mesh(auxGonds(mergeGeometries(noirs.map((g) => preparer(g, [])))), mat.noir);
+    const mB = new THREE.Mesh(auxGonds(mergeGeometries(lamelles.map((g) => preparer(g, ['uv'])))), mat.bois);
+    pivot.add(mesh, mL, mN, mB);
+    groupe.add(pivot);
+    i.porteAvant = pivot;
     i.positionPorteAvant = new THREE.Vector3(xm, (PA.y0 + PA.y1) / 2, Z_AV);
+    construireCabineAvant(i, groupe);
   }
 
   // --- les mains courantes du plafond, de chaque côté, pour se tenir quand ça bouge ---

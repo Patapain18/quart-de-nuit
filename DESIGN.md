@@ -57,10 +57,10 @@ arrivent, chacune avec ses signes et sa parade :
 | Les déferlantes (une toutes les 40 s à minuit, toutes les 12 s à 5 h) | leur grondement, de leur côté, de 2,5 s (les petites) à 6 s (les plus grosses) avant le choc — le moteur le couvre : on ne l'entend plus qu'au dernier tiers ; la nuit, un éclair montre la crête des plus grosses | fermer les volets de ce côté ; la porte ; se tenir (Maj) dehors |
 | Le foc qui bat (son écoute casse, vers 3 h) | son claquement, le bateau qui part, le pilote qui chauffe plus vite (il force 1,6 fois plus) | sortir le rouler, harnais accroché |
 | Les dalots bouchés (vers 4 h 30) | le cockpit reste plein (on le voit par la porte et les fenêtres arrière), on n'entend plus l'eau s'écouler ; l'alarme de cale | sortir les dégager, derrière la roue — sans rouvrir la porte tant que le cockpit est plein |
-| La trombe (née vers 3 h 30, elle passe vers 4 h 15, à 150 m au moins) | l'écho au radar, et rien d'autre : on ne la voit qu'à la lueur des éclairs | tenir |
-| Deux vagues scélérates (2 h 30, 5 h 20) | un grondement énorme, une minute avant ; un éclair montre le mur | tenir |
+| La trombe (née vers 3 h 25, elle passe vers 4 h 15, à 150 m au moins, et s'efface vers 4 h 50) | l'écho au radar, et rien d'autre : on ne la voit qu'à la lueur des éclairs | tenir |
+| Deux vagues scélérates (elles frappent vers 3 h 15 et 5 h 40) | un grondement énorme, une demi-heure de la nuit avant, de son côté ; un éclair montre le mur | fermer les volets de son côté ; tenir |
 | La foudre | les éclairs, le tonnerre de plus en plus proche, le feu de Saint-Elme | réarmer ce qui a sauté |
-| L'inexpliqué | un écho qui suit, des pas sur le pont, une voix sur le 16, des coups sous la coque… | rien : ce n'est jamais confirmé |
+| L'inexpliqué | un écho qui suit, des pas sur le toit, une voix sur le 16, le sondeur qui marque six mètres, trois coups derrière la porte de la cabine avant, cette porte qui s'entrouvre dans ton dos… ce que racontait le livre de bord | rien : ce n'est jamais confirmé |
 
 **Les volets de tempête** sont les portes de FNAF : on les ferme côté par côté, depuis le siège,
 quand une vague arrive de ce côté-là… mais volet fermé, on ne voit plus rien de ce côté ; leurs
@@ -81,12 +81,26 @@ Quand elle sonne, l'heure s'affiche avec son signe, et le journal le note.
 | 1 h | « Le baromètre baisse. » | 35 | toutes les 32 s, ×0,9 | un premier grain passe |
 | 2 h | « La mer se creuse. » | 38 | toutes les 26 s, ×0,95 | une voix sur le 16 ; la première vague scélérate (vers 2 h 30) |
 | 3 h | « Des éclairs, tout autour. » | 41 | toutes les 15 s, ×1 (la scélérate les fait taire un quart d'heure) | l'écoute du foc casse (la première sortie) ; la trombe naît vers 3 h 30, dans le noir |
-| 4 h | « Le baromètre n'a jamais été si bas. » | 43 | toutes les 17 s, ×1,05 | la trombe passe, à 150 m au moins ; le front vers 4 h 30 (le vent tourne de 25°, la mer croise) ; les dalots se bouchent (la seconde sortie) |
-| 5 h | « Le vent hurle dans le gréement. » | 46 | toutes les 12 s, ×1,1 | le plus fort : le grain le plus violent, la seconde vague scélérate, des coups sous la coque |
+| 4 h | « Le baromètre n'a jamais été si bas. » | 43 | toutes les 17 s, ×1,05 | la trombe passe, à 150 m au moins ; le front vers 4 h 30 (le vent tourne de 25°, la mer croise) ; les dalots se bouchent (la seconde sortie) ; la porte de la cabine avant s'entrouvre |
+| 5 h | « Le vent hurle dans le gréement. » | 46 | toutes les 12 s, ×1,1 | le plus fort : le grain le plus violent ; trois coups derrière la porte de la cabine avant ; la seconde vague scélérate, qui frappe vers 5 h 40 |
 | 6 h | | il tombe enfin | | la première lueur : la nuit est finie |
 
 La nuit est gardée au début de chaque heure : après un naufrage, on reprend à cette heure-là
 (ou à minuit).
+
+### Le livre de bord (à la place de Jos)
+
+*Morgane* appartenait à Yves Le Bihan. Il y a un an, jour pour jour, on l'a retrouvée à la dérive
+au large de Kervalen : le pilote enclenché, la timonerie vide. Son livre de bord est toujours à
+bord, sur la banquette (`quart/livre-de-bord.js` ; la touche L, ou E en le regardant). Il fait ce
+que faisait Jos : d'abord **ses consignes**, pour qui prendra le quart (tout ce qu'il faut
+surveiller) ; puis **sa dernière nuit**, la nuit du 9 au 10 octobre 2025 — une page par heure, qu'on
+ne lit qu'une fois cette heure venue (« Une page de plus dans le livre de bord »). Comme les
+appels du téléphone dans FNAF, chacune dit ce qui va arriver (la batterie, le grain, les vagues
+qu'on entend venir, le foc, les dalots…) et chacune est un peu plus étrange (l'écho qui suit, le
+mayday sur le 16, quelqu'un à l'avant, le sondeur, la porte de la cabine avant). La dernière, à
+5 h, s'arrête au milieu d'une phrase : « On frappe à la porte de la cabine avant. Trois coups.
+Je vais ».
 
 ### Les commandes
 
@@ -97,7 +111,7 @@ Au clavier (français) et à la souris. La souris tourne la tête.
   se lever (la pompe à main, la trappe, le coupe-batterie, le baromètre : il faut y aller).
 - **À pied** : Z Q S D pour marcher, E pour agir (Maj + E : l'action inverse), Maj pour se
   tenir, C pour s'accroupir, X le harnais (dehors).
-- **Partout** : F la lampe frontale, L le carnet de bord, H pour cacher l'aide, Échap la pause.
+- **Partout** : F la lampe frontale, L le livre de bord, H pour cacher l'aide, Échap la pause.
 
 ## 3. Feuille de route
 
@@ -114,7 +128,7 @@ ligne reste l'ancien tant que le nouveau n'est pas jouable.
    et les vitres qui éclatent ; les veilleurs automatiques pour régler la difficulté.
 4. ✅ **Les heures** — chaque heure plus dure, chaque menace annoncée par ses signes (le grondement
    qui vient d'un côté, le radar, l'éclair qui montre la vague) ; les deux sorties forcées.
-5. **L'inexpliqué et l'ambiance** — l'écho qui suit, les coups sous la coque, une voix sur la
+5. ✅ **L'inexpliqué et l'ambiance** — l'écho qui suit, les coups sous la coque, une voix sur la
    VHF, une forme au sondeur ; les notes de l'ancien propriétaire du bateau pour apprendre les
    commandes (à la place de Jos).
 6. **Le son** — plus silencieux, chaque son venant de sa direction, de longs creux avant les coups.
@@ -367,6 +381,70 @@ ferme pas les volets et laisse la porte ouverte — mais on reprend toujours au 
 
 **À voir** : `docs/heures-*.jpg` (5 h qui sonne, dans le noir ; les dalots bouchés, vus accroupi
 dans le cockpit ; l'éclair qui montre une grosse déferlante, 2,7 s avant qu'elle frappe).
+
+### Étape 5 : l'inexpliqué ✅ (10 octobre 2026)
+
+**Le livre de bord d'Yves Le Bihan** remplace Jos (`quart/livre-de-bord.js`, voir plus haut) :
+l'accueil le dit en deux phrases (on a retrouvé *Morgane* à la dérive il y a un an, jour pour
+jour, la timonerie vide) ; à minuit, un message montre où il est ; à chaque heure, une page de plus
+(« Une page de plus dans le livre de bord : 3 h, la nuit d'Yves Le Bihan (L) »), et le livre s'ouvre
+sur elle. Le carnet devient ce livre : à gauche, ses consignes puis sa dernière nuit, de son
+écriture, à l'encre bleu-noir (la dernière page s'arrête net, la plume a glissé) ; à droite, *ta*
+nuit (le journal). Le livre lui-même est posé sur la banquette, une reliure de toile bleue, un
+crayon dedans : E pour le lire. Ce qu'il raconte peut arriver… ou pas : rien n'est confirmé, mais
+le journal de ta nuit lui répond parfois mot pour mot (« Le sondeur a marqué six mètres »).
+
+**La porte basse de la cabine avant**, gardée fermée depuis l'étape 2 : elle s'entrouvre (son
+loquet saute, ses gonds grincent, de son côté) — jamais sous tes yeux : assis au poste, la console
+la cache ; debout, seulement dans ton dos (`porteAvant`, dans `quart/peur.js` : deux fois au plus,
+de 4 h 18 à 5 h 51, avec sa propre attente). Il faut se lever pour la voir ; le journal le note
+quand on la voit (« La porte de la cabine avant est entrouverte », puis « … de nouveau
+entrouverte. Je l'avais refermée ») ; E la referme, ou l'ouvre en grand. Derrière (`construireCabineAvant`) :
+la cabine sans lumière — ses matériaux ne prennent pas celle de la timonerie, seulement la
+frontale et les éclairs —, une marche, la couchette en V et un sac de couchage défait ; et, au
+pied de la marche, là où tombe le regard par la porte de 70 cm, **un ciré jaune en tas**, ses bandes
+réfléchissantes qui renvoient la frontale dans le noir. Le ciré de l'ancien propriétaire ? Rien ne
+le dit.
+
+**L'inexpliqué de l'ancien jeu, mis au 14 m** (`quart/peur.js`) : plus de carré ni de barre (les
+lieux sont la timonerie et le pont), plus de silence de Jos (la VHF grésille toute la nuit). Les
+pas sont sur le toit de la timonerie — ou, la porte de la cabine avant ouverte, dans la cabine
+avant, et ils viennent de là ; les trois coups de 5 h (`quart/nuit.js`, l'étrange) viennent de
+derrière la porte basse (« Trois coups, derrière la porte de la cabine avant ») ; quelqu'un à
+l'avant ne se voit plus que de la timonerie, par le pare-brise (du cockpit, la timonerie cache
+l'avant) ; la forme pâle dans l'eau se voit aussi debout contre une vitre de côté, ses volets
+ouverts ; les échos du radar, seulement à la console. L'étrange de `nuit.js` attend, lui aussi,
+qu'une vague scélérate ou la trombe soient passées.
+
+**Ce qui a changé en route** :
+- **la seconde vague scélérate frappait entre 5 h 52 et 5 h 58 — ou jamais** (sur une nuit
+  d'essai, elle arrivait après six heures, quand la nuit était finie) : elle attendait que la
+  trombe ait disparu, et la trombe vivait jusqu'à 5 h 05. La trombe vit maintenant 170 s au lieu de
+  200 (elle passe toujours vers 4 h 15, puis s'efface vers 4 h 50), et la scélérate naît vers 5 h :
+  elle frappe entre 5 h 36 et 5 h 45 sur les quatre nuits d'essai, au plus fort ;
+- la forme dans l'eau ne venait jamais plus en arrière que z = 3,2 m (l'arrière de l'ancien
+  bateau) : vue du cockpit, elle était devant soi, au lieu d'un peu en arrière ; elle suit
+  maintenant le 14 m, jusqu'au tableau arrière ;
+- l'annonce « Minuit » s'affichait quand on commençait directement à une autre heure
+  (`jeu.html?heure=28.4`).
+
+**Mesuré** (`npm run test-peur`, 29 vérifications : trois nuits avec un marin simulé, au poste,
+debout, dehors ; `npm run test-nuit`) : la porte de la cabine avant s'entrouvre 6 fois en trois
+nuits, toujours hors de sa vue ; elle ne se rouvre pas tant qu'on ne l'a pas refermée ; la forme
+dans l'eau se voit debout contre la vitre, pas derrière ses volets ni assis au poste ; le livre a
+une page par heure, lisible seulement une fois l'heure venue, la dernière inachevée. Les nuits des
+veilleurs, la seconde scélérate frappant enfin : l'attentif voit toujours l'aube 4 fois sur 4,
+sans noir ni vitre brisée ; le distrait coule entre 4 h 35 et 5 h 25, l'absent entre 3 h 12 et
+3 h 58. Les essais de marche : 22 sur 22 (la porte de la cabine avant, le livre).
+
+**Limites** : on ne descend pas dans la cabine avant, on ne fait qu'y regarder ; assis au poste, on
+ne voit pas la porte (c'est voulu : il faut se lever) ; le livre dit la même nuit à chaque partie ;
+les sons de la porte, des coups et des pas sont encore ceux qu'on calcule (l'étape 6 les
+reprendra) ; quelqu'un à l'avant et la forme dans l'eau sont plus rares qu'avant (on vit au poste,
+et il faut regarder dans la bonne direction, au bon moment).
+
+**À voir** : `docs/inexplique-*.jpg` (le livre de bord ouvert sur sa dernière nuit ; la cabine avant,
+porte ouverte, à la frontale).
 
 ## 4. Le moteur (ce qu'on garde de l'ancien jeu)
 

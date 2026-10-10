@@ -437,6 +437,10 @@ export class Interieur {
 
     this.eclairage = 'eteint';
     this.trappeOuverte = false;
+    // la porte basse de la cabine avant : 'fermee', 'entrouverte' ou 'ouverte' (et l'angle où
+    // elle en est : elle s'ouvre doucement, et bat un peu au roulis)
+    this.porteAvantEtat = 'fermee';
+    this.anglePorteAvant = 0;
     this._ciel = new THREE.Color();
     this._chaud = new THREE.Color();
     bateau.groupe.add(this.groupe);
@@ -468,6 +472,19 @@ export class Interieur {
     this.uniforms.uTrappe.value = ouverte ? 1 : 0;
   }
 
+  // La porte basse de la cabine avant : fermée, entrouverte (une main de large) ou ouverte
+  ouvrirPorteAvant(etat) {
+    this.porteAvantEtat = etat;
+  }
+  majPorteAvant(dt, gite) {
+    const cible = { fermee: 0, entrouverte: 0.6, ouverte: 1.42 }[this.porteAvantEtat] ?? 0;
+    // (pas fermée, elle bat au roulis : le bateau gîte, elle suit)
+    const bat = this.porteAvantEtat === 'fermee' ? 0 : 0.12 * Math.max(-1, Math.min(1, gite / 25));
+    this.anglePorteAvant += (cible + bat - this.anglePorteAvant) * Math.min(1, dt * (cible > this.anglePorteAvant ? 1.6 : 4));
+    if (this.porteAvantEtat === 'fermee' && this.anglePorteAvant < 0.004) this.anglePorteAvant = 0;
+    this.porteAvant.rotation.y = this.anglePorteAvant;
+  }
+
   // Réglé à chaque image.
   //   systemes : les systèmes du bord (quart/systemes.js : le courant, les disjoncteurs,
   //   l'éclairage, le moteur, les volets…) ; sans eux (l'accueil, les ateliers) : eclairage
@@ -476,11 +493,13 @@ export class Interieur {
   //   illumine les vitres ; descente : 0 (porte fermée) → 1 (ouverte) ; pression (hPa) et
   //   heure, pour les cadrans ; temoin (hPa) : l'aiguille témoin du baromètre, calée à la
   //   main ; vacille : 0 → 1, la lumière des plafonniers (1 : normale ; moins : elle faiblit,
-  //   quand le courant hésite) ; nuit : 0 → 1 (les noms des tableaux s'éclairent) ; dt
+  //   quand le courant hésite) ; nuit : 0 → 1 (les noms des tableaux s'éclairent) ; gite
+  //   (degrés : la porte de la cabine avant bat au roulis) ; dt
   regler({
     systemes = null, eclairage = 'eteint', feux = false, ciel, eclair = 0, descente = 1, pression = 1015, temoin = null, heure = 12,
-    vacille = 1, nuit = 0, dt = 0,
+    vacille = 1, nuit = 0, gite = 0, dt = 0,
   }) {
+    this.majPorteAvant(dt, gite);
     const sy = systemes ?? this.systemesAuRepos;
     if (!systemes) {
       sy.eclairage = eclairage;

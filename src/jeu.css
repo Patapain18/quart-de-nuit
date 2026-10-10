@@ -194,6 +194,13 @@ button.principal:hover { background: #f6c47a; }
 #carnet ol, #carnet ul { margin: 0; padding: 0; list-style: none; font: 16px/28px var(--manuscrit); }
 #carnet-consignes li { line-height: 26px; padding-left: 1.1em; text-indent: -1.1em; font-size: 15px; margin-bottom: 4px; }
 #carnet-consignes li::before { content: "– "; }
+/* (les pages de sa dernière nuit : son écriture, à l'encre bleu-noir ; la dernière s'arrête net,
+   la plume a glissé) */
+#carnet-pages li { font-size: 15px; line-height: 26px; color: #22304a; margin-bottom: 10px; }
+#carnet-pages li.inachevee::after {
+  content: ""; display: inline-block; width: 3.2em; height: 1.5px; margin-left: 0.2em; vertical-align: 0.3em;
+  background: currentColor; transform: rotate(-11deg); transform-origin: left center; opacity: 0.75;
+}
 #carnet-journal { overflow: hidden; align-self: start; }
 #carnet-journal li { display: grid; grid-template-columns: 4.6em 1fr; line-height: 28px; font-size: 15px; }
 #carnet-journal .h { font: 12.5px/28px var(--chiffres); color: #7a6440; }

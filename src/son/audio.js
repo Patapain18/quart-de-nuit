@@ -919,7 +919,8 @@ export class Audio {
 
   // Des coups contre la coque, à l'avant, sous la flottaison : trois, puis un quatrième,
   // plus faible. (Un tronc ? Une épave ? On ne saura pas.)
-  coupsCoque() {
+  // (pan : d'où ils viennent — de derrière la porte de la cabine avant)
+  coupsCoque(pan = -0.15) {
     if (!this.actif()) return;
     const ctx = this.ctx;
     const t0 = ctx.currentTime + 0.2;
@@ -941,7 +942,7 @@ export class Audio {
       g.gain.linearRampToValueAtTime(1.6 * force, t + 0.006);
       g.gain.exponentialRampToValueAtTime(0.001, t + 0.45);
       const p = ctx.createStereoPanner();
-      p.pan.value = -0.15;
+      p.pan.value = pan;
       s.connect(passe).connect(coque).connect(g).connect(p).connect(this.bus.dedans);
       s.start(t, Math.random() * 2, 0.5);
       // et le petit claquement du contact
@@ -1346,13 +1347,15 @@ export class Audio {
 
   // Des pas sur le pont, au-dessus de soi : de l'avant vers l'arrière, lents ; ils
   // s'arrêtent ; puis un dernier, juste au-dessus. (On ne les entend que dedans.)
-  pasSurLePont() {
+  // (decalage : d'où ils viennent, en plus de leur marche de gauche à droite ; 0 : au-dessus)
+  pasSurLePont(decalage = 0) {
     if (!this.actif()) return;
     const ctx = this.ctx;
     const t0 = ctx.currentTime + 0.1;
     const n = 6 + Math.floor(Math.random() * 3);
     const pas = [];
-    for (let i = 0; i < n; i++) pas.push([i * (0.62 + (Math.random() - 0.5) * 0.08), 0.55 + 0.25 * (i / n), -0.4 + 0.5 * (i / n)]);
+    const largeur = decalage ? 0.2 : 1;
+    for (let i = 0; i < n; i++) pas.push([i * (0.62 + (Math.random() - 0.5) * 0.08), 0.55 + 0.25 * (i / n), Math.max(-1, Math.min(1, decalage + largeur * (-0.4 + 0.5 * (i / n))))]);
     pas.push([n * 0.62 + 2.6, 1, 0.12]);
     for (const [dans, force, pan] of pas) {
       const t = t0 + dans;
@@ -1377,6 +1380,48 @@ export class Audio {
     }
     // (et le pont qui craque sous le poids, une fois)
     this.jouer('craquements', { dans: 0.1 + n * 0.3, gain: 0.35, vitesse: 0.8, pan: 0, bus: 'dedans' });
+  }
+
+  // La porte basse de la cabine avant (pan : de son côté) : en s'ouvrant, son loquet qui saute
+  // et ses gonds qui grincent, longtemps ; en se fermant, le panneau qui claque et le loquet
+  porteAvant(ouvre = true, pan = 0) {
+    if (!this.actif()) return;
+    const ctx = this.ctx;
+    const t = ctx.currentTime + 0.03;
+    const cote = ctx.createStereoPanner();
+    cote.pan.value = pan;
+    cote.connect(this.bus.dedans);
+    // le loquet : un claquement de laiton, bref et clair
+    const c = ctx.createBufferSource();
+    c.buffer = this.blanc;
+    const fc = ctx.createBiquadFilter();
+    fc.type = 'bandpass';
+    fc.frequency.value = ouvre ? 2600 : 1900;
+    fc.Q.value = 5;
+    const gc = ctx.createGain();
+    gc.gain.setValueAtTime(0, t);
+    gc.gain.linearRampToValueAtTime(ouvre ? 0.45 : 0.6, t + 0.002);
+    gc.gain.exponentialRampToValueAtTime(0.001, t + 0.07);
+    c.connect(fc).connect(gc).connect(cote);
+    c.start(t, Math.random(), 0.1);
+    if (ouvre) {
+      // les gonds : un grincement lent (un bois qui craque, ralenti), qui part un instant après
+      this.jouer('craquements', { dans: 0.25, gain: 0.7, vitesse: 0.42, pan, bus: 'dedans' });
+      this.jouer('craquements', { dans: 1.1, gain: 0.35, vitesse: 0.36, pan, bus: 'dedans' });
+    } else {
+      // le panneau qui frappe son chambranle : un coup sourd
+      const s2 = ctx.createBufferSource();
+      s2.buffer = this.brun;
+      const f2 = ctx.createBiquadFilter();
+      f2.type = 'lowpass';
+      f2.frequency.value = 320;
+      const g2 = ctx.createGain();
+      g2.gain.setValueAtTime(0, t);
+      g2.gain.linearRampToValueAtTime(1.1, t + 0.005);
+      g2.gain.exponentialRampToValueAtTime(0.001, t + 0.3);
+      s2.connect(f2).connect(g2).connect(cote);
+      s2.start(t, Math.random() * 2, 0.35);
+    }
   }
 
   // Quelque chose d'immense frotte sous la coque, d'un bord à l'autre (cote : d'où il vient)

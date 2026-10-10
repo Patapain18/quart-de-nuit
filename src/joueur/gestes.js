@@ -73,6 +73,27 @@ export function creerGestes(jeu, interieur) {
       },
     },
     {
+      // la porte basse de la cabine avant, à bâbord de la console : on l'ouvre pour regarder
+      // dedans (il n'y a rien… à la lampe, un sac de couchage en tas), on la referme
+      id: 'porte-avant',
+      point: interieur.positionPorteAvant,
+      rayon: 0.26,
+      dedans: true,
+      soi: ['porte-cabine-avant', 'loquet-cabine-avant', 'lambris-timonerie', 'boiseries', 'cabine-avant'],
+      titre: () => ({ fermee: 'La porte de la cabine avant', entrouverte: 'La porte de la cabine avant : entrouverte', ouverte: 'La cabine avant' })[interieur.porteAvantEtat],
+      principal: { texte: () => (interieur.porteAvantEtat === 'fermee' ? 'l\'ouvrir' : 'la fermer'), faire: () => jeu.basculerPorteAvant() },
+    },
+    {
+      // le livre de bord de l'ancien propriétaire, sur la banquette : le lire (comme L)
+      id: 'livre',
+      point: interieur.positionLivre,
+      rayon: 0.17,
+      dedans: true,
+      soi: ['objets', 'coussins-timonerie'],
+      titre: () => 'Le livre de bord d\'Yves Le Bihan',
+      principal: { texte: 'le lire', faire: () => jeu.lireLivre() },
+    },
+    {
       // la porte coulissante de la timonerie (on l'atteint des deux côtés)
       id: 'descente',
       point: new Vector3(0, TIMONERIE.plancher + 0.85, TIMONERIE.zArriere),
@@ -204,7 +225,7 @@ export function creerGestes(jeu, interieur) {
       titre: () => `Radio VHF (canal ${jeu.radio.canal})`,
       principal: { texte: 'écouter', faire: () => jeu.ecouterMeteo(), ...sousTension(jeu, 'vhf', 'La VHF') },
       // (on appelle sur le 16, le canal de détresse : personne ne répond)
-      secondaire: { texte: 'appeler', faire: () => jeu.appelerJos(), ...sousTension(jeu, 'vhf', 'La VHF') },
+      secondaire: { texte: 'appeler', faire: () => jeu.appelerLe16(), ...sousTension(jeu, 'vhf', 'La VHF') },
     },
     {
       // le baromètre : on tapote le verre (l'aiguille colle un peu)

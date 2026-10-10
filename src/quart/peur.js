@@ -5,19 +5,22 @@
 // Ce fichier décide QUAND (l'heure, la tension, rien d'autre en cours) et OÙ (ce que le
 // marin regarde, où il est) ; il ne dessine rien et ne fait aucun bruit : le jeu montre
 // (rendu/apparitions.js) et fait entendre (son/audio.js). L'étrange plus ancien — la lumière
-// sur l'eau, la voix sur le 16, les coups — est dans quart/nuit.js ; tout passe par la même
-// tension.
+// sur l'eau, la voix sur le 16, les coups derrière la porte de la cabine avant — est dans
+// quart/nuit.js ; tout passe par la même tension. (Le livre de bord de l'ancien propriétaire,
+// quart/livre-de-bord.js, en parle avant qu'elles n'arrivent… ou pas.)
 //
 // ctx, à chaque image :
-//   heure ; lieu : 'barre', 'pont', 'timonerie' ou 'carre' ; yeux, regard, haut : la
-//   position des yeux, la direction du regard et le haut de la vue, dans le repère du
-//   bateau (l'avant vers −z, tribord vers +x) ; tanX, tanY : le champ de vision (la
-//   tangente du demi-angle, en largeur et en hauteur) ; lampe (la frontale allumée) ; eclairage ('eteint', 'rouge', 'blanc') ; eclair
-//   (0 → 1 : un éclair en ce moment) ; noir (0 → 1 : le noir d'encre de la nuit d'orage) ;
-//   occupe (une vague scélérate, la trombe, le cargo, un danger : rien d'étrange ne vient
-//   s'y mêler) ; danger (0 → 1) ; silence (plus personne à la radio : toujours, maintenant) ;
-//   calme (secondes depuis la dernière déferlante) ; porteOuverte.
-import { zDe, hauteurPont } from '../bateau/forme.js';
+//   heure ; lieu : 'timonerie' (assis au poste ou debout dedans) ou 'pont' (dehors) ; yeux,
+//   regard, haut : la position des yeux, la direction du regard et le haut de la vue, dans le
+//   repère du bateau (l'avant vers −z, tribord vers +x) ; tanX, tanY : le champ de vision (la
+//   tangente du demi-angle, en largeur et en hauteur) ; lampe (la frontale allumée) ;
+//   eclairage ('eteint', 'rouge', 'blanc') ; eclair (0 → 1 : un éclair en ce moment) ; noir
+//   (0 → 1 : le noir d'encre de la nuit d'orage) ; occupe (une vague scélérate, la trombe, un
+//   danger : rien d'étrange ne vient s'y mêler) ; danger (0 → 1) ; calme (secondes depuis la
+//   dernière déferlante) ; porteOuverte (celle de la timonerie) ; porteAvant (celle de la
+//   cabine avant : 'fermee', 'entrouverte' ou 'ouverte') ; voletsFermes (côté par côté) ; assis
+//   (au poste : de là, la console cache la porte de la cabine avant).
+import { zDe, hauteurPont, TIMONERIE, PORTE_AVANT } from '../bateau/forme.js';
 
 const lisse = (a, b, x) => {
   const t = Math.min(1, Math.max(0, (x - a) / (b - a)));
@@ -48,6 +51,8 @@ export function tensionDeFond(h) {
 
 // Où se tient la silhouette : sur le pont avant, près du balcon (les pieds)
 export const SILHOUETTE = { x: 0, y: hauteurPont(0.83, 0), z: zDe(0.83), taille: 1.78 };
+// La porte basse de la cabine avant (son milieu, sur la cloison, sous le pare-brise)
+export const PORTE_CABINE = { x: (PORTE_AVANT.x0 + PORTE_AVANT.x1) / 2, y: (PORTE_AVANT.y0 + PORTE_AVANT.y1) / 2, z: TIMONERIE.zAvant };
 
 // Ce qui peut arriver : combien de fois au plus, entre quelles heures (24 : minuit ; 30 : six
 // heures), ce que ça ajoute à la tension, et à quelles conditions (dans quel lieu, en
@@ -77,9 +82,15 @@ export const EVENEMENTS = {
   // l'alarme du radar : un écho tout près, dans la zone de garde, presque dans notre
   // sillage ; un éclair montre la mer : il n'y a rien (et l'alarme se tait)
   echoProche: { fois: 1, de: 27.4, a: 29.7, choc: 0.55 },
+  // la porte basse de la cabine avant s'entrouvre, quand on ne la regarde pas (son loquet
+  // claque, ses gonds grincent) ; derrière, le noir ; on la referme… et elle se rouvre. (C'est
+  // une chose du bateau, pas une apparition : elle a sa propre attente, comme les gémissements)
+  porteAvant: { fois: 2, de: 28.3, a: 29.85, choc: 0.45, attente: 60 },
 };
+// (celles qui ne comptent pas dans l'attente des autres, et ont la leur)
+const A_PART = new Set(['gemissement', 'porteAvant']);
 const ATTENTE = 75; // secondes au moins entre deux choses étranges (hors gémissements)
-const DEHORS = new Set(['barre', 'pont']);
+const DEHORS = new Set(['pont']);
 
 // L'angle (degrés) entre le regard et la direction d'un point, vu des yeux
 export function angleVu(yeux, regard, p) {
@@ -132,7 +143,7 @@ export class Peur {
     this.choc = 0; // (ce que les dernières choses étranges ont ajouté : s'efface en 1 min 30)
     this.fois = Object.fromEntries(Object.keys(EVENEMENTS).map((k) => [k, 0]));
     this.dernier = -999; // (le temps de la dernière chose étrange)
-    this.dernierGemissement = -999;
+    this.derniers = {}; // (celles qui ont leur propre attente : le temps de la dernière fois)
     this.journal = []; // ce qui est arrivé : { nom, heure, regardee }
     // ce qui est en cours (pour le jeu : ce qu'il doit montrer)
     this.silhouette = null; // { x, y, z, face, opacite, age, duree, eclair }
@@ -174,7 +185,7 @@ export class Peur {
       const force = this.force[nom];
       if (!force) {
         if (this.fois[nom] >= e.fois || ctx.heure < e.de || ctx.heure > e.a || ctx.occupe) continue;
-        const attente = nom === 'gemissement' ? (this.t - this.dernierGemissement < e.attente) : (this.t - this.dernier < ATTENTE);
+        const attente = A_PART.has(nom) ? (this.t - (this.derniers[nom] ?? -999) < e.attente) : (this.t - this.dernier < ATTENTE);
         if (attente) continue;
       }
       if (this.enCours(nom) || !this.possible(nom, ctx)) continue;
@@ -203,14 +214,15 @@ export class Peur {
     const { lieu, yeux, regard } = ctx;
     switch (nom) {
       case 'silhouette': {
-        if (lieu === 'carre' || yeux.z < SILHOUETTE.z + 3) return false;
+        // (de la timonerie, par le pare-brise ; du cockpit, la timonerie cache l'avant)
+        if (lieu !== 'timonerie' || yeux.z < SILHOUETTE.z + 3) return false;
         // (dans le noir d'encre, on ne la voit qu'à la frontale : ses bandes la renvoient)
         if ((ctx.noir ?? 0) > 0.5 && !ctx.lampe) return false;
         const e = surEcran(ctx, this.pointSilhouette(ctx, 1.1));
         return coinDeLOeil(e) && Math.max(Math.abs(e.x), Math.abs(e.y)) < 0.88;
       }
       case 'eclairSilhouette': {
-        if (lieu === 'carre' || yeux.z < SILHOUETTE.z + 3 || ctx.eclair < 0.55) return false;
+        if (lieu !== 'timonerie' || yeux.z < SILHOUETTE.z + 3 || ctx.eclair < 0.55) return false;
         const e = surEcran(ctx, this.pointSilhouette(ctx, 1.1));
         return !!e && Math.abs(e.x) < 0.7 && Math.abs(e.y) < 0.8;
       }
@@ -219,47 +231,56 @@ export class Peur {
         // regarder droit devant, vers le pare-brise)
         return lieu === 'timonerie' && (ctx.eclairage !== 'eteint' || ctx.lampe) && regard.z < -0.8 && Math.abs(regard.y) < 0.45;
       case 'forme': {
-        if (!DEHORS.has(lieu) || regard.y > 0.1) return false;
+        // (dehors, ou debout contre une vitre de côté, ses volets ouverts, à regarder l'eau)
+        if (regard.y > 0.1) return false;
+        if (lieu === 'timonerie') {
+          const cote = yeux.x > 0 ? 'tribord' : 'babord';
+          if (Math.abs(yeux.x) < 0.55 || Math.sign(regard.x) !== Math.sign(yeux.x) || Math.abs(regard.x) < 0.45 || regard.y > -0.12 || ctx.voletsFermes?.[cote]) return false;
+        } else if (!DEHORS.has(lieu)) return false;
         const p = this.pointForme(ctx);
         const e = surEcran(ctx, { x: p.x, y: 0.2, z: p.z });
         return coinDeLOeil(e) && Math.max(Math.abs(e.x), Math.abs(e.y)) < 0.88;
       }
       case 'pas':
-        return (lieu === 'carre' || lieu === 'timonerie') && !ctx.porteOuverte;
+        // (sur le toit de la timonerie, au-dessus de soi ; ou, sa porte ouverte, dans la cabine
+        // avant)
+        return lieu === 'timonerie' && !ctx.porteOuverte;
       case 'coupCoque':
-        return (lieu === 'carre' || lieu === 'timonerie') && (ctx.calme ?? 0) > 40;
+        return lieu === 'timonerie' && (ctx.calme ?? 0) > 40;
       case 'nom':
-        // (pendant que Jos ne répond plus, si l'on peut ; sinon, quand même)
-        return ctx.silence || ctx.heure > EVENEMENTS.nom.a - 0.5;
+        // (la VHF grésille toute la nuit : personne ne répond plus)
+        return true;
       case 'echoSuiveur':
       case 'echoProche':
-        // (il faut un radar sous les yeux : la console de la timonerie, ou le répétiteur du
-        // cockpit, à la barre)
-        return lieu === 'timonerie' || lieu === 'barre';
+        // (il faut un radar sous les yeux : la console de la timonerie)
+        return lieu === 'timonerie';
+      case 'porteAvant':
+        // (fermée, dans la timonerie, et seulement quand on ne peut pas la voir — assis au
+        // poste, la console la cache ; debout, dans son dos : on l'entend s'ouvrir, il faut se
+        // retourner, se lever)
+        return lieu === 'timonerie' && (ctx.porteAvant ?? 'fermee') === 'fermee' && (ctx.assis || angleVu(yeux, regard, PORTE_CABINE) > 80);
       default:
         return true;
     }
   }
 
-  // Où apparaît la silhouette : sur le pont avant. À la barre, on est assis sur un bord, et
-  // la timonerie cache le milieu du pont avant : elle se tient sur ce bord-là (la vue passe
-  // le long de la timonerie) ; de la timonerie, au milieu (on la voit par le pare-brise)
+  // Où apparaît la silhouette : sur le pont avant, au milieu (on la voit par le pare-brise),
+  // un peu du côté où l'on se tient
   pointSilhouette(ctx, hauteur = 0) {
     const cote = Math.abs(ctx.yeux.x) > 0.3 ? Math.sign(ctx.yeux.x) : 0;
-    const x = ctx.lieu === 'timonerie' ? cote * 0.12 : cote * 0.5;
-    return { x: SILHOUETTE.x + x, y: SILHOUETTE.y + hauteur, z: SILHOUETTE.z };
+    return { x: SILHOUETTE.x + cote * 0.12, y: SILHOUETTE.y + hauteur, z: SILHOUETTE.z };
   }
-  // Où apparaît la forme dans l'eau : à 3 m de la coque, par le travers, du côté où l'on
-  // est, un peu en arrière des yeux
+  // Où apparaît la forme dans l'eau : à 2 m de la coque, par le travers, du côté où l'on
+  // est, un peu en arrière des yeux (pas plus loin que le tableau arrière)
   pointForme(ctx) {
     const cote = ctx.yeux.x >= 0 ? 1 : -1;
-    return { x: cote * 4.2, z: Math.min(3.2, ctx.yeux.z + 1.2) };
+    return { x: cote * 4.2, z: Math.min(zDe(0.06), ctx.yeux.z + 1.2) };
   }
 
   commencer(nom, ctx, evts) {
     const e = EVENEMENTS[nom];
     this.fois[nom]++;
-    if (nom === 'gemissement') this.dernierGemissement = this.t;
+    if (A_PART.has(nom)) this.derniers[nom] = this.t;
     else this.dernier = this.t;
     this.secouer(e.choc);
     const h = this.hasard;
@@ -308,7 +329,7 @@ export class Peur {
       } else {
         const regardee = enFace(e);
         s.opacite = Math.min(1, s.age / 0.8) * (1 - lisse(s.duree - 1.5, s.duree, s.age));
-        if (regardee || s.age > s.duree || ctx.lieu === 'carre') this.finir('silhouette', evts, regardee);
+        if (regardee || s.age > s.duree || ctx.lieu !== 'timonerie') this.finir('silhouette', evts, regardee);
       }
     }
     // le reflet : il reste tant qu'on regarde le pare-brise ; on se retourne, il n'y a

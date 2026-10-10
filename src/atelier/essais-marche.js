@@ -40,9 +40,11 @@ function tournees() {
     { nom: 'la commande du pilote', chemin: [[0.45, 1.6]], geste: 'pilote' },
     { nom: 'le moteur (son tableau, à gauche du pupitre)', chemin: [[0.45, 2.3], [-0.45, 2.3], [-0.45, 1.6]], geste: 'moteur' },
     { nom: 'le coupe-batterie', chemin: [[-0.45, 2.3], [-1.0, 3.35]], geste: 'coupe-batterie' },
+    { nom: 'la porte de la cabine avant', chemin: [[-0.45, 2.3], [-0.95, 1.45]], geste: 'porte-avant' },
     { nom: 'le siège de quart', chemin: [[-0.45, 2.3], [-0.45, 1.6]], geste: 'siege' },
     { nom: 'la commande des volets (au plafond)', chemin: [[-0.45, 2.3], [0.15, 2.3]], geste: 'volets-tribord' },
     { nom: 'le baromètre', chemin: [[0.75, 2.3]], geste: 'barometre' },
+    { nom: 'le livre de bord, sur la banquette', chemin: [[0.55, 2.55]], geste: 'livre' },
     { nom: 'le ciré, contre la paroi arrière', chemin: [[0.55, 3.35]], geste: 'cire' },
     { nom: 'ressortir dans le cockpit', chemin: [[0, 3.4], [0, 4.4]], geste: 'descente' },
   ];

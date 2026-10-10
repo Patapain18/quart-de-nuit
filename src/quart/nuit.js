@@ -29,8 +29,9 @@
 //    ne la voit qu'à la lueur des éclairs ;
 //  - deux vagues scélérates de 20 m : la première vers 2 h 30, la seconde au plus fort, vers
 //    5 h 20 ;
-//  - l'étrange, jamais expliqué (une lumière sur l'eau, une voix sur le 16, des coups contre
-//    la coque, et tout ce que décide quart/peur.js).
+//  - l'étrange, jamais expliqué (une lumière sur l'eau, une voix sur le 16, trois coups derrière
+//    la porte de la cabine avant, et tout ce que décide quart/peur.js) — ce que racontait déjà,
+//    une page par heure, le livre de bord de l'ancien propriétaire (quart/livre-de-bord.js).
 // On a gagné si le bateau est encore à flot, et le marin à bord, quand sonne six heures.
 //
 // Ce fichier ne dessine rien et ne fait aucun bruit : il dit au jeu ce qui se passe (ses
@@ -164,14 +165,15 @@ const GRAINS_DE_LA_NUIT = [
 // épais de sa gerbe d'embruns (celle de la bête, rendu/trombe.js, a 52 m de cœur)
 export const RAYON_TOUCHE = 95;
 
-// La bête (la trombe de la nuit) : elle vit 200 s (une heure trois quarts de la nuit) ; quand elle naît, elle est à moins d'un
+// La bête (la trombe de la nuit) : elle vit 170 s (près d'une heure et demie de la nuit : née vers
+// 3 h 25, elle s'efface vers 4 h 50, avant que naisse la seconde vague scélérate) ; quand elle naît, elle est à moins d'un
 // kilomètre du bateau, et s'il garde sa route, elle passe derrière lui à 250 m, une minute
 // trois quarts à deux minutes et demie plus tard ; son tourbillon (de Rankine) : un cœur de
 // 50 m, 38 m/s à son bord (74 nœuds). Son grain : force 0,6, plein d'éclairs. Personne ne barre :
 // si le bateau change d'allure (le moteur qu'on lance ou qu'on arrête), elle s'écarte doucement
 // de sa route pour passer à au moins 150 m (passeMin) — on la sent, mais elle ne vient pas sur
 // lui.
-export const BETE = { duree: 200, loin: 850, passe: [100, 150], ecart: 250, coeur: 50, vmax: 38, force: 0.6, orage: 1, passeMin: 150 };
+export const BETE = { duree: 170, loin: 850, passe: [100, 150], ecart: 250, coeur: 50, vmax: 38, force: 0.6, orage: 1, passeMin: 150 };
 
 // Où doit naître la bête pour passer derrière le bateau, à « ecart » mètres, s'il garde sa
 // route : on se place dans le repère du bateau (elle y avance à w = sa vitesse − celle du
@@ -265,14 +267,15 @@ export class Nuit {
     Object.assign(this.prevu, {
       lumiere: 25.1 + etrange() * 0.5,
       voix16: 26.2 + etrange() * 0.4,
-      coups: 28.4 + etrange() * 0.5,
+      coups: 28.9 + etrange() * 0.25,
     });
-    // les vagues scélérates (un hasard à part, lui aussi) : la première vers 2 h 30, la
-    // seconde au plus fort, juste après le passage du front (une vague croisée, d'un côté
-    // plus inattendu)
+    // les vagues scélérates (un hasard à part, lui aussi) : la première naît vers 2 h 30 (elle
+    // frappe vers 3 h 15) ; la seconde vers 5 h, au plus fort, après le passage du front (une
+    // vague croisée, d'un côté plus inattendu : elle frappe vers 5 h 35 — il lui faut une
+    // demi-heure de la nuit pour arriver)
     const scel = generateur(graine * 15485863 + 11);
     this.hasardScelerate = scel;
-    const heuresScelerates = [26.45 + scel() * 0.2, 29.2 + scel() * 0.2];
+    const heuresScelerates = [26.45 + scel() * 0.2, 28.95 + scel() * 0.15];
     heuresScelerates.slice(0, this.niveau.scelerates ?? 2).forEach((h, k) => { this.prevu[`scelerate${k}`] = h; });
     this.scelerates = null; // (le chef d'orchestre : monde/scelerates.js ; il lui faut la houle)
     this.aLancer = null; // (une vague à lancer tout de suite : pour vérifier)
@@ -1023,9 +1026,12 @@ export class Nuit {
 
   // ---------- L'étrange ----------
   // Rien n'est jamais expliqué ni confirmé. Chaque chose arrive une fois, et seulement si le
-  // marin est là pour la voir ou l'entendre (sinon, elle attend un peu, puis passe).
+  // marin est là pour la voir ou l'entendre (sinon, elle attend un peu, puis passe) — et pas
+  // pendant qu'une vague scélérate ou la trombe arrive : elle attend qu'elles soient passées.
   suivreEtrange(dt, ctx) {
     const h = this.heure;
+    const w = this.scelerates?.vague;
+    if ((w && w.distance < 900 && w.distance > -250) || (this.trombe && this.trombe.force > 0.1 && this.trombe.distance < 600)) return;
     const pret = (nom) => !this.faits.has(nom) && h >= this.prevu[nom];
     const arrive = (nom, journal) => {
       this.faits.add(nom);
@@ -1042,9 +1048,9 @@ export class Nuit {
     }
     // une voix sur le 16 (le haut-parleur de la VHF s'entend de partout)
     if (pret('voix16')) arrive('voix16', 'Une voix sur le 16. Trop brouillée pour comprendre.');
-    // des coups contre la coque : on ne les entend qu'à l'intérieur
+    // trois coups, derrière la porte de la cabine avant : on ne les entend qu'à l'intérieur
     if (pret('coups')) {
-      if (!ctx.aBord.dehors) arrive('coups', 'Des coups contre la coque, à l\'avant. Trois.');
+      if (!ctx.aBord.dehors) arrive('coups', 'Trois coups, derrière la porte de la cabine avant.');
       else if (h > this.prevu.coups + 0.8) this.faits.add('coups');
     }
   }
@@ -1055,11 +1061,12 @@ export class Nuit {
     if (!ctx.regard) return;
     const w = this.scelerates?.vague;
     const occupe = (w && w.distance > -250) || (this.trombe && this.trombe.force > 0.1 && this.trombe.distance < 900) || (ctx.danger ?? 0) > 0.4;
+    const porteAvant = ctx.aBord.porteAvant ?? 'fermee';
     const evts = this.peur.maj(dt, {
       heure: this.heure, lieu: ctx.lieu, yeux: ctx.yeux, regard: ctx.regard, haut: ctx.haut, tanX: ctx.tanX, tanY: ctx.tanY,
       lampe: ctx.lampe, eclairage: ctx.eclairage, noir: ctx.noir ?? 0,
-      eclair: ctx.eclair ?? 0, danger: ctx.danger ?? 0, calme: ctx.calme ?? 0, occupe, silence: true,
-      porteOuverte: ctx.aBord.descenteOuverte,
+      eclair: ctx.eclair ?? 0, danger: ctx.danger ?? 0, calme: ctx.calme ?? 0, occupe,
+      porteOuverte: ctx.aBord.descenteOuverte, porteAvant, voletsFermes: ctx.aBord.voletsFermes ?? null, assis: ctx.mode === 'poste',
     });
     const h = this.heure;
     const noter = (nom, texte) => {
@@ -1069,7 +1076,7 @@ export class Nuit {
     for (const e of evts) {
       if (e === 'gemissement' && this.peur.fois.gemissement === 1) noter('gemissement', 'La mer a gémi. Longtemps.');
       else if (e === 'chose') noter('chose', 'Le sondeur a marqué six mètres. Il y en a quatre-vingt-dix.');
-      else if (e === 'pas') noter('pas', 'Des pas sur le pont, au-dessus de moi.');
+      else if (e === 'pas') noter('pas', porteAvant === 'fermee' ? 'Des pas sur le toit de la timonerie, au-dessus de moi.' : 'Des pas, dans la cabine avant.');
       else if (e === 'nom') noter('nom', `Une voix a dit « ${NOM_BATEAU} », sur le 16.`);
       else if (e === 'coupCoque') noter('coupCoque', 'Un choc énorme contre la coque.');
       else if (e === 'eclairSilhouette') noter('eclairSilhouette', 'Dans l\'éclair, quelqu\'un à l\'avant. À l\'éclair suivant, plus personne.');

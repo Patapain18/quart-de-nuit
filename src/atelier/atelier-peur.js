@@ -7,27 +7,30 @@
 //    pourrait arriver maintenant (et sinon, pourquoi), où est sa cible sur l'écran ; un
 //    bouton pour la provoquer (elle arrive dès que ses conditions sont réunies) ;
 //  - où l'on est, ce que l'on regarde ;
-//  - la frise de la nuit : le silence de Jos, les vagues scélérates, la trombe, le cargo,
-//    l'étrange ancien, les fenêtres de la peur et ce qui est arrivé.
+//  - la frise de la nuit : les vagues scélérates, la trombe, l'étrange ancien, les pages du
+//    livre de bord, les fenêtres de la peur et ce qui est arrivé.
 // Des boutons pour commencer la nuit et sauter à une heure.
 import { EVENEMENTS, surEcran, coinDeLOeil, enFace } from '../quart/peur.js';
+import { PAGES } from '../quart/livre-de-bord.js';
+import { BETE } from '../quart/nuit.js';
 
 const NOMS = {
   gemissement: 'La mer gémit', silhouette: 'Quelqu\'un à l\'avant', reflet: 'Le reflet dans la vitre', forme: 'La forme dans l\'eau',
-  chose: 'La chose sous la coque', pas: 'Des pas sur le pont', nom: 'Ton nom sur le 16', coupCoque: 'Le choc (sursaut)',
+  chose: 'La chose sous la coque', pas: 'Des pas (le toit, la cabine avant)', nom: 'Morgane, sur le 16', coupCoque: 'Le choc (sursaut)',
   eclairSilhouette: 'Dans l\'éclair (sursaut)', echoSuiveur: 'L\'écho qui nous suit', echoProche: 'L\'alarme du radar',
+  porteAvant: 'La porte de la cabine avant',
 };
 // (pourquoi une chose ne peut pas arriver maintenant)
 const CONDITIONS = {
-  silhouette: 'dehors ou dans la timonerie, l\'avant du bateau au bord de la vue (dans le noir : la frontale allumée)',
-  eclairSilhouette: 'un éclair, l\'avant du bateau dans la vue',
+  silhouette: 'dans la timonerie, l\'avant du bateau au bord de la vue (dans le noir : la frontale allumée)',
+  eclairSilhouette: 'dans la timonerie, un éclair, l\'avant du bateau dans la vue',
   reflet: 'dans la timonerie, la lumière allumée, en regardant le pare-brise',
-  forme: 'dehors, l\'eau le long de la coque au bord de la vue',
+  forme: 'dehors, ou debout contre une vitre de côté (ses volets ouverts) : l\'eau le long de la coque au bord de la vue',
   pas: 'dans la timonerie, la porte fermée',
-  coupCoque: 'dedans, 40 s sans déferlante',
-  nom: 'pendant le silence de Jos (ou à la fin de sa fenêtre)',
-  echoSuiveur: 'un radar sous les yeux : à la barre ou dans la timonerie',
-  echoProche: 'un radar sous les yeux : à la barre ou dans la timonerie',
+  coupCoque: 'dans la timonerie, 40 s sans déferlante',
+  echoSuiveur: 'dans la timonerie (le radar est sur la console)',
+  echoProche: 'dans la timonerie (le radar est sur la console)',
+  porteAvant: 'dans la timonerie, elle fermée, et pas sous tes yeux (assis : la console la cache ; debout : dans ton dos)',
 };
 const heure = (h) => `${String(Math.floor(h % 24)).padStart(2, '0')} h ${String(Math.floor((h % 1) * 60)).padStart(2, '0')}`;
 
@@ -150,10 +153,10 @@ function dessinerFrise(svg, nuit) {
   const x = (h) => x0 + ((h - 24) / 6) * (L - x0 - 4);
   const pr = nuit.prevu;
   const rangs = [
-    ['Jos se tait', [[pr.silence, pr.silence + 0.55]]],
-    ['Scélérates', [0, 1, 2].filter((k) => Number.isFinite(pr[`scelerate${k}`])).map((k) => [pr[`scelerate${k}`], pr[`scelerate${k}`] + 0.9])],
-    ['Trombe, cargo', [[pr.trombe, pr.trombe + 2.2], [pr.cargo, pr.cargo + 2.2]]],
+    ['Scélérates', [0, 1, 2].filter((k) => Number.isFinite(pr[`scelerate${k}`])).map((k) => [pr[`scelerate${k}`], pr[`scelerate${k}`] + 0.65])],
+    ['Trombe', [[pr.trombe, pr.trombe + BETE.duree / 120]]],
     ['Étrange', ['lumiere', 'voix16', 'coups'].map((n) => [pr[n], pr[n] + 0.15])],
+    ['Livre de bord', PAGES.map((p) => [p.heure, p.heure + 0.06])],
     ...Object.keys(EVENEMENTS).map((nom) => [NOMS[nom].replace(/ \(sursaut\)/, ' !'), [[EVENEMENTS[nom].de, EVENEMENTS[nom].a]], nom]),
   ];
   const h = 13;
