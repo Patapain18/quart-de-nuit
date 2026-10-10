@@ -636,6 +636,125 @@
      "licence": "CC0 1.0"
     }
    ]
+  },
+  "porte-grince": {
+   "fichier": "porte-grince.mp3",
+   "sorte": "coups",
+   "role": "la porte basse de la cabine avant qui s'ouvre toute seule, en deux fois",
+   "morceaux": [
+    [
+     0.2,
+     1.62
+    ],
+    [
+     2.22,
+     1.4
+    ]
+   ],
+   "duree": 4.02,
+   "credits": [
+    {
+     "titre": "Creaking Door #2",
+     "auteur": "Joseph Sardin et Axeline T.",
+     "site": "BigSoundBank",
+     "page": "https://bigsoundbank.com/creaking-door-2-s3205.html",
+     "licence": "CC0 1.0"
+    }
+   ]
+  },
+  "coups-porte": {
+   "fichier": "coups-porte.mp3",
+   "sorte": "coups",
+   "role": "les trois coups, derrière la porte basse (un coup par morceau)",
+   "morceaux": [
+    [
+     0.2,
+     0.55
+    ],
+    [
+     1.15,
+     0.55
+    ],
+    [
+     2.1,
+     0.55
+    ],
+    [
+     3.05,
+     0.55
+    ],
+    [
+     4,
+     0.5
+    ]
+   ],
+   "duree": 4.9,
+   "credits": [
+    {
+     "titre": "Door",
+     "auteur": "Joseph Sardin",
+     "site": "BigSoundBank",
+     "page": "https://bigsoundbank.com/door-s0015.html",
+     "licence": "CC0 1.0"
+    }
+   ]
+  },
+  "pas": {
+   "fichier": "pas.mp3",
+   "sorte": "coups",
+   "role": "quelqu'un qui marche, au-dessus (un pas par morceau)",
+   "morceaux": [
+    [
+     0.2,
+     0.6
+    ],
+    [
+     1.2,
+     0.6
+    ],
+    [
+     2.2,
+     0.6
+    ],
+    [
+     3.2,
+     0.6
+    ],
+    [
+     4.2,
+     0.6
+    ],
+    [
+     5.2,
+     0.6
+    ],
+    [
+     6.2,
+     0.6
+    ],
+    [
+     7.2,
+     0.6
+    ],
+    [
+     8.2,
+     0.6
+    ],
+    [
+     9.2,
+     0.6
+    ]
+   ],
+   "duree": 10.2,
+   "credits": [
+    {
+     "titre": "Steps on a Wooden Floor #1",
+     "auteur": "Joseph Sardin",
+     "site": "BigSoundBank",
+     "page": "https://bigsoundbank.com/steps-on-a-wooden-floor-1-s1515.html",
+     "licence": "CC0 1.0"
+    }
+   ]
   }
  }
 }

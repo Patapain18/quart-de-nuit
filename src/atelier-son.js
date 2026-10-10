@@ -64,6 +64,12 @@ function vague(a, plusTard, { force = 1, cote = 1, moteur = false } = {}) {
   plusTard(d - entendue, () => a.grondementEntendu(force, entendue));
   return d;
 }
+// L'étrange, comme dans le jeu (quart.js : vivreEtrange, vivrePeur) : le monde se tait d'abord,
+// longtemps, puis…
+const troisCoups = (a) => { a.etouffer(5.2, 0.82); a.coupsCoque(PORTE_CABINE, 2.6); };
+const porteQuiSOuvre = (a) => { a.etouffer(5, 0.65); a.porteAvant(true, PORTE_CABINE, 1.1); };
+const SUR_LE_TOIT = { de: { x: -0.9, y: 3.35, z: 1.6 }, a: { x: 0.9, y: 3.35, z: 3.1 } };
+const pasSurLeToit = (a) => { a.etouffer(7.8, 0.55); a.pasSurLePont(SUR_LE_TOIT); };
 const EVENEMENTS = [
   ['Une grosse déferlante de tribord', (a, plusTard) => vague(a, plusTard, { moteur: !!valeurs.moteur })],
   ['Une grosse déferlante de bâbord', (a, plusTard) => vague(a, plusTard, { cote: -1, moteur: !!valeurs.moteur })],
@@ -73,9 +79,9 @@ const EVENEMENTS = [
   ['Un creux du vent', (a) => { a.creux.prochain = 0; a.respirer(0, valeurs.heure); }],
   // l'étrange de la nuit (jamais expliqué)
   ['Une voix sur le 16', (a) => a.voixFantome(7.5)],
-  ['Trois coups, derrière la porte basse', (a) => { a.etouffer(5.2, 0.82); a.coupsCoque(PORTE_CABINE, 2.6); }],
-  ['La porte basse s\'entrouvre', (a) => { a.etouffer(3.6, 0.65); a.porteAvant(true, PORTE_CABINE, 1.1); }],
-  ['Des pas sur le toit', (a) => { a.etouffer(5.5, 0.55); a.pasSurLePont({ de: { x: -0.9, y: 3.35, z: 1.6 }, a: { x: 0.9, y: 3.35, z: 3.1 } }); }],
+  ['Trois coups, derrière la porte basse', (a) => troisCoups(a)],
+  ['La porte basse s\'entrouvre', (a) => porteQuiSOuvre(a)],
+  ['Des pas sur le toit', (a) => pasSurLeToit(a)],
   ['Le cœur qui bat', (a) => { for (let k = 0; k < 8; k++) setTimeout(() => a.battement(0.4 + k * 0.08), k * 650); }],
 ];
 
@@ -280,7 +286,10 @@ async function droiteMoinsGauche(ecoute) {
 // (les trois coups derrière la porte basse, comme dans le jeu, quart.js : le monde se tait,
 // puis on frappe — calculés une fois pour les deux signes)
 let rendusCoups = null;
-const coups = () => (rendusCoups ??= rendre(CINQ, { duree: 10, evenement: (a) => { a.etouffer(5.2, 0.82); a.coupsCoque(PORTE_CABINE, 2.6); } }));
+const coups = () => (rendusCoups ??= rendre(CINQ, { duree: 10, evenement: troisCoups }));
+// (le creux seul, sans rien dedans : à quoi comparer ce qu'on entend dans le silence)
+let rendusCreux = {};
+const creuxSeul = (duree, profondeur) => (rendusCreux[`${duree}:${profondeur}`] ??= rendre(CINQ, { duree: 12, evenement: (a) => a.etouffer(duree, profondeur) }));
 const SIGNES = [
   {
     nom: 'Une grosse déferlante de tribord, moteur arrêté : dès qu\'elle gronde, le fond se retire — on n\'entend plus qu\'elle, assez tôt pour fermer les volets (il leur faut 2,5 s)',
@@ -323,6 +332,24 @@ const SIGNES = [
       return lufs(rendu, 5.55, 6.05) - lufs(rendu, 4.1, 5.5);
     },
   },
+  {
+    nom: 'Des pas sur le toit, dans le silence : on les entend marcher, au-dessus',
+    attendu: (d) => d >= 6, unite: 'au-dessus du creux, pendant qu\'ils marchent',
+    mesure: async () => {
+      const { rendu } = await rendre(CINQ, { duree: 12, evenement: pasSurLeToit });
+      const { rendu: creux } = await creuxSeul(7.8, 0.55);
+      return lufs(rendu, 3.5, 6.8) - lufs(creux, 3.5, 6.8);
+    },
+  },
+  {
+    nom: 'La porte basse s\'entrouvre : son grincement sort du silence',
+    attendu: (d) => d >= 6, unite: 'au-dessus du creux, pendant qu\'elle grince',
+    mesure: async () => {
+      const { rendu } = await rendre(CINQ, { duree: 12, evenement: porteQuiSOuvre });
+      const { rendu: creux } = await creuxSeul(5, 0.65);
+      return lufs(rendu, 4.3, 6.1) - lufs(creux, 4.3, 6.1);
+    },
+  },
 ];
 
 const MIN = -40;
@@ -342,6 +369,7 @@ document.getElementById('mesurer').addEventListener('click', async (ev) => {
     }
     zone.hidden = false;
     rendusCoups = null;
+    rendusCreux = {};
     zone.innerHTML = `<div class="echelle"><span></span><div class="graduations">${[-40, -30, -23, -14].map((v) => `<span style="left:${x(v)}">${chiffre(v, 0)}</span>`).join('')}</div></div>`;
     for (const [k, s] of SITUATIONS.entries()) {
       etat.textContent = `Mesure ${k + 1} / ${SITUATIONS.length + SIGNES.length} : ${s.nom}…`;

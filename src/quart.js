@@ -1015,7 +1015,7 @@ function vivrePeur(e) {
   else if (e === 'pas') {
     // (le monde se tait un instant : on les entend d'autant mieux ; la lumière hésite ; la porte
     // de la cabine avant ouverte, ils viennent de là)
-    audio.etouffer?.(5.5, 0.55);
+    audio.etouffer?.(7.8, 0.55); // (jusqu'au dernier pas, après leur silence)
     // (sur le toit, d'un bord à l'autre ; la porte de la cabine avant ouverte : dans la cabine,
     // vers la porte)
     const sens = Math.random() < 0.5 ? 1 : -1;
@@ -1028,7 +1028,7 @@ function vivrePeur(e) {
     // retournant)
     bateau.interieur.ouvrirPorteAvant('entrouverte');
     // (un creux, d'abord : le monde se retire ; puis le loquet, les gonds)
-    audio.etouffer?.(3.6, 0.65);
+    audio.etouffer?.(5, 0.65); // (jusqu'à son second grincement)
     audio.porteAvant?.(true, bateau.interieur.positionPorteAvant, 1.1);
     etat.porteAvantVue = false;
     etat.vacille = Math.max(etat.vacille ?? 0, 0.6);

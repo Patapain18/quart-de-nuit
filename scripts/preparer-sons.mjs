@@ -1,4 +1,5 @@
 // Fabrique les sons du jeu : node scripts/preparer-sons.mjs (npm run sons)
+// (npm run sons -- pas porte-grince : seulement ces sons-là ; la fiche garde les autres)
 //
 // Suit la recette (scripts/sons/recette.mjs) : télécharge les enregistrements d'origine
 // (une seule fois, dans sons-bruts/), en coupe les morceaux choisis, règle leur volume, et
@@ -121,14 +122,24 @@ async function coups(son) {
   return { fichier: `${son.nom}.mp3`, sorte: 'coups', role: son.role, morceaux, duree: duree(sortie), credits: sources.map(credit) };
 }
 
-const fiche = { licence: 'Tous ces enregistrements sont dans le domaine public (CC0 1.0).', sons: {} };
+// (des noms donnés : on ne refait qu'eux, et la fiche garde les autres tels quels)
+const choisis = process.argv.slice(2);
+const inconnus = choisis.filter((nom) => !SONS.some((s) => s.nom === nom));
+if (inconnus.length) throw new Error(`sons inconnus : ${inconnus.join(', ')}`);
+const aFaire = choisis.length ? SONS.filter((s) => choisis.includes(s.nom)) : SONS;
+const cheminFiche = path.join(SORTIE, 'sons.json');
+const fiche = choisis.length && fs.existsSync(cheminFiche)
+  ? JSON.parse(fs.readFileSync(cheminFiche, 'utf8'))
+  : { licence: 'Tous ces enregistrements sont dans le domaine public (CC0 1.0).', sons: {} };
 let total = 0;
-for (const son of SONS) {
+for (const son of aFaire) {
   process.stdout.write(`${son.nom}… `);
   fiche.sons[son.nom] = son.sorte === 'boucle' ? await boucle(son) : await coups(son);
   const taille = fs.statSync(path.join(SORTIE, `${son.nom}.mp3`)).size;
   total += taille;
   console.log(`${fiche.sons[son.nom].duree.toFixed(1)} s, ${(taille / 1024).toFixed(0)} Ko`);
 }
-fs.writeFileSync(path.join(SORTIE, 'sons.json'), JSON.stringify(fiche, null, 1));
-console.log(`\n${SONS.length} sons, ${(total / 1024 / 1024).toFixed(1)} Mo en tout, dans ${SORTIE}/`);
+// (dans l'ordre de la recette)
+fiche.sons = Object.fromEntries(SONS.filter((s) => fiche.sons[s.nom]).map((s) => [s.nom, fiche.sons[s.nom]]));
+fs.writeFileSync(cheminFiche, JSON.stringify(fiche, null, 1));
+console.log(`\n${aFaire.length} sons, ${(total / 1024 / 1024).toFixed(1)} Mo en tout, dans ${SORTIE}/`);

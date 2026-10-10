@@ -52,6 +52,10 @@ export const SOURCES = {
   'bsb-0313': { titre: 'Crackling Radio #2', auteur: 'Joseph Sardin', site: 'BigSoundBank', page: 'https://bigsoundbank.com/crackling-radio-2-s0313.html', fichier: 'https://bigsoundbank.com/UPLOAD/mp3/0313.mp3' },
   'bsb-0311': { titre: 'Radio Interference #2', auteur: 'Joseph Sardin', site: 'BigSoundBank', page: 'https://bigsoundbank.com/radio-interference-2-s0311.html', fichier: 'https://bigsoundbank.com/UPLOAD/mp3/0311.mp3' },
   'bsb-0310': { titre: 'Radio Interference #1', auteur: 'Joseph Sardin', site: 'BigSoundBank', page: 'https://bigsoundbank.com/radio-interference-1-s0310.html', fichier: 'https://bigsoundbank.com/UPLOAD/mp3/0310.mp3' },
+  // (l'étape 6 de la nuit seule : la porte basse, les trois coups, les pas)
+  'bsb-3205': { titre: 'Creaking Door #2', auteur: 'Joseph Sardin et Axeline T.', site: 'BigSoundBank', page: 'https://bigsoundbank.com/creaking-door-2-s3205.html', fichier: 'https://bigsoundbank.com/UPLOAD/mp3/3205.mp3' },
+  'bsb-0015': { titre: 'Door', auteur: 'Joseph Sardin', site: 'BigSoundBank', page: 'https://bigsoundbank.com/door-s0015.html', fichier: 'https://bigsoundbank.com/UPLOAD/mp3/0015.mp3' },
+  'bsb-1515': { titre: 'Steps on a Wooden Floor #1', auteur: 'Joseph Sardin', site: 'BigSoundBank', page: 'https://bigsoundbank.com/steps-on-a-wooden-floor-1-s1515.html', fichier: 'https://bigsoundbank.com/UPLOAD/mp3/1515.mp3' },
 };
 
 // Les sons du jeu (nom du fichier : public/sons/<nom>.mp3)
@@ -103,5 +107,22 @@ export const SONS = [
   {
     nom: 'radio', role: 'la radio qui grésille', sorte: 'coups', canaux: 1, lufs: -22,
     morceaux: [['bsb-0312', 0, 4.4], ['bsb-0313', 0, 3.8], ['bsb-0311', 0, 5.8], ['bsb-0310', 0, 8]],
+  },
+  // (les morceaux de ces trois-là ont été trouvés à la mesure du volume, tranche par tranche :
+  // chaque coup, chaque pas commence 3 centièmes avant que le son monte d'un coup — l'impact)
+  {
+    nom: 'porte-grince', role: 'la porte basse de la cabine avant qui s\'ouvre toute seule, en deux fois', sorte: 'coups', canaux: 1, lufs: -20,
+    morceaux: [['bsb-3205', 0.17, 1.62], ['bsb-3205', 1.79, 1.4]],
+  },
+  {
+    nom: 'coups-porte', role: 'les trois coups, derrière la porte basse (un coup par morceau)', sorte: 'coups', canaux: 1, lufs: -18,
+    morceaux: [['bsb-0015', 0.15, 0.55], ['bsb-0015', 0.89, 0.55], ['bsb-0015', 1.52, 0.55], ['bsb-0015', 2.17, 0.55], ['bsb-0015', 2.85, 0.5]],
+  },
+  {
+    nom: 'pas', role: 'quelqu\'un qui marche, au-dessus (un pas par morceau)', sorte: 'coups', canaux: 1, lufs: -20,
+    morceaux: [
+      ['bsb-1515', 2.01, 0.6], ['bsb-1515', 2.94, 0.6], ['bsb-1515', 4.85, 0.6], ['bsb-1515', 8.6, 0.6], ['bsb-1515', 14.11, 0.6],
+      ['bsb-1515', 20.54, 0.6], ['bsb-1515', 21.45, 0.6], ['bsb-1515', 30.44, 0.6], ['bsb-1515', 33.19, 0.6], ['bsb-1515', 34.11, 0.6],
+    ],
   },
 ];

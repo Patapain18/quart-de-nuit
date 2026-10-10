@@ -1085,8 +1085,8 @@ export class Audio {
     this.parasites(duree + 0.6, 0.55);
   }
 
-  // Des coups contre la coque, à l'avant, sous la flottaison : trois, puis un quatrième,
-  // plus faible. (Un tronc ? Une épave ? On ne saura pas.)
+  // Des coups — contre la coque, ou derrière la porte basse de la cabine avant : trois, puis un
+  // quatrième, plus faible. (Un tronc ? Une épave ? Quelqu'un ? On ne saura pas.)
   // (ou : d'où ils viennent — de derrière la porte de la cabine avant ; dans : dans combien de
   // secondes ils commencent — le jeu fait d'abord le silence)
   coupsCoque(ou = -0.15, dans = 0.2) {
@@ -1094,8 +1094,15 @@ export class Audio {
     const ctx = this.ctx;
     const t0 = ctx.currentTime + dans;
     const p = this.versOu(ou, 'dedans', { pres: true });
-    [[0, 1], [0.72, 0.95], [1.4, 1.05], [5.2, 0.45]].forEach(([dans, force]) => {
-      const t = t0 + dans;
+    // (de vrais coups sur une porte légère, s'ils sont chargés : un morceau différent pour chacun,
+    // un peu ralentis — plus lourds)
+    const premier = Math.floor(Math.random() * 5);
+    [[0, 1], [0.72, 0.95], [1.4, 1.05], [5.2, 0.45]].forEach(([apres, force], k) => {
+      if (this.jouer('coups-porte', {
+        index: (premier + k) % 5, dans: dans + apres, gain: force, vitesse: 0.88 + 0.05 * Math.random(),
+        grave: 3500, ou, pres: true, bus: 'dedans',
+      })) return;
+      const t = t0 + apres;
       // le choc sourd du bois et du polyester : un coup bref qui fait résonner la coque
       const s = ctx.createBufferSource();
       s.buffer = this.brun;
@@ -1225,8 +1232,8 @@ export class Audio {
     const a1 = ctx.createGain();
     a1.gain.setValueAtTime(0.0001, t);
     a1.gain.setValueAtTime(0.0001, debut);
-    a1.gain.linearRampToValueAtTime(v * 0.5, debut + Math.min(0.5, (impact - debut) / 3));
-    a1.gain.exponentialRampToValueAtTime(v * 0.9, impact);
+    a1.gain.linearRampToValueAtTime(v * 0.6, debut + Math.min(0.5, (impact - debut) / 3));
+    a1.gain.exponentialRampToValueAtTime(v, impact);
     a1.gain.setTargetAtTime(0.0001, impact + 0.1, 0.5);
     g1.connect(f1).connect(a1).connect(cote);
     g1.start(t, Math.random() * 2);
@@ -1571,7 +1578,16 @@ export class Audio {
     for (let i = 0; i < n; i++) pas.push([i * (0.62 + (Math.random() - 0.5) * 0.08), 0.55 + 0.25 * (i / n), ou(i / n)]);
     // (et le dernier, plus lourd, après un silence : il s'est arrêté au-dessus de toi)
     pas.push([n * 0.62 + 2.6, 1, ou(0.92)]);
-    for (const [dans, force, lieu] of pas) {
+    const premier = Math.floor(Math.random() * 10);
+    for (const [k, [dans, force, lieu]] of pas.entries()) {
+      // (de vrais pas, s'ils sont chargés : sur le toit, le plafond les étouffe — on n'entend que
+      // le talon qui cogne ; dans la cabine avant, un peu moins ; chacun coupé avant que la
+      // semelle ne traîne : des pas lents, détachés)
+      const auDessus = !estUnPoint(lieu) || lieu.y > 2.5;
+      if (this.jouer('pas', {
+        index: (premier + k) % 10, dans: 0.1 + dans, gain: 1.2 * force, vitesse: 0.9 + 0.06 * Math.random(), duree: 0.45,
+        grave: auDessus ? 750 : 2400, ou: lieu, pres: true, bus: 'dedans',
+      })) continue;
       const t = t0 + dans;
       const s = ctx.createBufferSource();
       s.buffer = this.brun;
@@ -1615,9 +1631,15 @@ export class Audio {
     c.connect(fc).connect(gc).connect(cote);
     c.start(t, Math.random(), 0.1);
     if (ouvre) {
-      // les gonds : un grincement lent (un bois qui craque, ralenti), qui part un instant après
-      this.jouer('craquements', { dans: dans + 0.22, gain: 0.7, vitesse: 0.42, ou, pres: true, bus: 'dedans' });
-      this.jouer('craquements', { dans: dans + 1.07, gain: 0.35, vitesse: 0.36, ou, pres: true, bus: 'dedans' });
+      // les gonds : une vraie porte qui grince, ralentie, en deux fois — elle s'arrête, puis s'ouvre
+      // encore un peu ; sinon (pas encore chargée), un bois qui craque, ralenti
+      const lent = 0.8 + 0.06 * Math.random();
+      if (this.jouer('porte-grince', { index: 0, dans: dans + 0.12, gain: 0.85, vitesse: lent, ou, pres: true, bus: 'dedans' })) {
+        this.jouer('porte-grince', { index: 1, dans: dans + 0.12 + 1.62 / lent + 0.7, gain: 0.55, vitesse: lent * 0.95, ou, pres: true, bus: 'dedans' });
+      } else {
+        this.jouer('craquements', { dans: dans + 0.22, gain: 0.7, vitesse: 0.42, ou, pres: true, bus: 'dedans' });
+        this.jouer('craquements', { dans: dans + 1.07, gain: 0.35, vitesse: 0.36, ou, pres: true, bus: 'dedans' });
+      }
     } else {
       // le panneau qui frappe son chambranle : un coup sourd
       const s2 = ctx.createBufferSource();
