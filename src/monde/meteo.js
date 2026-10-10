@@ -48,8 +48,9 @@ export const AMBIANCES = {
   aube: {
     regard: { soleil: 15, site: 6 },
     nom: 'L\'aube après la tempête', heure: 5.35, vent: 14, directionVent: 260, nuages: 0.38, orage: 0, pluie: 0, brume: 0.3,
-    // (le front s'en va vers le nord-nord-est ; le soleil se lève à côté de lui)
-    front: 0.55, directionFront: 28, largeurFront: 40,
+    // (le front s'en va vers le nord-nord-est ; le soleil se lève à côté de lui ; l'orage se
+    // défait : de son enclume, il ne reste qu'un voile)
+    front: 0.55, directionFront: 28, largeurFront: 40, enclumeFront: 0.35,
     houle: { hs: 3.2, periode: 14, direction: 245 },
   },
 };
@@ -57,8 +58,8 @@ export const AMBIANCES = {
 // Valeurs par défaut de ce qui n'est pas réglé dans une ambiance
 // (front : le front orageux, de 0 (au-delà de l'horizon) à 1 (sur nous) ; directionFront :
 // d'où on le voit, et largeurFront : sur quelle largeur de l'horizon, à droite et à gauche,
-// en degrés)
-const DEFAUTS = { fetch: 150, latitude: 47, declinaison: 10, phaseLune: 0.42, front: 0, directionFront: 212, largeurFront: 62 };
+// en degrés ; enclumeFront : ce qu'il reste de son enclume, 0 → 1)
+const DEFAUTS = { fetch: 150, latitude: 47, declinaison: 10, phaseLune: 0.42, front: 0, directionFront: 212, largeurFront: 62, enclumeFront: 1 };
 
 export function etatMeteo(ambiance) {
   return { ...DEFAUTS, ...structuredClone(ambiance) };
@@ -80,6 +81,7 @@ export function interpoler(a, b, t) {
     front: m(a.front ?? 0, b.front ?? 0),
     directionFront: angle(a.directionFront ?? 212, b.directionFront ?? 212),
     largeurFront: m(a.largeurFront ?? 62, b.largeurFront ?? 62),
+    enclumeFront: m(a.enclumeFront ?? 1, b.enclumeFront ?? 1),
     fetch: m(a.fetch, b.fetch),
     houle: {
       hs: m(a.houle.hs, b.houle.hs),
@@ -148,6 +150,7 @@ export function geometrieFront(meteo) {
     sommet: Math.max(0.01, Math.atan((11000 - chute) / distance)),
     distance,
     avancee: 0.36,
+    enclume: meteo.enclumeFront ?? 1,
     visibilite: lisse(0.02, 0.12, f) * (1 - lisse(0.9, 0.97, f)),
   };
 }

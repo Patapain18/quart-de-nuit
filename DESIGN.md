@@ -132,7 +132,7 @@ ligne reste l'ancien tant que le nouveau n'est pas jouable.
    VHF, une forme au sondeur ; les notes de l'ancien propriétaire du bateau pour apprendre les
    commandes (à la place de Jos).
 6. ✅ **Le son** — plus silencieux, chaque son venant de sa direction, de longs creux avant les coups.
-7. **Les nuages** — corriger leurs défauts.
+7. ✅ **Les nuages** — corriger leurs défauts.
 8. **Finitions et mise en ligne.**
 
 ### Étape 1 : la nuit seule ✅ (9 octobre 2026)
@@ -545,6 +545,77 @@ n'est entendu — c'est à ton oreille de juger.
 **À voir** : `docs/son-l-atelier-mesure-la-nuit.jpg` (la mesure de l'atelier : les sept
 situations dans leur cible, et les neuf signes).
 
+### Étape 7 : les nuages ✅ (10 octobre 2026)
+
+Ce que tu disais au virage : les nuages « pas très bien intégrés, avec beaucoup de glitchs », et
+« les nuages sombres qui arrivent et que l'on voit au loin », pas très esthétiques. Dans la
+nouvelle nuit, on ne voit les nuages qu'à la lueur des éclairs, puis à l'aube (de 5 h 20 au lever,
+avec l'accéléré de 6 h à 6 h 48) : c'est là que je les ai photographiés et mesurés — dans le jeu, et
+dans l'atelier de la mer avec la météo exacte de la nuit, les nuages figés (leur dérive et leur
+horloge remises à zéro) pour comparer avant et après sur la même image.
+
+**Ce qui n'allait pas** :
+- les nuages étaient des taches floues, comme de la fumée : leur densité montait sur 300 m environ
+  au bord (un vrai cumulus devient opaque en quelques dizaines de mètres), et la marche avançait à
+  pas égaux de 250 à 450 m — le bord d'un nuage tombait entre deux pas. Ni l'image réduite ni le
+  lissage d'une image à l'autre n'y étaient pour rien (mesuré : en pleine résolution, sans lissage,
+  aussi flou) ;
+- les nuages lointains étaient des briques : de petits rectangles plats, traversés à grands pas ;
+- l'enclume du front faisait une bande rouge tirée à la règle à travers le ciel, et ses tours une
+  île noire posée sur l'horizon : sa « brume » l'assombrissait au lieu de l'éclaircir ;
+- **le front faisait le tour de l'horizon** : la nuit, il est sur nous, orienté au sud-sud-ouest ;
+  à 6 h, au nord-nord-est. Entre 5 h 51 et 6 h, sa direction tournait de 176° par l'ouest, pendant
+  qu'il réapparaissait ;
+- avant le lever, les nuages étaient d'un violet uniforme, sans relief.
+
+**La nouvelle marche** (`rendu/glsl/nuages.js`, `nuagesVolume`) : à grands pas dans l'air libre, en
+ne regardant que la forme des nuages (pas cher), et plus grands encore hors de toute zone nuageuse ;
+dès qu'on touche un nuage, on revient un peu en arrière et on le traverse à petits pas (15 m pour un
+nuage proche, 200 m au plus au loin), avec son détail et sa lumière ; son bord passé, chaque pas en
+traverse à peu près autant (le cœur d'un plafond d'orage n'a pas besoin de cent pas pour être
+opaque) ; ressorti, on reprend les grands pas ; on s'arrête au haut utile de la couche (par beau
+temps, les nuages n'en occupent que le bas). Les nuages sont trois fois plus denses (un cumulus
+opaque en quelques dizaines de mètres : son bord est net), leur base franche ; le bruit 3D qui les
+forme est en demi-flottants. La qualité règle le nombre de pas : 28, 36, 48 et 60, de l'économique
+au superbe. **La nuit noire, sans éclair**, on ne voit pas les nuages : seule compte leur opacité,
+qui cache les étoiles — la marche les traverse alors à grands pas, et reprend les petits dès qu'un
+éclair part.
+
+**La lumière et l'air** : avant le lever, **la lueur de l'aube** — celle de l'horizon, du côté du
+soleil encore caché — éclaire les nuages : leur flanc tourné vers elle s'éclaire, leurs bords minces
+s'allument à contre-jour ; elle passe la main au soleil quand il les atteint. Et **la brume** du jeu
+(`visibilite`, `monde/meteo.js` : à cette distance, il reste 5 % de la lumière) voile maintenant les
+nuages lointains : l'horizon est un dégradé propre, les nuages proches restent nets.
+
+**Le front** (`rendu/glsl/front.js`) : la même brume, celle des basses couches (1,5 km), cache son
+pied ; ses sommets, à 11 km, la dépassent. À 60 km, dans 35 km de visibilité, ce n'est plus qu'une
+silhouette pâle, couleur du ciel, ses sommets au-dessus de la brume. Un orage qui se défait ne garde
+de son enclume qu'un voile (`enclumeFront`, 35 % à l'aube), et son dessous ne rougeoie plus d'un
+bout à l'autre. Passé au-dessus de nous (vers 4 h 40), il part vers le nord-nord-est
+(`directionFront`, `quart/nuit.js`) : il réapparaît là, sans tourner.
+
+**Mesuré** :
+- le coût du ciel sur la carte graphique (Apple M4 Pro, qualité haute, 1920 × 1200) : la nuit
+  d'orage, 5 à 6,3 ms au lieu de 7,5 ; l'aube, 6,6 à 9 ms au lieu de 5 à 7 (le soleil et la lueur
+  éclairent chaque pas dans un nuage). La nuit fait l'essentiel des douze minutes : en moyenne, le
+  ciel coûte moins qu'avant ;
+- les pas, comptés pixel par pixel : à l'aube, la nouvelle marche fait moins de tours que l'ancienne
+  (14 à 22 contre 17 à 33), mais calcule la lumière 1,6 fois plus souvent ; à 36 pas, 13 à 18 % des
+  pixels touchaient le plafond (des nuages rongés) : 48 en haute ;
+- `npm run test-heures`, trois vérifications de plus : on ne voit le front qu'à partir de 5 h 52, il
+  reste à moins de 0,1° de 28° tant qu'on le voit (à 158° sans la correction), son enclume à 35 % ;
+- les 13 tests et la construction passent ; les six ambiances de l'atelier de la mer et la trombe
+  sous l'éclair, regardées : rien de cassé.
+
+**Limites** : un nuage vu juste au-dessus de soi reste un peu mou (son dessous est éclairé
+uniformément) ; l'aube coûte 1 à 2,5 ms de plus qu'avant ; en qualité économique, les petits nuages
+lointains perdent un peu de détail ; je n'ai pu regarder que sur cet ordinateur — sur un plus
+modeste, à toi de me dire.
+
+**À voir** : `docs/nuages-l-aube-avant-apres.jpg` (6 h 18, vers le front et vers le lever, avant et
+après) et `docs/nuages-l-eclair-et-le-lever.jpg` (un éclair à minuit, avant et après ; le dessus à
+6 h 18 avant, le lever de 6 h 42 après).
+
 ## 4. Le moteur (ce qu'on garde de l'ancien jeu)
 
 Tout ce qui fait l'image, le son et la physique reste, et sert la nouvelle nuit. Le détail de
@@ -553,7 +624,8 @@ chacun, étape par étape, est dans l'ancien cahier (étiquette `v1-journee-et-n
   faire flotter le bateau, dans un worker (`src/mer/`, `src/rendu/eau.js`) ; les déferlantes, les
   vagues scélérates de 20 m (`src/monde/scelerates.js`, `src/mer/scelerate.js`), le sillage, le
   plancton qui s'allume.
-- **Le ciel** : l'atmosphère, les nuages en volume, le front orageux (`src/rendu/ciel.js`) ;
+- **Le ciel** : l'atmosphère, les nuages en volume (traversés à pas variables depuis l'étape 7), le
+  front orageux (`src/rendu/ciel.js`) ;
   **les grains** (`src/monde/grains.js`) : des averses d'orage qui existent à un endroit, leur
   rafale, leur pluie, leur nuage ; **les risées** (`src/monde/risees.js`).
 - **La foudre** (`src/monde/foudre.js`, `src/rendu/eclairs.js`) : les éclairs partent des nuages

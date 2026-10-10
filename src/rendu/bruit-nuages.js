@@ -113,9 +113,12 @@ void main() {
 `;
 
 export function creerBruitNuages(renderer, taille = 128) {
+  // (en demi-flottants, pas en octets : le bord d'un nuage est un seuil très raide sur ce bruit ;
+  // avec 256 valeurs seulement, les bords nets des nuages — glsl/nuages.js — en montreraient les
+  // marches)
   const cible = new THREE.WebGL3DRenderTarget(taille, taille, taille, {
     format: THREE.RGBAFormat,
-    type: THREE.UnsignedByteType,
+    type: THREE.HalfFloatType,
     minFilter: THREE.LinearMipmapLinearFilter,
     magFilter: THREE.LinearFilter,
     generateMipmaps: false,

@@ -30,10 +30,10 @@ import { REGLAGES_GRAINS } from '../monde/grains.js';
 // (trombe : la taille de son volume par rapport à l'écran, le nombre de pas pour le
 // traverser, et si la matière fait de l'ombre sur elle-même)
 export const QUALITES = {
-  economique: { nom: 'Économique', pixels: 1, msaa: 0, ombres: 1024, nuages: 0.34, pas: 22, mer: 256, pluie: 0.45, particules: 0.4, trombe: { echelle: 0.33, pas: 72, ombres: false } },
-  moyenne: { nom: 'Moyenne', pixels: 1.25, msaa: 2, ombres: 2048, nuages: 0.42, pas: 28, mer: 320, pluie: 0.7, particules: 0.7, trombe: { echelle: 0.4, pas: 96, ombres: true } },
-  haute: { nom: 'Haute', pixels: 1.5, msaa: 4, ombres: 2048, nuages: 0.5, pas: 36, mer: 384, pluie: 1, particules: 1, trombe: { echelle: 0.5, pas: 128, ombres: true } },
-  superbe: { nom: 'Superbe', pixels: 2, msaa: 4, ombres: 4096, nuages: 0.6, pas: 44, mer: 448, pluie: 1, particules: 1, trombe: { echelle: 0.6, pas: 160, ombres: true } },
+  economique: { nom: 'Économique', pixels: 1, msaa: 0, ombres: 1024, nuages: 0.34, pas: 28, mer: 256, pluie: 0.45, particules: 0.4, trombe: { echelle: 0.33, pas: 72, ombres: false } },
+  moyenne: { nom: 'Moyenne', pixels: 1.25, msaa: 2, ombres: 2048, nuages: 0.42, pas: 36, mer: 320, pluie: 0.7, particules: 0.7, trombe: { echelle: 0.4, pas: 96, ombres: true } },
+  haute: { nom: 'Haute', pixels: 1.5, msaa: 4, ombres: 2048, nuages: 0.5, pas: 48, mer: 384, pluie: 1, particules: 1, trombe: { echelle: 0.5, pas: 128, ombres: true } },
+  superbe: { nom: 'Superbe', pixels: 2, msaa: 4, ombres: 4096, nuages: 0.6, pas: 60, mer: 448, pluie: 1, particules: 1, trombe: { echelle: 0.6, pas: 160, ombres: true } },
 };
 
 export class Monde3D {

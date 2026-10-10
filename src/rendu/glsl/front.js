@@ -28,6 +28,7 @@ uniform vec3 uFrontAmbiance;  // la lumière du ciel qui l'éclaire
 uniform vec3 uFrontSoleil;    // la lumière du soleil sur le bas de ses tours (à 2 km d'altitude)
 uniform vec3 uFrontSoleilHaut; // et sur leurs sommets et l'enclume (à 10 km : elle y arrive encore quand le soleil s'est couché pour nous)
 uniform vec3 uFrontDirSoleil; // d'où vient cette lumière
+uniform vec4 uFrontAir;       // l'air entre lui et nous : visibilité (km), ce qu'il reste de son enclume (0 → 1), l'orage d'ici (0 → 1 : cet air est à l'ombre)
 
 float ecartAngle(float a, float b) { return mod(a - b + 9.42477796, 6.28318531) - 3.14159265; }
 
@@ -175,6 +176,8 @@ vec4 frontOrage(vec3 d, vec3 ciel, float detail) {
   vec3 sh = normalize(vec3(uFrontDirSoleil.x, 0.0, uFrontDirSoleil.z) + 1e-5);
   vec3 droite = vec3(cos(uFront.x), 0.0, sin(uFront.x));
   Enclume en = enclumeFront(da, el, detail, dot(sh, droite));
+  // (un orage qui se défait n'en garde qu'un voile)
+  en.densite *= uFrontAir.y;
   float plein = 1.0 - (1.0 - tour) * (1.0 - en.densite);
   float a = plein;
   // (dans la brume de la mer et dans ses reflets, son bord s'estompe : sinon, vue d'un peu
@@ -252,6 +255,9 @@ vec4 frontOrage(vec3 d, vec3 ciel, float detail) {
     float libre = 1.0 - smoothstep(0.3, 0.85, dot(sh, versFront));
     float cote = clamp(0.5 + 0.8 * x * dot(sh, droite), 0.0, 1.0);
     vec3 dessous = uFrontSoleilHaut * rasant * libre * mix(0.35, 1.0, cote) * mix(0.5, 1.0, en.avance) * (0.012 + 0.025 * en.relief) * (0.75 + 0.5 * en.voile);
+    // (sans trop de rouge : ce rougeoiement, uniforme d'un bout à l'autre, faisait une bande
+    // tirée à la règle à travers le ciel — on le garde dans ses bosses, et sur son bord)
+    dessous = mix(vec3(dot(dessous, vec3(0.3, 0.5, 0.2))), dessous, 0.55) * mix(0.35, 1.0, en.relief * en.avance);
     vec3 c = gris * mix(0.13, 0.3, en.avance) + dessous;
     // le soleil haut : un peu de sa lumière traverse son bord, mince ; sa tranche est au
     // soleil s'il est derrière nous ; à contre-jour, ses bords s'allument
@@ -271,10 +277,18 @@ vec4 frontOrage(vec3 d, vec3 ciel, float detail) {
     float lueur = exp(-dot(e, e) * 0.8) * (0.25 + 1.6 * grain * grain) * (0.5 + dessus);
     couleur += vec3(0.62, 0.7, 1.0) * uFrontEclair.w * (lueur * 0.25 + 0.03 * plein) * (0.5 + 0.5 * min(qh, 1.0));
   }
-  // au loin, un voile d'air bleuté : à 40 km, l'air entre lui et nous éclaircit ses noirs
-  // (pris au ciel, mais sans son éclat du couchant : sous l'orage, l'air est à l'ombre)
-  float brume = clamp(0.62 - H * 1.2, 0.15, 0.55) * (1.0 - 0.3 * en.avance * en.densite);
-  couleur = mix(couleur, min(ciel * 0.6, uFrontAmbiance * vec3(0.4, 0.45, 0.55)), brume);
+  // au loin, l'air entre lui et nous : il prend la couleur du ciel derrière lui (sous l'orage,
+  // cet air est à l'ombre : plus sombre). Sa brume est dans les basses couches (1,5 km) : elle
+  // cache le pied du front ; ses sommets, à 11 km, la dépassent — le regard qui monte vers eux
+  // n'en traverse qu'une petite part. (Avec la visibilité du jeu, monde/meteo.js : à cette
+  // distance, il reste 5 % de la lumière. Sans cette brume, à 60 km, le front était une île noire
+  // posée sur l'horizon.)
+  float km = uFrontEnclume.y;
+  float altitude = max(0.05, km * tan(max(el, 0.0)) + km * km / 12742.0);
+  float traverse = km * min(1.0, 1.5 / altitude);
+  float voile = 1.0 - exp(-3.0 * traverse / max(uFrontAir.x, 1.0));
+  vec3 air = mix(ciel, min(ciel * 0.6, uFrontAmbiance * vec3(0.4, 0.45, 0.55)), uFrontAir.z * 0.8);
+  couleur = mix(couleur, air, voile);
   return vec4(couleur, a * uFront.w);
 }
 `;

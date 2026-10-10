@@ -18,7 +18,7 @@ import { GLSL_OUTILS, PassePleinEcran, SOMMET_PLEIN_ECRAN } from './outils.js';
 import { creerBruitNuages } from './bruit-nuages.js';
 import { glslGrains } from './glsl/grains.js';
 import { GrainsRendu } from './grains.js';
-import { INTENSITE_SOLEIL, geometrieFront, couchesNuages } from '../monde/meteo.js';
+import { INTENSITE_SOLEIL, geometrieFront, couchesNuages, visibilite } from '../monde/meteo.js';
 
 // Correspondance direction ↔ carte du ciel : la hauteur est « étirée » près de
 // l'horizon, là où les couleurs changent le plus vite.
@@ -210,13 +210,14 @@ uniform float uEclairCiel;
 uniform float uVisibiliteEtoiles;
 uniform float uBaseNuages;
 uniform float uOrage;
+uniform float uVisibiliteAir;
 ${GLSL_ATMOSPHERE}
 ${GLSL_CARTE_CIEL}
 ${glslFront('uBruitLune')}
 uniform int uRideauxN;
 uniform vec4 uRideauxReglages;
 uniform sampler2D uRideauxEcran;
-float voileNuages(float t) { return exp(-t / mix(55000.0, 22000.0, uOrage)); }
+float voileNuages(float t) { return exp(-3.0 * t * min(1.0, 1500.0 / max(uBaseNuages, 1.0)) / max(uVisibiliteAir, 2000.0)); }
 
 uvec3 pcg3d(uvec3 v) {
   v = v * 1664525u + 1013904223u;
@@ -339,6 +340,9 @@ void main() {
 }
 `;
 
+// (la teinte de la lueur de l'aube : plus chaude que le reste du ciel)
+const TEINTE_LUEUR = new THREE.Vector3(1.3, 0.95, 0.75);
+
 // La face du cube de reflets où se range la direction (x, y, z) : celle de son plus grand
 // côté (dans l'ordre de Three : +x, −x, +y, −y, +z, −z)
 function faceDuCube(x, y, z) {
@@ -366,7 +370,7 @@ export class Ciel {
     u.uCarteGrains.value = this.grains.carte;
     u.uCarteGrainsCentre.value = this.grains.uniformsCarte.uCarteGrainsCentre.value;
     u.uDeriveNuages.value = new THREE.Vector2();
-    for (const nom of ['uDirSoleil', 'uSoleilNuages', 'uDirLune', 'uLuneNuages', 'uAmbHaut', 'uAmbBas']) u[nom].value = v3();
+    for (const nom of ['uDirSoleil', 'uSoleilNuages', 'uDirLune', 'uLuneNuages', 'uAmbHaut', 'uAmbBas', 'uLueurAube', 'uDirLueur']) u[nom].value = v3();
     u.uEclair.value = new THREE.Vector4();
     u.uEclairA.value = new THREE.Vector4();
     u.uEclairB.value = new THREE.Vector4(0, 0, 0, 900);
@@ -376,6 +380,7 @@ export class Ciel {
       uFront: { value: new THREE.Vector4() },
       uFrontEnclume: { value: new THREE.Vector4() },
       uFrontEclair: { value: new THREE.Vector4() },
+      uFrontAir: { value: new THREE.Vector4(60, 1, 0, 0) },
       uFrontAmbiance: { value: v3() },
       uFrontSoleil: { value: v3() },
       uFrontSoleilHaut: { value: v3() },
@@ -404,7 +409,7 @@ export class Ciel {
         ...u,
         uVueProjectionInverse: { value: new THREE.Matrix4() },
         uPositionCamera: { value: v3() },
-        uPas: { value: 36 },
+        uPas: { value: 48 }, // (au plus : la qualité le règle — monde3d.js, QUALITES)
         uImage: { value: 0 },
       },
       vertexShader: SOMMET_PLEIN_ECRAN, fragmentShader: FRAGMENT_NUAGES, depthTest: false, depthWrite: false,
@@ -470,6 +475,7 @@ export class Ciel {
           uVisibiliteEtoiles: { value: 1 },
           uBaseNuages: u.uBaseNuages,
           uOrage: u.uOrage,
+          uVisibiliteAir: u.uVisibiliteAir,
           ...this.uniformsFront,
           ...this.grains.uniforms,
           uRideauxEcran: { value: this.rideauxEcran.texture },
@@ -533,7 +539,17 @@ export class Ciel {
     // (l'ambiance est un éclairement : divisé par π, c'est la luminance du ciel)
     u.uAmbHaut.value.copy(amb).multiplyScalar((0.75 + 0.25 * (1 - meteo.orage)) / Math.PI);
     u.uAmbBas.value.copy(amb).multiplyScalar(0.05);
+    // la lueur de l'aube (ou du couchant) : quand le soleil est juste sous l'horizon, c'est elle qui
+    // éclaire les nuages, par le côté où il va se lever (sans elle, ils n'étaient que des taches
+    // d'un violet uniforme) ; elle passe la main au soleil quand il atteint les nuages (à 2 km
+    // d'altitude, on le voit encore 1,4° sous l'horizon), et s'efface sous l'orage
+    const hauteur = ecl.dirSoleil[1];
+    const crepuscule = THREE.MathUtils.smoothstep(hauteur, -0.17, -0.05) * (1 - THREE.MathUtils.smoothstep(hauteur, -0.025, 0.035));
+    u.uLueurAube.value.copy(amb).multiply(TEINTE_LUEUR).multiplyScalar(0.75 * crepuscule * (1 - 0.7 * meteo.orage));
+    u.uDirLueur.value.set(ecl.dirSoleil[0], 0, ecl.dirSoleil[2]).normalize().setY(0.1).normalize();
     u.uCouverture.value = meteo.nuages;
+    u.uNuitNoire.value = ecl.noir ?? 0;
+    u.uVisibiliteAir.value = visibilite(meteo);
     u.uCirrus.value = meteo.cirrus ?? 0.3;
     u.uOrage.value = meteo.orage;
     const couches = couchesNuages(meteo);
@@ -555,6 +571,9 @@ export class Ciel {
     const abaissement = Math.max(0, -ecl.dirSoleil[1]);
     const ombre = (6371000 * abaissement * abaissement) / 2 / 11000;
     uf.uFrontEnclume.value.set(front.avancee, front.distance / 1000, ombre, 0);
+    // (l'air entre lui et nous : la visibilité, en km ; ce qu'il reste de son enclume ; et
+    // l'orage d'ici, qui met cet air à l'ombre)
+    uf.uFrontAir.value.set(visibilite(meteo) / 1000, front.enclume, meteo.orage ?? 0, 0);
     uf.uFrontAmbiance.value.copy(amb).multiplyScalar(1 / Math.PI);
     uf.uFrontSoleil.value.fromArray(ecl.soleilNuages).multiplyScalar(2.5);
     uf.uFrontSoleilHaut.value.fromArray(ecl.soleilHaut).multiplyScalar(2.5);

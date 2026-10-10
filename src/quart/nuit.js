@@ -123,10 +123,12 @@ const ETAPES_METEO = [
   [26, { ...TEMPETE, vent: 38, directionVent: 219 }],
   [27, { ...TEMPETE, vent: 41, directionVent: 218 }],
   [28.3, { ...TEMPETE, vent: 43, directionVent: 222 }],
-  // (le front : le vent tourne pendant qu'il passe au-dessus de nous)
-  [28.7, { ...TEMPETE, vent: 44, directionVent: 244, houle: { ...TEMPETE.houle, direction: 250 } }],
-  [29.4, { ...TEMPETE, vent: 46, directionVent: 246, houle: { ...TEMPETE.houle, direction: 252 } }],
-  [29.85, { ...TEMPETE, vent: 45, directionVent: 248, houle: { ...TEMPETE.houle, direction: 252 } }],
+  // (le front : le vent tourne pendant qu'il passe au-dessus de nous ; passé, il s'en va vers le
+  // nord-nord-est — on ne le voit pas encore : il couvre le ciel —, et c'est là qu'il réapparaîtra,
+  // à l'aube ; sinon, entre 5 h 51 et 6 h, il faisait le tour de l'horizon en réapparaissant)
+  [28.7, { ...TEMPETE, vent: 44, directionVent: 244, directionFront: 28, houle: { ...TEMPETE.houle, direction: 250 } }],
+  [29.4, { ...TEMPETE, vent: 46, directionVent: 246, directionFront: 28, houle: { ...TEMPETE.houle, direction: 252 } }],
+  [29.85, { ...TEMPETE, vent: 45, directionVent: 248, directionFront: 28, houle: { ...TEMPETE.houle, direction: 252 } }],
   // (six heures : la première lueur ; le vent faiblit d'un coup derrière le front)
   [HEURE_AUBE, { ...AMBIANCES.aube, vent: 30, directionVent: 252, nuages: 0.8, orage: 0.3, pluie: 0.25, brume: 0.42, houle: { hs: 3.2, periode: 13, direction: 250 } }],
   [HEURE_LEVER, { ...AMBIANCES.aube, vent: 18, directionVent: 262, nuages: 0.45, orage: 0, pluie: 0, brume: 0.28, front: 0.4, houle: { hs: 3, periode: 14, direction: 250 } }],

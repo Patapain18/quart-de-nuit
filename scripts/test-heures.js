@@ -1,10 +1,11 @@
 // Vérifie les heures de la nuit, sans navigateur : node scripts/test-heures.js
 // (quart/nuit.js : chaque heure plus dure ; ce qu'on entend venir, et quand — le moteur couvre
 // tout ; l'éclair qui montre les grosses vagues ; les dalots qui se bouchent et le cockpit qui ne
-// se vide plus ; la trombe qui ne vient pas sur le bateau)
+// se vide plus ; la trombe qui ne vient pas sur le bateau ; le front qui s'en va, à l'aube)
 import { Quaternion, Vector3 } from 'three';
-import { Nuit, HEURES, ENTENDRE, ECLAIR_VAGUE, EAU, BETE, meteoDeLaNuit, programmeDe } from '../src/quart/nuit.js';
+import { Nuit, HEURES, ENTENDRE, ECLAIR_VAGUE, EAU, BETE, HEURE_AUBE, HEURE_LEVER, heureEnTexte, meteoDeLaNuit, programmeDe } from '../src/quart/nuit.js';
 import { preavis } from '../src/monde/deferlantes.js';
+import { geometrieFront } from '../src/monde/meteo.js';
 
 let echecs = 0;
 const verifier = (condition, message) => {
@@ -150,6 +151,27 @@ console.log('\nLa trombe ne vient pas sur le bateau');
     plusPres = Math.min(plusPres, Math.hypot(t.x, t.z));
   }
   verifier(plusPres > 0.8 * BETE.passeMin, `droit sur le bateau arrêté, elle s'écarte : passée à ${Math.round(plusPres)} m (au moins ${BETE.passeMin} m voulus)`);
+}
+
+console.log('\nÀ l\'aube, le front s\'en va');
+{
+  // (on ne le voit qu'à la fin de la nuit, qui s'éloigne au nord-nord-est : tant qu'on le voit, il
+  // ne doit pas tourner autour de nous — avant l'étape 7 des nuages, entre 5 h 51 et 6 h, il faisait
+  // le tour de l'horizon par l'ouest, de 212° à 28°, en réapparaissant)
+  let premier = null;
+  let ecartMax = 0;
+  let enclumeAube = null;
+  for (let h = 28; h <= HEURE_LEVER; h += 0.005) {
+    const f = geometrieFront(meteoDeLaNuit(h));
+    if (f.visibilite <= 0.002) continue;
+    const az = (f.azimut * 180) / Math.PI;
+    premier ??= { h, az };
+    ecartMax = Math.max(ecartMax, Math.abs(((az - 28 + 540) % 360) - 180));
+    if (h >= HEURE_AUBE && enclumeAube === null) enclumeAube = f.enclume;
+  }
+  verifier(premier && premier.h > 29.8, `on le voit à partir de ${premier ? heureEnTexte(premier.h) : '—'} (pas pendant la nuit : il est sur nous)`);
+  verifier(ecartMax < 3, `tant qu'on le voit, il reste au nord-nord-est : ${virgule(ecartMax)}° au plus de 28°`);
+  verifier(enclumeAube !== null && enclumeAube < 0.5, `de son enclume, il ne reste qu'un voile : ${enclumeAube === null ? '—' : Math.round(enclumeAube * 100)} %`);
 }
 
 console.log(echecs ? `\n${echecs} vérification(s) en échec` : '\nTout est bon.');
