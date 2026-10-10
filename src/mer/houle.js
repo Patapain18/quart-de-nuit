@@ -265,10 +265,14 @@ function ouvrirFil(houle, graine, cascades) {
     enCours: false,
     resultat: null,
     panne: false,
+    depuis: 0, // (quand on lui a demandé la mer qu'il calcule)
+    latence: 0, // (le temps qu'il met à répondre, en ms : moyenne glissante)
   };
   travailleur.onmessage = ({ data }) => {
     if (data.type !== 'resultat') return;
     fil.enCours = false;
+    const ms = performance.now() - fil.depuis;
+    fil.latence = fil.latence ? fil.latence * 0.8 + ms * 0.2 : ms;
     fil.resultat = { t: data.t, version: data.version, donnees: data.tampons.map((b) => new Float32Array(b)) };
   };
   // (si le fil ne démarre pas, on calcule tout ici, comme avant)
@@ -289,7 +293,11 @@ export class Houle {
     this.temps = 0;
     this._s = [0, 0, 0];
     this.version = 0; // (change à chaque nouvel état de la mer d'un coup)
-    this.partDansLeFil = 0; // la part des images dont la mer vient du fil (moyenne glissante)
+    // la part des images où la mer n'a pas été calculée ici : elle vient du fil, ou l'on a
+    // gardé celle d'avant (moyenne glissante) ; et la part de celles où on l'a gardée
+    this.partDansLeFil = 0;
+    this.partAttente = 0;
+    this.enAttente = 0; // (le temps passé depuis la dernière mer, quand on l'a gardée)
     this.fil = fil ? ouvrirFil(this, graine, cascades) : null;
     // les vagues scélérates (mer/scelerate.js), quand il y en a : elles s'ajoutent à la houle,
     // pour la physique comme pour l'image (eau.js : la première seulement)
@@ -336,15 +344,24 @@ export class Houle {
   // La mer au temps t. Avec un fil : il a calculé pendant l'image d'avant la mer de cet
   // instant-ci ; on échange ses tableaux contre les nôtres (sans rien recopier) et on lui
   // demande déjà ceux de l'image suivante. Ici, il ne reste que l'écume (elle a besoin de
-  // l'image d'avant). Si le fil n'a pas fini à temps — ou si le navigateur ne nous a pas
-  // rendu la main entre deux images, comme dans les outils d'essai qui enchaînent les
-  // images —, on calcule ici, comme sans fil : la mer est la même.
-  calculer(t, dt = 1 / 60) {
+  // l'image d'avant).
+  // Et si le fil n'a pas fini à temps ?
+  //  - en direct (enDirect : le jeu qui tourne, une image après l'autre), on garde la mer
+  //    de l'image d'avant, le temps qu'il finisse. Sur un ordinateur lent, la mer avance un
+  //    peu moins souvent que l'image, mais on ne fait pas deux fois le même travail (la
+  //    calculer aussi ici ralentirait tout le reste, au pire moment). Au-delà d'un quart de
+  //    seconde sans réponse, on la calcule ici ;
+  //  - sinon (les outils d'essai, qui enchaînent les images sans rendre la main au
+  //    navigateur : le fil ne peut pas répondre), on calcule ici, comme sans fil : la mer
+  //    est la même.
+  calculer(t, dt = 1 / 60, { enDirect = false } = {}) {
     this.temps = t;
     if (this.aRegler?.length) {
       const [c, j0, j1] = this.aRegler.shift();
       c.regler(this.mer, j0, j1);
     }
+    // (le temps écoulé depuis la dernière mer : l'écume vieillit d'autant)
+    const ecoule = dt + this.enAttente;
     const fil = this.fil;
     if (fil && !fil.panne) {
       const r = fil.resultat;
@@ -354,19 +371,38 @@ export class Houle {
         this.cascades.forEach((c, i) => {
           const ancienne = c.donnees;
           c.donnees = r.donnees[i];
-          c.calculerEcume(dt, this.ecume, ancienne);
+          c.calculerEcume(ecoule, this.ecume, ancienne);
           fil.libres[i] = ancienne;
         });
+        this.enAttente = 0;
         this.partDansLeFil += (1 - this.partDansLeFil) * 0.02;
-        this.demanderAuFil(t + dt);
+        this.partAttente *= 0.98;
+        this.demanderAuFil(t + this.avance(dt));
         return;
       }
       // (trop vieille, ou d'une mer qui a changé : on reprend juste ses tableaux)
       if (r) fil.libres = r.donnees;
+      // (il calcule encore : en direct, on garde la mer d'avant)
+      else if (enDirect && fil.enCours && performance.now() - fil.depuis < 250) {
+        this.enAttente = ecoule;
+        this.partDansLeFil += (1 - this.partDansLeFil) * 0.02;
+        this.partAttente += (1 - this.partAttente) * 0.02;
+        return;
+      }
     }
-    for (const c of this.cascades) c.calculer(t, dt, this.choppy, this.ecume);
+    for (const c of this.cascades) c.calculer(t, ecoule, this.choppy, this.ecume);
+    this.enAttente = 0;
     this.partDansLeFil *= 0.98;
+    this.partAttente *= 0.98;
     if (fil && !fil.panne && !fil.enCours) this.demanderAuFil(t + dt);
+  }
+
+  // Dans combien de temps on se servira de la mer qu'on demande au fil : à l'image
+  // suivante s'il répond vite ; s'il lui faut plus d'une image (un ordinateur lent), à
+  // celle où sa réponse arrivera — la mer sera alors celle de cet instant-là
+  avance(dt) {
+    const images = Math.ceil(this.fil.latence / (dt * 1000));
+    return Math.min(4, Math.max(1, images)) * dt;
   }
 
   // Demande au fil la mer du temps t (on lui confie nos tableaux libres pour l'écrire)
@@ -375,7 +411,14 @@ export class Houle {
     const tampons = fil.libres.map((d) => d.buffer);
     fil.libres = null;
     fil.enCours = true;
+    fil.depuis = performance.now();
     fil.travailleur.postMessage({ type: 'calculer', t, choppy: this.choppy, version: this.version, tampons }, tampons);
+  }
+
+  // (un faux ordinateur lent, pour les essais : chaque calcul du fil prend « fois » fois
+  // plus de temps)
+  freinerFil(fois) {
+    this.fil?.travailleur.postMessage({ type: 'frein', fois });
   }
 
   // Somme des cascades « physiques » au point (x, z) de la grille non déplacée (et de la

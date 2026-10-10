@@ -569,7 +569,7 @@ function boucle(maintenant) {
   placerTrombe();
   deplacerCargo(dt);
   majScelerate(dt);
-  monde.image(dt, { toutLeCube, placerCamera });
+  monde.image(dt, { toutLeCube, placerCamera, enDirect: true });
   toutLeCube = false;
   ageMesures += dt;
   if (ageMesures > 0.5) { afficherMesures(); ageMesures = 0; }

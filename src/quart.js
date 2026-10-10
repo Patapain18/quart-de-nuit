@@ -100,6 +100,14 @@ const marin = new Marin();
 marin.encombrement = construireEncombrement(bateau);
 // (jeu.html?perf : le compteur de fluidité, en haut à gauche)
 if (parametres.has('perf')) import('./atelier/fluidite.js').then((m) => m.afficherFluidite(monde));
+// (jeu.html?frein-carte=3&frein-processeur=2 : un faux ordinateur lent, pour les essais — la
+// carte graphique fait trois fois son plus gros travail (monde3d.js, freiner), et tout le
+// calcul du processeur prend deux fois plus de temps : ici, dans la boucle, et dans le fil
+// de la houle)
+const freinCarte = Number(parametres.get('frein-carte'));
+if (freinCarte > 1) monde.frein = freinCarte;
+const freinProcesseur = Number(parametres.get('frein-processeur')) || 1;
+if (freinProcesseur > 1) monde.houle.freinerFil(freinProcesseur);
 // (jeu.html?peur : l'atelier de la peur, à droite)
 if (parametres.has('peur')) import('./atelier/atelier-peur.js').then((m) => m.ouvrirAtelierPeur(window.__jeu));
 // (jeu.html?trombe=fil : une autre trombe que celle du jeu — voir l'atelier de la trombe)
@@ -1933,7 +1941,8 @@ function boucle(maintenant) {
   dernier = maintenant;
   // (les outils de mise au point font avancer le jeu eux-mêmes, image par image)
   if (etat.fige) { requestAnimationFrame(boucle); return; }
-  monde.image(dt, { simuler, placerCamera });
+  const debut = performance.now();
+  monde.image(dt, { simuler, placerCamera, enDirect: true });
   ageInstruments += dt;
   if (ageInstruments > 0.12 && etat.mode !== 'accueil') {
     afficherEtatBord();
@@ -1943,6 +1952,11 @@ function boucle(maintenant) {
   afficherGeste();
   // (six heures : on attend que le soleil soit levé)
   if (etat.aubeEnAttente && (nuit?.heure ?? 99) >= HEURE_LEVER - 0.01) afficherAube();
+  // (le faux processeur lent : tout ce calcul prend « freinProcesseur » fois plus de temps)
+  if (freinProcesseur > 1) {
+    const fin = performance.now() + (performance.now() - debut) * (freinProcesseur - 1);
+    while (performance.now() < fin);
+  }
   requestAnimationFrame(boucle);
 }
 requestAnimationFrame(boucle);

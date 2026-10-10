@@ -124,6 +124,7 @@ export class Monde3D {
     this.foudreLocale = new Foudre(11);
     this.eclair = { intensite: 0, eclaire: 0, actif: null, centre: null, trait: null };
     this.mesures = { houleMs: 0, imageMs: 0, ips: 0 };
+    this.frein = 1; // (un faux ordinateur lent, pour les essais : voir freiner())
     this._compteur = { images: 0, depuis: performance.now() };
     this.redimensionner();
     addEventListener('resize', () => this.redimensionner());
@@ -386,20 +387,35 @@ export class Monde3D {
     if (this.chronoGPU.actif) return this.chronoGPU.mesurer(nom, f);
     const c = this.chrono;
     if (!c.actif || !c.image) return f();
-    const gl = this.renderer.getContext();
-    if (c.gpu) gl.finish();
+    if (c.gpu) this.attendreCarte();
     const t0 = performance.now();
     const r = f();
-    if (c.gpu) gl.finish();
+    if (c.gpu) this.attendreCarte();
     c.image[nom] = (c.image[nom] ?? 0) + performance.now() - t0;
     return r;
+  }
+
+  // Attend que la carte graphique ait fini tout ce qu'on lui a demandé (pour la chronométrer).
+  // gl.finish() ne suffit pas : Chrome n'attend pas vraiment. Lire un pixel, si : on efface
+  // une petite image d'un pixel, puis on lit ce pixel ; la carte graphique travaille dans
+  // l'ordre, il faut donc que tout ce qui précède soit fini.
+  attendreCarte() {
+    const r = this.renderer;
+    const a = (this._attente ??= { cible: new THREE.WebGLRenderTarget(1, 1, { depthBuffer: false }), pixel: new Uint8Array(4) });
+    const avant = r.getRenderTarget();
+    r.setRenderTarget(a.cible);
+    r.clear();
+    r.readRenderTargetPixels(a.cible, 0, 0, 1, 1, a.pixel);
+    r.setRenderTarget(avant);
   }
 
   // Une image : la mer avance, le ciel se prépare, on dessine
   // simuler : appelé une fois la houle calculée, pour faire bouger le bateau
   //   (flottaison simple dans l'atelier, vraie physique dans le jeu)
   // placerCamera : appelé une fois le bateau bougé (sinon la caméra a une image de retard)
-  image(dt, { toutLeCube = false, placerCamera = null, simuler = null } = {}) {
+  // enDirect : l'image d'une boucle qui rend la main au navigateur entre deux images (le
+  //   jeu qui tourne) ; sinon, un outil d'essai qui les enchaîne (voir Houle.calculer)
+  image(dt, { toutLeCube = false, placerCamera = null, simuler = null, enDirect = false } = {}) {
     const debut = performance.now();
     const chrono = this.chrono;
     if (chrono.actif) chrono.image = { temps: this.temps };
@@ -407,7 +423,7 @@ export class Monde3D {
     this.temps += dt;
     const m = this.meteo;
     const t0 = performance.now();
-    this.mesurer('houle', () => this.houle.calculer(this.temps, dt));
+    this.mesurer('houle', () => this.houle.calculer(this.temps, dt, { enDirect }));
     this.mesures.houleMs = this.mesures.houleMs * 0.95 + (performance.now() - t0) * 0.05;
 
     this.ciel.uniformsNuages.uTemps.value = this.temps;
@@ -499,6 +515,8 @@ export class Monde3D {
     this.mesurer('ciel', () => this.ciel.preparer(this.camera, { toutLeCube }));
     this.mesurer('trombe', () => this.trombe.preparer(this.camera));
     this.mesurer('rendu', () => this.post.rendre(this.scene, this.camera));
+    // (un faux ordinateur lent : la carte graphique refait les nuages et la scène)
+    if (this.frein > 1) this.mesurer('frein', () => this.freiner());
 
     if (chrono.actif && chrono.image) {
       chrono.image.total = performance.now() - debut;
@@ -513,6 +531,20 @@ export class Monde3D {
       this.mesures.ips = (c.images * 1000) / (maintenant - c.depuis);
       c.images = 0;
       c.depuis = maintenant;
+    }
+  }
+
+  // Le faux ordinateur lent, pour les essais (jeu.html?frein-carte=3) : la carte graphique
+  // fait « frein » fois ce qui lui coûte le plus (les nuages, la scène et son halo). Chaque
+  // dessin refait exactement le même : l'image ne change pas, elle coûte juste plus cher.
+  // (frein = 2,5 : une fois sur deux, deux dessins de plus ; l'autre, un seul)
+  freiner() {
+    this._reste = (this._reste ?? 0) + this.frein - 1;
+    const fois = Math.floor(this._reste);
+    this._reste -= fois;
+    for (let k = 0; k < fois; k++) {
+      this.ciel.passeNuages.rendre(this.renderer, this.ciel.nuagesEcran);
+      this.post.rendre(this.scene, this.camera);
     }
   }
 
