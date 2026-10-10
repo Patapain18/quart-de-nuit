@@ -4,9 +4,11 @@
 
 Le pilote automatique tient le bateau vent arrière, les vagues dans le dos. Toi, tu ne barres pas : tu le gardes en vie, comme le gardien de nuit de *Five Nights at Freddy's*. La batterie que tout vide, le moteur qui la recharge mais couvre les bruits, le pilote qui chauffe, l'eau qui monte vers les batteries, les vitres que les vagues brisent si leurs volets sont ouverts… et chaque heure est pire que la précédente. Si le bateau est encore à flot, et toi à bord, quand sonnent six heures, tu as gagné.
 
-> Où on en est (octobre 2026) : **le jeu change de direction** (voir [DESIGN.md](DESIGN.md)). L'ancien jeu — une journée d'apprentissage avec Jos, puis une nuit de navigation — est gardé dans git (étiquette `v1-journee-et-nuit`) et reste en ligne tant que le nouveau n'est pas prêt. Le nouveau se construit sur la branche `la-nuit-seule` : l'étape 1 (la nuit seule, de minuit à six heures, sans Jos ni barre), l'étape 2 (le bateau de 14 m, sa grande timonerie vitrée, ses volets de tempête et sa cale), l'étape 3 (les systèmes du bord : la batterie, le moteur, le pilote qui chauffe, les pompes, les vitres), l'étape 4 (les heures : chaque heure plus dure, chaque vague qu'on entend venir de son côté, les deux sorties forcées), l'étape 5 (l'inexpliqué : le livre de bord de l'ancien propriétaire à la place de Jos, la porte de la cabine avant), l'étape 6 (le son : plus silencieux, chaque son venant de sa place, de longs creux avant les coups) et l'étape 7 (les nuages : nets au lieu de flous, le front lointain qui se fond dans la brume au lieu d'une île noire, la lueur de l'aube) sont faites.
+Il y a un an, jour pour jour, on a retrouvé *Morgane* à la dérive au large de Kervalen, le pilote enclenché, la timonerie vide. Le livre de bord de son ancien propriétaire, Yves Le Bihan, est toujours à bord : ses consignes, et sa dernière nuit, une page par heure.
 
-**Jouer en ligne (l'ancien jeu, pour l'instant) : https://patapain18.github.io/quart-de-nuit/**
+> En octobre 2026, le jeu a changé de direction (voir [DESIGN.md](DESIGN.md)) : il ne garde que la nuit de tempête, en huit étapes. L'ancien jeu — une journée d'apprentissage avec Jos, le vieux marin du sémaphore, puis une nuit de navigation — est gardé dans git (étiquette `v1-journee-et-nuit`).
+
+**Jouer en ligne : https://patapain18.github.io/quart-de-nuit/**
 
 ## Lancer le jeu
 
@@ -23,7 +25,7 @@ Au clavier (français) et à la souris. La souris tourne la tête.
 
 - **Assis au poste** (au début de la nuit, dans la timonerie) : E pour agir sur ce que tu regardes et qui est à portée de main (le radar, le traceur, la commande du pilote, le bouton du moteur, chaque disjoncteur du tableau électrique, la VHF et la commande des volets au plafond) ; Espace pour te lever.
 - **À pied** : Z Q S D pour marcher, E pour agir sur ce que l'on regarde (Maj + E : l'action inverse), Maj pour se tenir, C pour s'accroupir, X le harnais (dehors).
-- **Partout** : F la lampe frontale, L le livre de bord (les consignes de l'ancien propriétaire, sa dernière nuit page par page, et le journal de la tienne ; la molette tourne les pages), H pour cacher l'aide, Échap la pause (la nuit continue pendant la pause).
+- **Partout** : F la lampe frontale, L le livre de bord (les consignes de l'ancien propriétaire, sa dernière nuit page par page, et le journal de la tienne ; la molette tourne les pages), H pour cacher l'aide, Échap la pause (la nuit t'attend : pendant la pause, rien n'arrive à bord).
 
 **Ce qu'il faut surveiller** (l'heure, en haut à droite, dit aussi la batterie et les alarmes) :
 - **les vagues** : chaque heure, elles viennent plus souvent (une toutes les 40 s à minuit, toutes les 12 s à 5 h) et plus grosses ; tu les entends gronder avant qu'elles frappent, de leur côté — devant les plus grosses, tout le reste se tait —, et la nuit un éclair montre parfois leur crête (avec un casque, coche « Je joue avec un casque » dans les options : le son passe en trois dimensions) ;

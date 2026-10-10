@@ -60,7 +60,9 @@ float bruitE(vec3 p) {
 // dedans : la cale (éclairée par les lampes de l'intérieur) ; sinon le cockpit (dehors)
 function materiauEau(uniforms, { dedans }) {
   const m = new THREE.MeshStandardMaterial({
-    color: dedans ? 0x0e100d : 0x0b1a1c, roughness: dedans ? 0.07 : 0.06, metalness: 0, transparent: true,
+    // (l'eau du cockpit : de la mer secouée, trouble, vert-de-gris — un peu plus claire que la
+    // nuit, pour qu'elle prenne la lumière de la frontale)
+    color: dedans ? 0x0e100d : 0x1a2a26, roughness: dedans ? 0.07 : 0.06, metalness: 0, transparent: true,
   });
   if (dedans) m.envMapIntensity = 0.02;
   m.onBeforeCompile = (shader) => {
@@ -123,9 +125,11 @@ ${dedans ? `  if (p.z < ${f(CALE.zAvant)} || p.z > ${f(CALE.zArriere)}) discard;
   normal = normalize(abs(det) * normal - sign(det) * (dh.x * r1 + dh.y * r2));
 }`)
       .replace('#include <color_fragment>', `#include <color_fragment>
-// l'eau est d'autant plus opaque qu'elle est profonde (2 cm : on voit le fond ; 30 cm :
-// presque plus)
-diffuseColor.a = 1.0 - exp(-max(profondeurEau, 0.0) * ${dedans ? '5.0' : '9.0'});
+// l'eau est d'autant plus opaque qu'elle est profonde (dans la cale, 2 cm : on voit le fond ;
+// 30 cm : presque plus ; dans le cockpit, la mer qui vient d'y entrer est trouble : à 7 cm, on
+// devine encore le plancher ; à 20 cm, plus du tout — avant, on voyait ses lattes à travers 20 cm
+// d'eau, comme sous une vitre teintée)
+diffuseColor.a = 1.0 - exp(-max(profondeurEau, 0.0) * ${dedans ? '5.0' : '17.0'});
 // des bulles et de l'écume quand l'eau vient d'arriver ou qu'elle est secouée
 {
   float b = bruitE(vec3(vPosMonde.xz * 9.0, uTemps * 2.0));
@@ -134,6 +138,14 @@ diffuseColor.a = 1.0 - exp(-max(profondeurEau, 0.0) * ${dedans ? '5.0' : '9.0'})
   diffuseColor.a = mix(diffuseColor.a, 0.95, mousse);
 }`)
       .replace('#include <roughnessmap_fragment>', '#include <roughnessmap_fragment>\nroughnessFactor = mix(roughnessFactor, 0.8, smoothstep(0.62, 0.8, bruitE(vec3(vPosMonde.xz * 9.0, uTemps * 2.0))) * uMousse);');
+    if (!dedans) {
+      // (sa surface renvoie le ciel et la frontale, d'autant plus qu'on la regarde en rasant)
+      shader.fragmentShader = shader.fragmentShader.replace('#include <opaque_fragment>', `{
+  float nv = clamp(dot(normal, normalize(vViewPosition)), 0.0, 1.0);
+  diffuseColor.a = max(diffuseColor.a, 0.02 + 0.98 * pow(1.0 - nv, 5.0));
+}
+#include <opaque_fragment>`);
+    }
     if (dedans) {
       shader.fragmentShader = shader.fragmentShader
         .replace('#include <lights_fragment_end>', `${GLSL_CABINE}\n#include <lights_fragment_end>`)
@@ -246,7 +258,8 @@ export class EauABord {
       this.avant[cle] = litres;
     }
     // (le puits du cockpit fait ~2,1 m²)
-    this.cockpit.maj(dt, groupe, litresCockpit / 2100, g, Math.max(0.25, this.mousse.cockpit), temps);
+    // (la mer qui embarque dans le cockpit écume toujours un peu)
+    this.cockpit.maj(dt, groupe, litresCockpit / 2100, g, Math.max(0.4, this.mousse.cockpit), temps);
     this.cale.maj(dt, groupe, EauABord.hauteurDansLaCale(litresCale, plein), g, 0.15 + this.mousse.cale * 0.85, temps);
   }
 }

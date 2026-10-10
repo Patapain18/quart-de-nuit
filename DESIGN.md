@@ -5,9 +5,11 @@
 **Minuit. Une tempête, un voilier, et toi seul à bord. Six heures avant l'aube.**
 
 Le pilote automatique tient le bateau vent arrière, les vagues dans le dos. Toi, tu ne barres
-pas : tu le gardes en vie. L'eau qui entre, le pilote qui lâche, la porte, le foc qui bat…
-chaque heure est pire que la précédente. Si le bateau est encore à flot, et toi à bord, quand
-sonnent six heures, tu as gagné.
+pas : tu le gardes en vie. La batterie que tout vide, les volets à fermer du côté d'où gronde la
+vague, l'eau qui monte dans la cale, le moteur qui recharge mais couvre les bruits, le pilote qui
+chauffe… chaque heure est pire que la précédente. Si le bateau est encore à flot, et toi à bord,
+quand sonnent six heures, tu as gagné. Il y a un an, jour pour jour, on a retrouvé *Morgane* à la
+dérive, la timonerie vide ; le livre de bord de son ancien propriétaire est toujours à bord.
 
 ---
 
@@ -115,8 +117,9 @@ Au clavier (français) et à la souris. La souris tourne la tête.
 
 ## 3. Feuille de route
 
-Une étape = un résultat visible ; je travaille sur la branche `la-nuit-seule`, et le jeu en
-ligne reste l'ancien tant que le nouveau n'est pas jouable.
+Une étape = un résultat visible. J'ai travaillé sur la branche `la-nuit-seule`, le jeu en ligne
+restant l'ancien tant que le nouveau n'était pas jouable ; à l'étape 8, elle a rejoint `main` : la
+nuit seule est en ligne.
 
 1. ✅ **La nuit seule** — le jeu commence directement à minuit ; plus de journée, de Jos, de
    barre ni de navigation ; le pilote tient le cap ; six heures de deux minutes, de plus en plus
@@ -133,7 +136,8 @@ ligne reste l'ancien tant que le nouveau n'est pas jouable.
    commandes (à la place de Jos).
 6. ✅ **Le son** — plus silencieux, chaque son venant de sa direction, de longs creux avant les coups.
 7. ✅ **Les nuages** — corriger leurs défauts.
-8. **Finitions et mise en ligne.**
+8. ✅ **Finitions et mise en ligne** — relire tout ce que voit le joueur, corriger les restes,
+   publier.
 
 ### Étape 1 : la nuit seule ✅ (9 octobre 2026)
 
@@ -615,6 +619,40 @@ modeste, à toi de me dire.
 **À voir** : `docs/nuages-l-aube-avant-apres.jpg` (6 h 18, vers le front et vers le lever, avant et
 après) et `docs/nuages-l-eclair-et-le-lever.jpg` (un éclair à minuit, avant et après ; le dessus à
 6 h 18 avant, le lever de 6 h 42 après).
+
+### Étape 8 : finitions et mise en ligne ✅ (10 octobre 2026)
+
+**Relu, en jouant** : tout ce que voit le joueur — l'accueil du site et celui du jeu, l'aide, la
+pause, le livre de bord, les messages de la nuit, les écrans de fin (un naufrage, puis la reprise de
+l'heure) et celui de l'aube avec son bilan, les options, l'« À propos ».
+
+**Corrigé** :
+- la pause disait « La nuit ne s'arrête pas pendant la pause » (et le README « la nuit continue ») :
+  c'était faux — mesuré, pendant huit secondes de pause, l'heure, la batterie et l'eau de la cale ne
+  bougent pas. Elle dit maintenant « La nuit t'attend : pendant la pause, rien n'arrive à bord » ;
+- les restes du carnet (l'aide « carnet de bord », le bouton de la pause) : c'est le livre de bord
+  depuis l'étape 5 ;
+- l'« À propos » : 352 morceaux de coque (et non 346, ceux de l'ancien bateau), l'atelier des grains
+  dans les coulisses ;
+- les textes de l'accueil (du site et du jeu) et des fins mis au jeu d'aujourd'hui (la batterie,
+  les volets, le moteur ; le naufrage rappelle les volets — une vitre brisée laisse entrer la mer — ;
+  le chavirage, qu'on réarme le pilote une fois froid) ;
+- les options de l'ancien jeu (la voix de Jos, la barre assistée, la difficulté) retirées : plus
+  rien ne s'en servait ;
+- **l'eau du cockpit**, presque transparente vue de près (étape 4) : sous 21 cm d'eau, on voyait les
+  lattes du plancher comme sous une vitre teintée. C'est maintenant de la mer trouble, vert-de-gris,
+  qui écume et renvoie la frontale (opaque à 20 cm ; à 7 cm, on devine encore le plancher) ;
+- une icône d'onglet (un voilier) sur toutes les pages, et un aperçu pour les partages (le titre, une
+  phrase, et une image de la tempête vue de la timonerie : `public/apercu.jpg`).
+
+**Vérifié** : la version construite, servie comme elle le sera en ligne — l'accueil, le jeu (la nuit
+démarre, les 24 sons se chargent, aucune erreur), les cinq ateliers ; les 13 tests ; les essais de
+marche (22 sur 22). Les parties gardées de l'ancien jeu ne gênent pas : la nuit seule garde les
+siennes sous une autre clé, avec un numéro de version, et vérifie les options une à une.
+
+**Mis en ligne** : la branche `la-nuit-seule` a rejoint `main`, et GitHub Pages publie à chaque envoi
+sur `main` : https://patapain18.github.io/quart-de-nuit/ — la nuit seule remplace l'ancien jeu, qui
+reste dans git (étiquette `v1-journee-et-nuit`).
 
 ## 4. Le moteur (ce qu'on garde de l'ancien jeu)
 

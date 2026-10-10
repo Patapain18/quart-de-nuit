@@ -1484,7 +1484,7 @@ function afficherHeure() {
   zone.querySelector('.alertes').innerHTML = alertes.map((a) => `<li>${a}</li>`).join('');
 }
 
-// Le carnet de bord (L) : ce qu'il faut surveiller, et le journal de la nuit
+// Le livre de bord (L) : les consignes d'Yves Le Bihan, sa dernière nuit, et le journal de la tienne
 function basculerCarnet() {
   etat.carnet = !etat.carnet;
   document.getElementById('carnet').hidden = !etat.carnet;
@@ -1581,7 +1581,7 @@ const AIDE = {
   poste: [
     ['E', 'agir sur ce que tu regardes (radar, tableau, VHF, volets…)'],
     [TOUCHES.lever.nom, 'se lever'],
-    [`${TOUCHES.lampe.nom} · ${TOUCHES.carnet.nom}`, 'lampe frontale · carnet de bord'],
+    [`${TOUCHES.lampe.nom} · ${TOUCHES.carnet.nom}`, 'lampe frontale · livre de bord'],
     [TOUCHES.aide.nom, 'cacher l\'aide'],
   ],
   pied: [
@@ -1591,7 +1591,7 @@ const AIDE = {
     ['Maj', 'se tenir (on ne glisse plus)'],
     [TOUCHES.accroupir.nom, 's\'accroupir'],
     [TOUCHES.harnais.nom, 'harnais : s\'attacher, se détacher'],
-    [`${TOUCHES.lampe.nom} · ${TOUCHES.carnet.nom}`, 'lampe frontale · carnet de bord'],
+    [`${TOUCHES.lampe.nom} · ${TOUCHES.carnet.nom}`, 'lampe frontale · livre de bord'],
     [TOUCHES.aide.nom, 'cacher l\'aide'],
   ],
 };
@@ -1684,8 +1684,8 @@ function finir(raison) {
     horsBord: ['Passé par-dessus bord', 'Le bateau s\'est couché et tu as passé les filières. Dehors, accroche toujours ton harnais à la ligne de vie (X).'],
     bome: ['Assommé par la bôme', 'Quand le bateau a empanné, la bôme a traversé le cockpit. Dans le cockpit, accroupis-toi (C).'],
     emporte: ['Emporté par une déferlante', 'Une vague a balayé le bateau couché, et tu n\'étais pas attaché. Dehors, le harnais reste accroché (X).'],
-    naufrage: ['Le bateau a coulé', 'Trop d\'eau à bord : Morgane s\'est alourdie, puis enfoncée. Garde la porte fermée, et pompe dès que l\'eau monte dans la cale.'],
-    chavirage: ['Chaviré', 'Le bateau s\'est retourné et ne s\'est pas redressé. Sans pilote, il se met en travers des vagues : réarme-le dès qu\'il lâche.'],
+    naufrage: ['Le bateau a coulé', 'Trop d\'eau à bord : Morgane s\'est alourdie, puis enfoncée. Garde la porte fermée, les volets du côté d\'où viennent les vagues (une vitre brisée laisse entrer la mer), et pompe dès que l\'eau monte dans la cale.'],
+    chavirage: ['Chaviré', 'Le bateau s\'est retourné et ne s\'est pas redressé. Sans pilote, il se met en travers des vagues : quand il chauffe, soulage-le (le moteur, le foc roulé) ; s\'il disjoncte, réarme-le au tableau dès qu\'il a refroidi.'],
   };
   const [titre, texte] = textes[raison] ?? textes.naufrage;
   document.getElementById('titre-fin').textContent = titre;

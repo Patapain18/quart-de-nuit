@@ -1,5 +1,5 @@
 // Les options du joueur : la qualité de l'image, la souris, la vue, le confort (contre le
-// mal de mer), la barre (assistée ou non), le son et la voix de Jos.
+// mal de mer, les yeux sensibles, un écran peu lumineux) et le son.
 // Toutes gardées par le navigateur, sous une seule clé. N'importe quelle page peut les
 // lire (lireOptions) et les changer (changerOptions) ; ceux qui veulent savoir quand elles
 // changent s'abonnent (quandOptionsChangent).
@@ -18,20 +18,16 @@ export const OPTIONS_DE_BASE = {
   clignotements: true, // les éclairs vifs, les lumières qui vacillent (sinon : adoucis, pour les yeux sensibles)
   nuit: 'encre', // la nuit d'orage : 'encre' (noir d'encre), 'tres-sombre' ou 'sombre' (pour un écran peu lumineux)
   volume: 0.8, // le son : 0 → 1
-  voix: true, // Jos parle (sinon : seulement les sous-titres)
   sousTitres: true, // les sous-titres de la radio
   bruits: false, // les bruits qui comptent, écrits à l'écran (les vagues qu'on entend venir, et d'où)
   casque: false, // le son en trois dimensions (devant, derrière, au-dessus) : avec un casque
   aide: true, // les touches, en bas à gauche
-  barreAssistee: true, // Q et D donnent le cap, la barre le tient (sinon : la vraie barre)
-  difficulte: 'marin', // la dernière difficulté choisie pour la nuit
 };
 
 // Les valeurs permises : une valeur inconnue (une vieille version, une valeur modifiée à
 // la main…) est remplacée par celle de base, pour que le jeu ne casse jamais
 const LISTES = {
   qualite: ['economique', 'moyenne', 'haute', 'superbe'],
-  difficulte: ['matelot', 'marin', 'caphornier'],
   nuit: ['encre', 'tres-sombre', 'sombre'],
 };
 const BORNES = { sensibilite: [0.3, 2.5], champ: [60, 90], stabilisation: [0, 1], volume: [0, 1] };
