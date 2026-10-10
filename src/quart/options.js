@@ -21,6 +21,7 @@ export const OPTIONS_DE_BASE = {
   voix: true, // Jos parle (sinon : seulement les sous-titres)
   sousTitres: true, // les sous-titres de la radio
   bruits: false, // les bruits qui comptent, écrits à l'écran (les vagues qu'on entend venir, et d'où)
+  casque: false, // le son en trois dimensions (devant, derrière, au-dessus) : avec un casque
   aide: true, // les touches, en bas à gauche
   barreAssistee: true, // Q et D donnent le cap, la barre le tient (sinon : la vraie barre)
   difficulte: 'marin', // la dernière difficulté choisie pour la nuit

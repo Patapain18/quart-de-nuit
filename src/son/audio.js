@@ -11,12 +11,25 @@
 //
 // Le mélange suit ce qui se passe, à chaque image (maj) : la force du vent, la pluie, la
 // hauteur des vagues, les voiles qui faseyent, le bateau qui roule (le bois travaille).
-// Trois « bus » (des tables de mixage) :
-//  - dehors : ce que l'on entend sur le pont ; dans la cabine, la coque l'étouffe (un
-//    filtre ne laisse passer que les graves) ;
-//  - dedans : ce que l'on n'entend que dans la cabine (la coque, le toit), avec l'écho d'une
-//    petite pièce en bois ;
-//  - bord : ce qui est à bord, dedans comme dehors (les craquements, le winch, la pompe).
+// Les « bus » (des tables de mixage) :
+//  - dehors : le fond de la tempête (le vent, la mer, la pluie sur le pont) ; dans la
+//    timonerie, les vitres l'étouffent (moins quand la porte est ouverte, plus quand les
+//    volets sont fermés), et le moteur le couvre ;
+//  - signes : ce qu'il faut entendre venir — le grondement des déferlantes, la vague
+//    scélérate, la trombe, le tonnerre : les vitres les étouffent moins, le moteur les couvre ;
+//  - dedans : ce que l'on n'entend que dans la timonerie (la pluie sur le toit, le vent qui
+//    siffle, l'eau contre la coque ; les coups, les pas, la porte), avec l'écho d'une petite
+//    pièce en bois ;
+//  - bord : ce qui est à bord, dedans comme dehors (le moteur, les pompes, les alarmes, les
+//    craquements) ;
+//  - radio : le haut-parleur de la VHF ; tete : ce qui n'est que dans ta tête (le cœur, le
+//    sifflement de l'angoisse).
+// Plus silencieux que l'ancien jeu : la nuit, le fond est bas, et il respire — de longs creux
+// où le vent tombe un moment (respirer) ; avant les coups, le monde se tait (etouffer).
+// Chaque son vient de sa direction : il a une place, un point du bateau (son repère : tribord
+// vers +x, le haut vers +y, l'arrière vers +z — la mer et le ciel, ramenés dans ce repère), et
+// l'oreille est là où sont tes yeux (ecouter : le jeu la place à chaque image) ; avec un casque,
+// on entend s'il vient de devant ou de derrière, d'en haut ou d'en bas (le modèle « HRTF »).
 // Les sons calculés (du bruit filtré, comme avant) font le reste : l'eau le long de la
 // coque, le clapot dans la cabine, le moteur du cargo, la trombe, les bips… et ils
 // remplacent les enregistrements tant que ceux-ci ne sont pas chargés.
@@ -102,8 +115,24 @@ function echoLarge(ctx) {
 const BOUCLES = {
   'vent-doux': 'dehors', 'vent-fort': 'dehors', 'vent-rafales': 'dehors', greement: 'dehors', 'greement-aigu': 'dehors',
   'mer-forte': 'dehors', 'cockpit-jour': 'dehors', 'sous-voiles': 'dehors', 'pluie-pont': 'dehors', 'voile-bat': 'dehors',
-  pilote: 'bord', hurlement: 'bord', 'cabine-mer': 'dedans', coque: 'dedans', 'pluie-toit': 'dedans', 'vent-dedans': 'dedans',
+  pilote: 'fondBord', hurlement: 'fondBord', 'cabine-mer': 'fondDedans', coque: 'fondDedans', 'pluie-toit': 'fondDedans', 'vent-dedans': 'fondDedans',
 };
+// (celles qui ont une place à bord : le vérin du pilote, à l'arrière, sur la mèche du safran)
+const PLACES_BOUCLES = { pilote: 'safran' };
+
+// D'où vient un son : rien (partout), un nombre (un simple panoramique, de −1 à gauche à 1 à
+// droite), ou un point du bateau { x, y, z }
+const estUnPoint = (ou) => !!ou && typeof ou === 'object';
+// (place un nœud qui a une position : un panneur, ou l'oreille ; quand — t — pour un son qui
+// bouge : il y glisse depuis là où il était)
+function placer(n, p, t = null, ctx = null) {
+  if (n.positionX) {
+    for (const [param, v] of [[n.positionX, p.x], [n.positionY, p.y], [n.positionZ, p.z]]) {
+      if (t === null) param.value = v;
+      else param.linearRampToValueAtTime(v, t);
+    }
+  } else if (t === null || !ctx) n.setPosition(p.x, p.y, p.z);
+}
 
 const lisse = (a, b, x) => {
   const t = Math.min(1, Math.max(0, (x - a) / (b - a)));
@@ -164,15 +193,37 @@ export class Audio {
     this.compresseur.connect(this.sortie).connect(ctx.destination);
     // les bus
     this.filtreCabine = filtre('lowpass', 18000, 0.5);
-    this.bus = { dehors: gain(1), dedans: gain(0), bord: gain(1), radio: gain(1) };
-    // (le bruit du monde peut se retirer un instant : etouffer() ; et le moteur du bord, quand
-    // il tourne, le couvre : masque)
+    this.bus = {
+      dehors: gain(1), signes: gain(1), dedans: gain(0), bord: gain(1), radio: gain(1), tete: gain(1),
+      // (les fonds : ce qui se retire dans les creux — etouffer, respirer)
+      fondDedans: gain(1), fondBord: gain(1),
+    };
+    // (le fond du monde peut se retirer : etouffer() avant un coup, et respirer() de lui-même ;
+    // le moteur du bord, quand il tourne, le couvre : masque)
     this.etouffe = gain(1);
+    this.respire = gain(1);
     this.masque = gain(1);
-    this.bus.dehors.connect(this.etouffe).connect(this.masque).connect(this.filtreCabine).connect(this.compresseur);
+    this.bus.dehors.connect(this.respire).connect(this.etouffe).connect(this.masque).connect(this.filtreCabine).connect(this.compresseur);
+    // (les signes : ni les creux ni les vitres ne les éteignent tout à fait ; le moteur, si)
+    this.masqueSignes = gain(1);
+    this.filtreSignes = filtre('lowpass', 18000, 0.5);
+    this.vitresSignes = gain(1);
+    this.bus.signes.connect(this.masqueSignes).connect(this.filtreSignes).connect(this.vitresSignes).connect(this.compresseur);
+    this.etouffeDedans = gain(1);
+    this.respireDedans = gain(1);
+    this.masqueDedans = gain(1);
+    this.bus.fondDedans.connect(this.respireDedans).connect(this.etouffeDedans).connect(this.masqueDedans).connect(this.bus.dedans);
+    this.etouffeBord = gain(1);
+    this.respireBord = gain(1);
+    this.masqueBord = gain(1);
+    this.bus.fondBord.connect(this.respireBord).connect(this.etouffeBord).connect(this.masqueBord).connect(this.bus.bord);
     this.bus.dedans.connect(this.compresseur);
     this.bus.bord.connect(this.compresseur);
-    this.bus.radio.connect(this.sortie);
+    // (la VHF : son haut-parleur, au plafond de la timonerie — placé quand le jeu dit où il est)
+    this.panneurRadio = ctx.createStereoPanner();
+    this.bus.radio.connect(this.panneurRadio).connect(this.sortie);
+    this.bus.tete.connect(this.sortie);
+    this.creux = { prochain: 30 + Math.random() * 30, fin: -1 };
     // l'écho de la cabine : sur ce qui est dedans, et sur le bord quand on est dedans
     this.echo = ctx.createConvolver();
     this.echo.buffer = echoCabine(ctx);
@@ -234,13 +285,15 @@ export class Audio {
     // l'eau dans la cabine (elle clapote d'un bord à l'autre) et dans le cockpit (elle
     // gargouille en s'écoulant par les nables)
     this.clapotis = { filtre: filtre('lowpass', 380, 0.9), gain: gain() };
-    source(this.brun, 1.3).connect(this.clapotis.filtre).connect(this.clapotis.gain).connect(this.bus.bord);
+    source(this.brun, 1.3).connect(this.clapotis.filtre).connect(this.clapotis.gain).connect(this.lieu('cale', 'bord'));
     this.gargouille = { filtre: filtre('bandpass', 520, 3), gain: gain() };
-    source(this.rose, 1.6).connect(this.gargouille.filtre).connect(this.gargouille.gain).connect(this.bus.bord);
+    source(this.rose, 1.6).connect(this.gargouille.filtre).connect(this.gargouille.gain).connect(this.lieu('dalots', 'bord'));
     // la trombe : un rugissement grave et un sifflement
-    this.trombe = { filtre: filtre('lowpass', 260, 0.7), gain: gain(), sifflement: filtre('bandpass', 900, 2), gainSifflement: gain() };
-    source(this.brun, 0.7).connect(this.trombe.filtre).connect(this.trombe.gain).connect(this.bus.dehors);
-    source(this.blanc, 0.8).connect(this.trombe.sifflement).connect(this.trombe.gainSifflement).connect(this.bus.dehors);
+    // (elle a sa place, qui bouge : maj la suit — e.ouTrombe)
+    this.trombe = { filtre: filtre('lowpass', 260, 0.7), gain: gain(), sifflement: filtre('bandpass', 900, 2), gainSifflement: gain(), cote: this.panneur({ x: 0, y: 30, z: 400 }) };
+    this.trombe.cote.connect(this.bus.signes);
+    source(this.brun, 0.7).connect(this.trombe.filtre).connect(this.trombe.gain).connect(this.trombe.cote);
+    source(this.blanc, 0.8).connect(this.trombe.sifflement).connect(this.trombe.gainSifflement).connect(this.trombe.cote);
     // le cargo : le grondement de son moteur (un diesel lent : 90 tours par minute)
     this.moteur = { gain: gain(), filtre: filtre('lowpass', 140, 1) };
     const diesel = ctx.createOscillator();
@@ -280,7 +333,7 @@ export class Audio {
       coque.connect(gain(0.45)).connect(this.diesel.gain);
       for (const o of [explosions, cycle, hacheur, coque]) o.start();
       this.diesel.oscillateurs = [explosions, cycle, hacheur, coque];
-      this.diesel.gain.connect(this.bus.bord);
+      this.diesel.gain.connect(this.lieu('moteur', 'bord'));
     }
     // la pompe de cale électrique : un moteur qui geint, l'eau qui gicle dans le tuyau
     this.pompeElectrique = { gain: gain() };
@@ -291,7 +344,7 @@ export class Audio {
       o.connect(filtre('lowpass', 900, 0.8)).connect(gain(0.5)).connect(this.pompeElectrique.gain);
       source(this.rose, 1.4).connect(filtre('bandpass', 700, 1.2)).connect(gain(0.6)).connect(this.pompeElectrique.gain);
       o.start();
-      this.pompeElectrique.gain.connect(this.bus.bord);
+      this.pompeElectrique.gain.connect(this.lieu('cale', 'bord'));
     }
     // les moteurs des volets : un ronronnement, tant qu'ils bougent
     this.moteursVolets = { gain: gain() };
@@ -307,15 +360,15 @@ export class Audio {
       o.connect(f).connect(m).connect(this.moteursVolets.gain);
       o.start();
       lfo.start();
-      this.moteursVolets.gain.connect(this.bus.bord);
+      this.moteursVolets.gain.connect(this.lieu('volets', 'bord'));
     }
     this.alarmesBord = {}; // (quand chaque alarme a sonné la dernière fois)
     // la vague scélérate : un grondement grave qui enfle pendant qu'elle approche, et
     // dessous une pulsation sourde (deux notes très graves, presque pareilles, qui battent
     // lentement l'une contre l'autre : on la sent plus qu'on ne l'entend)
-    // (on l'entend venir de son côté : cote)
-    this.scelerate = { filtre: filtre('lowpass', 120, 0.8), gain: gain(), pulsation: gain(), cote: ctx.createStereoPanner() };
-    this.scelerate.cote.connect(this.bus.dehors);
+    // (on l'entend venir de son côté : cote, que maj place — e.ouScelerate)
+    this.scelerate = { filtre: filtre('lowpass', 120, 0.8), gain: gain(), pulsation: gain(), cote: this.panneur({ x: 0, y: 5, z: 400 }) };
+    this.scelerate.cote.connect(this.bus.signes);
     source(this.brun, 0.6).connect(this.scelerate.filtre).connect(this.scelerate.gain).connect(this.scelerate.cote);
     for (const f of [43, 45.5, 87]) {
       const o = ctx.createOscillator();
@@ -338,7 +391,7 @@ export class Audio {
     this.angoisse.gain.connect(this.bus.bord);
     const sifflement = ctx.createOscillator();
     sifflement.frequency.value = 3150;
-    sifflement.connect(this.angoisse.aigu).connect(this.bus.radio);
+    sifflement.connect(this.angoisse.aigu).connect(this.bus.tete);
     sifflement.start();
     // l'écho du large
     this.echoLarge = ctx.createConvolver();
@@ -357,6 +410,7 @@ export class Audio {
     this.sonotheque = new Sonotheque(ctx, base);
     this.sonotheque.quandPret.add((nom) => this.brancher(nom));
     this.chargement = this.sonotheque.charger().catch((e) => console.warn('sons :', e.message));
+    if (this.lieux) this.fixerLieux(this.lieux);
   }
 
   // Un enregistrement vient d'arriver : s'il s'agit d'une boucle, elle se met à tourner
@@ -371,9 +425,10 @@ export class Audio {
     [s.loopStart, s.loopEnd] = infos.boucle;
     const g = ctx.createGain();
     g.gain.value = 0;
-    s.connect(g).connect(this.bus[BOUCLES[nom]]);
-    // (chaque boucle part d'un endroit au hasard : deux parties ne sonnent pas pareil)
-    s.start(0, infos.boucle[0] + Math.random() * (infos.boucle[1] - infos.boucle[0]));
+    s.connect(g).connect(PLACES_BOUCLES[nom] ? this.lieu(PLACES_BOUCLES[nom], BOUCLES[nom]) : this.bus[BOUCLES[nom]]);
+    // (chaque boucle part d'un endroit au hasard : deux parties ne sonnent pas pareil — sauf pour
+    // les mesures de l'atelier du son, qui doivent se comparer d'une fois à l'autre)
+    s.start(0, infos.boucle[0] + (this.horsLigne ? 0.37 : Math.random()) * (infos.boucle[1] - infos.boucle[0]));
     this.boucles[nom] = { source: s, gain: g };
     // la trombe : les mêmes enregistrements, ralentis (plus graves), font son grondement de
     // train de marchandises (le vent de tempête à mi-vitesse) et le fracas de l'eau arrachée
@@ -429,6 +484,102 @@ export class Audio {
 
   a(nom) { return !!this.boucles[nom]; }
 
+  // ---------- D'où vient le son ----------
+  // Un panneur à cette place (un point du bateau) : avec un casque, on entend d'où ça vient ;
+  // pres : un son du bord, à quelques mètres (il s'atténue un peu avec la distance) ; sinon (la
+  // mer, le ciel, la trombe), seule compte sa direction — le jeu règle déjà son volume
+  panneur(p, { pres = false } = {}) {
+    const n = this.ctx.createPanner();
+    // (avec un casque — l'option : en trois dimensions, devant, derrière, en haut ; sinon, un
+    // panoramique franc, qui s'entend aussi sur des haut-parleurs : dans les graves, la 3D ne
+    // sépare presque pas les deux oreilles — 3 dB à 300 Hz)
+    n.panningModel = this.casque ? 'HRTF' : 'equalpower';
+    (this.panneurs ??= new Set()).add(new WeakRef(n));
+    n.distanceModel = 'inverse';
+    n.refDistance = pres ? 1.2 : 1;
+    n.rolloffFactor = pres ? 0.5 : 0;
+    placer(n, p);
+    return n;
+  }
+
+  // Le son en trois dimensions (avec un casque), ou non : pour les panneurs qui existent déjà, et
+  // les suivants
+  regler3D(casque) {
+    this.casque = !!casque;
+    for (const r of this.panneurs ?? []) {
+      const n = r.deref();
+      if (n) n.panningModel = this.casque ? 'HRTF' : 'equalpower';
+      else this.panneurs.delete(r);
+    }
+  }
+
+  // Le nœud où brancher un son qui vient de « ou » (rien, un panoramique, ou un point du bateau),
+  // relié au bus (son nom, ou un nœud)
+  versOu(ou, bus, { pres = false } = {}) {
+    const sortie = typeof bus === 'string' ? this.bus[bus] : bus;
+    if (!ou) return sortie;
+    let n;
+    if (estUnPoint(ou)) n = this.panneur(ou, { pres });
+    else {
+      n = this.ctx.createStereoPanner();
+      n.pan.value = Math.max(-1, Math.min(1, ou));
+    }
+    n.connect(sortie);
+    return n;
+  }
+
+  // Un lieu du bord (le moteur, la cale, la console… : fixerLieux), pour ce qui y sonne sans
+  // cesse ; tant que le jeu ne les a pas donnés, au milieu
+  lieu(nom, bus) {
+    this.panneursLieux ??= [];
+    const n = this.panneur(this.lieux?.[nom] ?? { x: 0, y: 1.5, z: 2 }, { pres: true });
+    n.connect(this.bus[bus]);
+    this.panneursLieux.push([nom, n]);
+    return n;
+  }
+
+  // (la sortie d'un lieu du bord, pour les sons brefs qui y sonnent : une seule par lieu et par bus)
+  aLieu(nom, bus) {
+    this.sortiesLieux ??= {};
+    return (this.sortiesLieux[`${nom}:${bus}`] ??= this.lieu(nom, bus));
+  }
+
+  // Le jeu dit où sont les choses à bord ({ nom: { x, y, z } } : le moteur, la cale, la console,
+  // la VHF, le safran, les volets, les dalots…)
+  fixerLieux(lieux) {
+    this.lieux = lieux;
+    for (const [nom, n] of this.panneursLieux ?? []) if (lieux[nom]) placer(n, lieux[nom]);
+    if (this.ctx && lieux.vhf) {
+      // (la VHF : un vrai panneur, maintenant qu'on sait où elle est)
+      this.panneurRadio.disconnect();
+      this.bus.radio.disconnect();
+      this.panneurRadio = this.panneur(lieux.vhf, { pres: true });
+      this.bus.radio.connect(this.panneurRadio).connect(this.sortie);
+    }
+  }
+
+  // L'oreille : là où sont les yeux, le regard et le haut de la tête (repère du bateau)
+  ecouter({ position, avant, haut }) {
+    if (!this.ctx) return;
+    const l = this.ctx.listener;
+    if (l.positionX) {
+      const t = this.ctx.currentTime;
+      const regler = (param, v) => param.setTargetAtTime(v, t, 0.015);
+      regler(l.positionX, position.x);
+      regler(l.positionY, position.y);
+      regler(l.positionZ, position.z);
+      regler(l.forwardX, avant.x);
+      regler(l.forwardY, avant.y);
+      regler(l.forwardZ, avant.z);
+      regler(l.upX, haut.x);
+      regler(l.upY, haut.y);
+      regler(l.upZ, haut.z);
+    } else {
+      l.setPosition(position.x, position.y, position.z);
+      l.setOrientation(avant.x, avant.y, avant.z, haut.x, haut.y, haut.z);
+    }
+  }
+
   // le volume d'une boucle enregistrée (et sa vitesse de lecture, qui change sa hauteur)
   boucle(nom, niveau, temps = 0.4, vitesse = null) {
     this.niveaux[nom] = niveau;
@@ -455,6 +606,8 @@ export class Audio {
   maj(dt, e) {
     if (!this.actif()) return;
     const t = this.ctx.currentTime;
+    if (e.ecoute) this.ecouter(e.ecoute);
+    if (e.heure !== undefined && e.heure !== null) this.respirer(dt, e.heure);
     const vent = Math.max(0, e.ventApparent);
     const fv = Math.min(1, vent / 45);
     const hs = e.houle ?? 1;
@@ -463,8 +616,9 @@ export class Audio {
 
     // ----- dehors -----
     // le vent : la brise (enregistrée en studio, régulière), puis la tempête, puis ses rafales
+    // (la tempête enfle toute la nuit, du coup de vent de minuit — 29 nœuds — à 44 nœuds)
     this.boucle('vent-doux', 0.4 * lisse(2, 14, vent) * (1 - 0.6 * lisse(24, 36, vent)), 0.5, 0.85 + 0.35 * fv);
-    this.boucle('vent-fort', 0.75 * lisse(18, 34, vent), 0.6);
+    this.boucle('vent-fort', 0.75 * lisse(18, 44, vent), 0.6);
     this.boucle('vent-rafales', 0.75 * lisse(24, 40, vent), 0.6);
     this.vers(this.vent.gain.gain, (0.04 + 0.5 * fv * fv + 0.05 * fv) * calcul('vent-doux', 0.2));
     this.vers(this.vent.filtre.frequency, 280 + 900 * fv);
@@ -516,18 +670,20 @@ export class Audio {
       this.vers(b.filtre.frequency, 900 + 3200 * averse * averse, 0.8);
     }
 
-    // ----- dedans (la cabine) -----
+    // ----- dedans (la timonerie) -----
+    // (une pièce vitrée, au-dessus de l'eau : la mer à travers la coque n'y est plus qu'un
+    // murmure ; la pluie tambourine sur le toit, juste au-dessus ; le vent siffle aux joints)
     const d = this.dedans ? 1 : 0;
-    this.boucle('cabine-mer', d * (0.18 + 0.3 * lisse(1, 4.5, hs)), 0.6);
-    this.boucle('coque', d * 0.4 * lisse(1, 7, e.vitesse), 0.6);
-    this.boucle('pluie-toit', d * 0.5 * e.pluie, 0.8);
-    this.boucle('vent-dedans', d * 0.42 * lisse(16, 34, vent), 0.6);
+    this.boucle('cabine-mer', d * (0.05 + 0.1 * lisse(1, 4.5, hs)), 0.6);
+    this.boucle('coque', d * 0.14 * lisse(1, 7, e.vitesse), 0.6);
+    this.boucle('pluie-toit', d * 0.26 * e.pluie, 0.8);
+    this.boucle('vent-dedans', d * 0.22 * lisse(16, 34, vent), 0.6);
 
     // ----- à bord -----
     // le vent qui hurle, la nuit, au plus fort (plus fort dans la cabine, par les ouvertures)
-    this.boucle('hurlement', (this.dedans ? 0.5 : 0.22) * lisse(26, 42, vent) * (0.4 + 0.6 * (e.nuit ?? 0)), 1.2);
+    this.boucle('hurlement', (this.dedans ? 0.2 : 0.22) * lisse(26, 42, vent) * (0.4 + 0.6 * (e.nuit ?? 0)), 1.2);
     // le moteur du pilote, quand il pousse la barre
-    this.boucle('pilote', 0.5 * Math.min(1, e.pilote ?? 0), 0.08);
+    this.boucle('pilote', 0.32 * Math.min(1, e.pilote ?? 0), 0.08);
     // le moteur du bord (0 : arrêté → 1 : à son régime ; il se lance et s'arrête en douceur) ;
     // quand il tourne, il couvre le monde du dehors : on n'entend plus venir les vagues
     const regime = e.regimeMoteur ?? 0;
@@ -543,6 +699,9 @@ export class Audio {
     }
     this.vers(this.diesel.gain.gain, 0.42 * regime * (this.dedans ? 1 : 0.8), 0.4);
     this.vers(this.masque.gain, 1 - 0.55 * regime, 0.6);
+    this.vers(this.masqueSignes.gain, 1 - 0.3 * regime, 0.6);
+    this.vers(this.masqueDedans.gain, 1 - 0.5 * regime, 0.6);
+    this.vers(this.masqueBord.gain, 1 - 0.5 * regime, 0.6);
     this.vers(this.pompeElectrique.gain.gain, e.pompeElectrique ? 0.08 : 0, 0.15);
     this.vers(this.moteursVolets.gain.gain, e.voletsBougent ? 0.07 : 0, 0.08);
     // les alarmes du bord (elles sonnent tant qu'il y a de quoi)
@@ -580,7 +739,8 @@ export class Audio {
     const df = e.deferle ?? 0;
     this.niveaux.scelerate = sc;
     this.vers(this.scelerate.gain.gain, 1.4 * sc ** 1.5, 0.9);
-    this.vers(this.scelerate.cote.pan, (e.panScelerate ?? 0) * (1 - 0.6 * lisse(0.75, 1, sc)), 0.4);
+    if (e.ouScelerate) placer(this.scelerate.cote, e.ouScelerate);
+    if (e.ouTrombe) placer(this.trombe.cote, e.ouTrombe);
     this.vers(this.scelerate.filtre.frequency, 90 + 650 * sc * sc, 0.9);
     this.vers(this.scelerate.pulsation.gain, 0.22 * Math.min(1, sc * 1.6), 1.5);
     const rugit = this.boucles['scelerate-mer-forte'];
@@ -592,10 +752,10 @@ export class Audio {
     // le vent forcit (un craquement de temps en temps par beau temps, sans cesse dans la tempête)
     this.ageCraquement += dt;
     const secoue = Math.min(1, e.mouvement ?? roule);
-    const parSeconde = 0.06 + 1.6 * secoue * secoue + 0.5 * lisse(20, 40, vent);
-    if (this.ageCraquement > 0.3 && Math.random() < parSeconde * dt) {
+    const parSeconde = 0.04 + 0.3 * secoue * secoue + 0.1 * lisse(25, 45, vent);
+    if (this.ageCraquement > 0.8 && Math.random() < parSeconde * dt) {
       this.ageCraquement = 0;
-      this.craquement(0.35 + 0.65 * Math.max(secoue, lisse(25, 42, vent) * Math.random()));
+      this.craquement(0.2 + 0.55 * Math.max(secoue, lisse(25, 42, vent) * Math.random()), true);
     }
     // le winch : un cliquetis par cran du rochet
     if (e.bordage > 0.01) {
@@ -608,7 +768,8 @@ export class Audio {
   }
 
   // Joue un morceau d'une planche enregistrée. Renvoie false si elle n'est pas chargée.
-  // o : { index, gain, vitesse (hauteur), pan (-1 → 1), bus, dans (secondes), duree, grave (Hz : filtre) }
+  // o : { index, gain, vitesse (hauteur), pan (-1 → 1) ou ou (un point du bateau : d'où il vient ;
+  // pres : tout près, à bord), bus, dans (secondes), duree, grave (Hz : filtre) }
   jouer(nom, o = {}) {
     const tampon = this.sonotheque?.tampon(nom);
     const infos = this.sonotheque?.infos(nom);
@@ -633,24 +794,23 @@ export class Audio {
       sortie = sortie.connect(f);
     }
     sortie = sortie.connect(g);
-    if (o.pan) {
-      const p = ctx.createStereoPanner();
-      p.pan.value = o.pan;
-      sortie = sortie.connect(p);
-    }
-    sortie.connect(this.bus[o.bus ?? 'bord']);
+    sortie.connect(this.versOu(o.ou ?? o.pan ?? null, o.bus ?? 'bord', { pres: !!o.pres }));
     s.start(quand, Math.max(0, debut - 0.02), duree + 0.08);
     return true;
   }
 
   // Un craquement du bois ou d'un cordage (force 0 → 1) : plus grave quand c'est fort (la
   // coque, le mât), plus aigu pour un petit grincement ; d'un côté ou de l'autre
-  craquement(force = 0.5) {
+  // (fond : la coque qui travaille sans cesse, plus bas — elle se tait dans les creux, et le
+  // moteur la couvre ; sinon, celle qui craque sous un coup)
+  craquement(force = 0.5, fond = false) {
+    // (quelque part dans la timonerie : une paroi, le plafond, le plancher)
+    const ou = this.lieux ? { x: (Math.random() * 2 - 1) * 1.3, y: 1 + 2.1 * Math.random(), z: 0.9 + 2.9 * Math.random() } : (Math.random() * 2 - 1) * 0.8;
     this.jouer('craquements', {
-      gain: 0.25 + 0.75 * force,
+      gain: fond ? 0.1 + 0.4 * force : 0.25 + 0.75 * force,
       vitesse: 1.05 - 0.5 * force * Math.random() - 0.1 * Math.random(),
-      pan: (Math.random() * 2 - 1) * 0.8,
-      bus: 'bord',
+      ou, pres: true,
+      bus: fond ? 'fondBord' : 'bord',
     });
   }
 
@@ -682,7 +842,7 @@ export class Audio {
       gain: 0.35 + 0.8 * force,
       duree: 0.9 + force * 1.4,
       vitesse: 0.9 + Math.random() * 0.2,
-      pan: (Math.random() - 0.5) * 0.6,
+      ou: this.lieux?.etrave ?? (Math.random() - 0.5) * 0.6,
       bus: 'dehors',
     });
     const ctx = this.ctx;
@@ -698,7 +858,7 @@ export class Audio {
     g.gain.setValueAtTime(0, t);
     g.gain.linearRampToValueAtTime(v, t + 0.02);
     g.gain.exponentialRampToValueAtTime(0.002, t + 0.6 + force * 0.6);
-    s.connect(f).connect(g).connect(this.bus.dehors);
+    s.connect(f).connect(g).connect(this.versOu(this.lieux?.etrave ?? null, 'dehors'));
     s.start(t, Math.random() * 3, 1.4);
   }
 
@@ -706,19 +866,20 @@ export class Audio {
   // jusqu'à nous (monde/foudre.js : 3 s par kilomètre, depuis là où l'éclair est passé au
   // plus près) ; il roule d'autant plus longtemps que le trait est long ; tout près, il
   // claque ; de loin, il n'en reste que les graves. o : { distance (m), duree (s : combien
-  // de temps il roule), force (0 → 1), pan (−1 : à gauche → 1 : à droite), claque }
-  tonnerre({ distance, duree = 8, force = 1, pan = 0, claque = false }) {
+  // de temps il roule), force (0 → 1), pan (−1 : à gauche → 1 : à droite) ou ou (d'où il vient :
+  // un point du bateau, là-haut, loin), claque }
+  tonnerre({ distance, duree = 8, force = 1, pan = 0, ou = null, claque = false }) {
     if (!this.actif()) return;
     const proche = Math.max(0, 1 - distance / 9000);
     // tout près : un claquement sec (morceau 0) ; à quelques kilomètres, un coup puis un
     // roulement (1-3) ; loin : un long roulement (4-5)
     const index = claque && distance < 900 ? 0 : distance < 2300 ? 1 + Math.floor(Math.random() * 2) : distance < 5000 ? 2 + Math.floor(Math.random() * 2) : 4 + Math.floor(Math.random() * 2);
     if (this.jouer('tonnerres', {
-      index, bus: 'dehors',
+      index, bus: 'signes',
       gain: Math.min(1.3, (0.3 + 0.9 * proche) * force),
       grave: 400 + 9000 * proche * proche,
       vitesse: 0.85 + 0.2 * Math.random(),
-      pan,
+      ou: ou ?? pan,
       duree: index === 0 ? undefined : Math.max(5, duree * 1.3 + 2),
     })) return;
     // (pas encore d'enregistrement : le tonnerre calculé)
@@ -726,6 +887,7 @@ export class Audio {
     const t = ctx.currentTime;
     const s = ctx.createBufferSource();
     s.buffer = this.brun;
+    s.loop = true;
     s.playbackRate.value = 0.6 + proche * 0.6;
     const f = ctx.createBiquadFilter();
     f.type = 'lowpass';
@@ -736,7 +898,7 @@ export class Audio {
     g.gain.linearRampToValueAtTime(v, t + 0.05 + (1 - proche) * 0.4);
     g.gain.setTargetAtTime(v * 0.5, t + 0.5, 0.6);
     g.gain.setTargetAtTime(0.0001, t + 1.6 + Math.random() * 1.5, 1.1);
-    s.connect(f).connect(g).connect(this.bus.dehors);
+    s.connect(f).connect(g).connect(this.versOu(ou ?? pan, 'signes'));
     s.start(t, Math.random() * 2);
     s.stop(t + 9);
   }
@@ -777,7 +939,7 @@ export class Audio {
     o.start(t);
     o.stop(t + 1.3);
     // et le tonnerre, aussitôt : il roule au-dessus de nous
-    this.jouer('tonnerres', { index: 0, gain: 1.2 * (0.6 + 0.4 * pres), bus: 'dehors', vitesse: 0.9 + 0.1 * Math.random() });
+    this.jouer('tonnerres', { index: 0, gain: 1.2 * (0.6 + 0.4 * pres), bus: 'signes', vitesse: 0.9 + 0.1 * Math.random() });
   }
 
   // Après un coup de tonnerre tout près, les oreilles sifflent un moment (force 0 → 1)
@@ -822,13 +984,19 @@ export class Audio {
     }
   }
 
-  // en bas, dans la cabine : la tempête n'arrive plus qu'étouffée par la coque ; ce qui est
-  // à bord résonne dans la petite pièce en bois
-  dansLaCabine(dedans) {
+  // Dans la timonerie : la tempête arrive étouffée par les vitres et les parois — moins quand la
+  // porte est ouverte (porte : 0 → 1), davantage derrière les volets fermés (volets : combien de
+  // côtés, 0 → 4) ; ce qui est à bord résonne dans la petite pièce en bois. Les signes (le
+  // grondement des vagues, la scélérate, le tonnerre) passent mieux : ce sont des graves.
+  dansLaCabine(dedans, { porte = 0, volets = 0 } = {}) {
     if (!this.actif()) return;
     this.dedans = dedans;
-    this.vers(this.filtreCabine.frequency, dedans ? 520 : 18000, 0.35);
-    this.vers(this.bus.dehors.gain, dedans ? 0.3 : 1, 0.35);
+    const ferme = Math.min(1, volets / 4);
+    const coupure = (1500 + 3500 * porte) * (1 - 0.35 * ferme);
+    this.vers(this.filtreCabine.frequency, dedans ? coupure : 18000, 0.35);
+    this.vers(this.bus.dehors.gain, dedans ? (0.3 + 0.25 * porte) * (1 - 0.3 * ferme) : 1, 0.35);
+    this.vers(this.filtreSignes.frequency, dedans ? 1100 + 2500 * porte : 18000, 0.35);
+    this.vers(this.vitresSignes.gain, dedans ? (0.8 + 0.2 * porte) * (1 - 0.15 * ferme) : 1, 0.35);
     this.vers(this.bus.dedans.gain, dedans ? 1 : 0, 0.35);
     this.vers(this.envoiBord.gain, dedans ? 0.45 : 0.05, 0.35);
   }
@@ -919,11 +1087,13 @@ export class Audio {
 
   // Des coups contre la coque, à l'avant, sous la flottaison : trois, puis un quatrième,
   // plus faible. (Un tronc ? Une épave ? On ne saura pas.)
-  // (pan : d'où ils viennent — de derrière la porte de la cabine avant)
-  coupsCoque(pan = -0.15) {
+  // (ou : d'où ils viennent — de derrière la porte de la cabine avant ; dans : dans combien de
+  // secondes ils commencent — le jeu fait d'abord le silence)
+  coupsCoque(ou = -0.15, dans = 0.2) {
     if (!this.actif()) return;
     const ctx = this.ctx;
-    const t0 = ctx.currentTime + 0.2;
+    const t0 = ctx.currentTime + dans;
+    const p = this.versOu(ou, 'dedans', { pres: true });
     [[0, 1], [0.72, 0.95], [1.4, 1.05], [5.2, 0.45]].forEach(([dans, force]) => {
       const t = t0 + dans;
       // le choc sourd du bois et du polyester : un coup bref qui fait résonner la coque
@@ -941,9 +1111,7 @@ export class Audio {
       g.gain.setValueAtTime(0, t);
       g.gain.linearRampToValueAtTime(1.6 * force, t + 0.006);
       g.gain.exponentialRampToValueAtTime(0.001, t + 0.45);
-      const p = ctx.createStereoPanner();
-      p.pan.value = pan;
-      s.connect(passe).connect(coque).connect(g).connect(p).connect(this.bus.dedans);
+      s.connect(passe).connect(coque).connect(g).connect(p);
       s.start(t, Math.random() * 2, 0.5);
       // et le petit claquement du contact
       const c = ctx.createBufferSource();
@@ -977,7 +1145,7 @@ export class Audio {
       g.gain.setValueAtTime(0, t);
       g.gain.linearRampToValueAtTime(0.55 * f * (0.4 + 0.6 * force), t + 0.012);
       g.gain.exponentialRampToValueAtTime(0.001, t + 0.18);
-      o.connect(g).connect(this.bus.radio);
+      o.connect(g).connect(this.bus.tete);
       o.start(t);
       o.stop(t + 0.22);
     }
@@ -997,7 +1165,7 @@ export class Audio {
     g.gain.setValueAtTime(0, t);
     g.gain.linearRampToValueAtTime(0.5, t + 0.05);
     g.gain.exponentialRampToValueAtTime(0.002, t + 0.45);
-    s.connect(f).connect(g).connect(this.bus.bord);
+    s.connect(f).connect(g).connect(this.aLieu('pompe', 'bord'));
     s.start(t, Math.random() * 2, 0.5);
   }
 
@@ -1027,20 +1195,28 @@ export class Audio {
   // (pan : -1 → 1, d'où elle vient : on l'entend arriver de son côté)
   // (entendue : à combien de secondes du choc on commence à l'entendre — tout de suite, ou
   // plus tard quand le moteur la couvre : quart/nuit.js, ENTENDRE)
-  deferlante(force = 0.5, dans = 3.5, pan = 0, entendue = dans) {
+  // (ou : d'où elle vient — un panoramique, ou un point du bateau, loin, du côté de la vague ;
+  // arrivee : là où elle frappe — son grondement y glisse, à mesure qu'elle approche)
+  deferlante(force = 0.5, dans = 3.5, ou = 0, entendue = dans, arrivee = null) {
     if (!this.actif()) return;
     const ctx = this.ctx;
     const t = ctx.currentTime;
     const impact = t + dans;
     const debut = impact - Math.max(0.05, Math.min(dans, entendue));
     const v = 0.35 + 0.7 * force;
-    const cote = ctx.createStereoPanner();
-    cote.pan.value = pan;
-    cote.connect(this.bus.dehors);
-    // le grondement : du bruit grave qui naît d'un coup (on l'entend), monte et s'éclaircit en
-    // approchant
+    const cote = this.versOu(ou, 'signes');
+    if (estUnPoint(ou) && arrivee && cote.positionX) {
+      for (const [param, a, b] of [[cote.positionX, ou.x, arrivee.x], [cote.positionY, ou.y, arrivee.y], [cote.positionZ, ou.z, arrivee.z]]) {
+        param.setValueAtTime(a, t);
+        param.linearRampToValueAtTime(b, impact);
+      }
+    }
+    // le grondement : du bruit grave qui naît d'un coup (on l'entend tout de suite, de son côté),
+    // puis enfle et s'éclaircit en approchant
     const g1 = ctx.createBufferSource();
     g1.buffer = this.brun;
+    // (le bruit ne dure que 4 s : il boucle — les plus grosses grondent 6 s)
+    g1.loop = true;
     const f1 = ctx.createBiquadFilter();
     f1.type = 'bandpass';
     f1.Q.value = 0.6;
@@ -1049,7 +1225,7 @@ export class Audio {
     const a1 = ctx.createGain();
     a1.gain.setValueAtTime(0.0001, t);
     a1.gain.setValueAtTime(0.0001, debut);
-    a1.gain.exponentialRampToValueAtTime(v * 0.09, debut + Math.min(0.25, (impact - debut) / 2));
+    a1.gain.linearRampToValueAtTime(v * 0.5, debut + Math.min(0.5, (impact - debut) / 3));
     a1.gain.exponentialRampToValueAtTime(v * 0.9, impact);
     a1.gain.setTargetAtTime(0.0001, impact + 0.1, 0.5);
     g1.connect(f1).connect(a1).connect(cote);
@@ -1058,11 +1234,12 @@ export class Audio {
     // le fracas : une vague de falaise enregistrée (morceaux 5 à 8), ou le souffle calculé
     const enregistre = this.jouer('vagues', {
       index: 5 + Math.floor(Math.random() * 4), dans: Math.max(0, dans - 0.15), gain: 0.6 + 0.8 * force, bus: 'dehors',
-      vitesse: 0.85 + 0.15 * Math.random(), pan: pan * 0.8,
+      vitesse: 0.85 + 0.15 * Math.random(), ou: estUnPoint(ou) ? (arrivee ?? ou) : ou * 0.8,
     });
     if (!enregistre) {
       const g2 = ctx.createBufferSource();
       g2.buffer = this.rose;
+      g2.loop = true;
       const f2 = ctx.createBiquadFilter();
       f2.type = 'lowpass';
       f2.frequency.setValueAtTime(5000, impact);
@@ -1112,7 +1289,7 @@ export class Audio {
       g.gain.linearRampToValueAtTime(niveau, debut + 0.01);
       g.gain.setValueAtTime(niveau, debut + duree - 0.02);
       g.gain.linearRampToValueAtTime(0.0001, debut + duree);
-      o.connect(g).connect(this.bus.bord);
+      o.connect(g).connect(this.aLieu('console', 'bord'));
       o.start(debut);
       o.stop(debut + duree + 0.05);
       return o;
@@ -1155,7 +1332,7 @@ export class Audio {
     g.gain.linearRampToValueAtTime(0.22, t + 0.08);
     g.gain.setValueAtTime(0.22, t + duree - 0.1);
     g.gain.linearRampToValueAtTime(0.0001, t + duree);
-    o.connect(hache).connect(f).connect(g).connect(this.bus.bord);
+    o.connect(hache).connect(f).connect(g).connect(this.aLieu('moteur', 'bord'));
     o.start(t);
     lfo.start(t);
     o.stop(t + duree + 0.1);
@@ -1179,14 +1356,15 @@ export class Audio {
       const f = ctx.createBiquadFilter();
       f.type = 'lowpass';
       f.frequency.value = 500;
-      o.connect(f).connect(g).connect(this.bus.bord);
+      o.connect(f).connect(g).connect(this.aLieu('moteur', 'bord'));
       o.start(t + k * 0.5);
       o.stop(t + k * 0.5 + 0.45);
     }
   }
 
   // Une vitre se fend (un claquement sec, aigu) ; pan : -1 à gauche → 1 à droite
-  vitreFendue(pan = 0) {
+  // (ou : la vitre — un point du bateau, ou un panoramique)
+  vitreFendue(ou = 0) {
     if (!this.actif()) return;
     const ctx = this.ctx;
     const t = ctx.currentTime;
@@ -1199,9 +1377,8 @@ export class Audio {
     g.gain.setValueAtTime(0.0001, t);
     g.gain.linearRampToValueAtTime(0.5, t + 0.004);
     g.gain.exponentialRampToValueAtTime(0.001, t + 0.12);
-    const pn = ctx.createStereoPanner();
-    pn.pan.value = pan;
-    n.connect(f).connect(g).connect(pn).connect(this.bus.bord);
+    const pn = this.versOu(ou, 'bord', { pres: true });
+    n.connect(f).connect(g).connect(pn);
     n.start(t, Math.random());
     n.stop(t + 0.2);
     // (et le verre qui chante un instant)
@@ -1217,13 +1394,11 @@ export class Audio {
   }
 
   // Une vitre éclate : le fracas, puis les éclats qui tombent et tintent
-  vitreBrisee(pan = 0) {
+  vitreBrisee(ou = 0) {
     if (!this.actif()) return;
     const ctx = this.ctx;
     const t = ctx.currentTime;
-    const pn = ctx.createStereoPanner();
-    pn.pan.value = pan;
-    pn.connect(this.bus.bord);
+    const pn = this.versOu(ou, 'bord', { pres: true });
     const n = ctx.createBufferSource();
     n.buffer = this.blanc;
     const f = ctx.createBiquadFilter();
@@ -1275,23 +1450,61 @@ export class Audio {
   }
 
   // Le bruit du monde se retire (le vent, la mer, la pluie) : profondeur 0 → 1, pendant
-  // « duree » secondes, puis il revient. (Avant un choc, dans le creux d'une vague : un
-  // silence qu'on n'attendait pas.)
-  etouffer(duree = 2, profondeur = 0.75) {
+  // « duree » secondes, puis il revient (en « retour » secondes). (Avant un choc, dans le creux
+  // d'une vague : un silence qu'on n'attendait pas.)
+  // Le monde se tait un instant (avant un coup : on l'entend d'autant mieux) : le fond du dehors,
+  // la pluie et le vent de la timonerie, le hurlement des ouvertures, la coque qui travaille —
+  // pas les signes, ni ce qui sonne à bord. (Un creux moins profond ne coupe pas celui qui est
+  // en cours.)
+  etouffer(duree = 2, profondeur = 0.75, retour = 1.8) {
     if (!this.actif()) return;
-    const g = this.etouffe.gain;
     const t = this.ctx.currentTime;
-    g.cancelScheduledValues(t);
-    g.setValueAtTime(g.value, t);
-    g.linearRampToValueAtTime(1 - profondeur, t + 0.35);
-    g.setValueAtTime(1 - profondeur, t + duree);
-    g.linearRampToValueAtTime(1, t + duree + 1.8);
+    const e = this.etouffement;
+    if (e && t < e.fin && profondeur <= e.profondeur) return;
+    this.etouffement = { fin: t + duree + retour, profondeur };
+    for (const n of [this.etouffe, this.etouffeDedans, this.etouffeBord]) {
+      const g = n.gain;
+      g.cancelScheduledValues(t);
+      g.setValueAtTime(g.value, t);
+      g.linearRampToValueAtTime(1 - profondeur, t + 0.35);
+      g.setValueAtTime(1 - profondeur, t + Math.max(0.35, duree));
+      g.linearRampToValueAtTime(1, t + Math.max(0.35, duree) + retour);
+    }
+  }
+
+  // On commence à entendre une déferlante (quart/nuit.js : 'deferlante-entendue' ; entendue : à
+  // combien de secondes du choc) : devant les plus grosses, le fond se retire jusqu'au choc — on
+  // n'entend plus qu'elle, qui gronde de son côté — et revient avec le fracas
+  grondementEntendu(force, entendue) {
+    if (force >= 0.85) this.etouffer(entendue - 0.45, 0.6, 0.4);
+  }
+
+  // Le vent respire : de temps en temps, un long creux, où la tempête se retire un moment (les
+  // rafales tombent) avant de revenir. Plus souvent au début de la nuit qu'au plus fort.
+  // heure : 24 (minuit) → 30 (six heures)
+  respirer(dt, heure = 26) {
+    const t = this.ctx.currentTime;
+    const c = this.creux;
+    if (t < c.prochain) return;
+    const avance = Math.min(1, Math.max(0, (heure - 24) / 6));
+    const duree = (6 + 5 * Math.random()) * (1 - 0.35 * avance);
+    const profondeur = 0.45 + 0.2 * Math.random();
+    for (const n of [this.respire, this.respireDedans, this.respireBord]) {
+      const g = n.gain;
+      g.cancelScheduledValues(t);
+      g.setValueAtTime(g.value, t);
+      g.linearRampToValueAtTime(1 - profondeur, t + 2.2);
+      g.setValueAtTime(1 - profondeur, t + 2.2 + duree);
+      g.linearRampToValueAtTime(1, t + 4.9 + duree);
+    }
+    c.fin = t + 4.9 + duree;
+    c.prochain = c.fin + (30 + 45 * Math.random()) * (1 + 0.6 * avance);
   }
 
   // ---------- La peur (quart/peur.js) ----------
   // La mer gémit : une voix immense et grave, au loin, qui monte puis retombe, noyée dans
   // un long écho (pan : de quel côté, −1 → 1)
-  gemissement(pan = 0) {
+  gemissement(ou = 0) {
     if (!this.actif()) return;
     const ctx = this.ctx;
     const t0 = ctx.currentTime + 0.05;
@@ -1301,14 +1514,11 @@ export class Audio {
     sortie.gain.linearRampToValueAtTime(0.55, t0 + 2.4);
     sortie.gain.setValueAtTime(0.55, t0 + duree - 3);
     sortie.gain.linearRampToValueAtTime(0, t0 + duree);
-    const p = ctx.createStereoPanner();
-    p.pan.value = pan;
     const passe = ctx.createBiquadFilter();
     passe.type = 'lowpass';
     passe.frequency.value = 900;
-    sortie.connect(passe).connect(p);
-    p.connect(this.bus.dehors);
-    p.connect(this.echoLarge);
+    sortie.connect(passe).connect(this.versOu(ou, 'dehors'));
+    passe.connect(this.echoLarge);
     // (deux voix presque à l'unisson, l'une un demi-ton au-dessus : ça ne sonne pas juste)
     for (const [k, niveau] of [[1, 0.6], [1.06, 0.28]]) {
       const o = ctx.createOscillator();
@@ -1347,17 +1557,21 @@ export class Audio {
 
   // Des pas sur le pont, au-dessus de soi : de l'avant vers l'arrière, lents ; ils
   // s'arrêtent ; puis un dernier, juste au-dessus. (On ne les entend que dedans.)
-  // (decalage : d'où ils viennent, en plus de leur marche de gauche à droite ; 0 : au-dessus)
-  pasSurLePont(decalage = 0) {
+  // (chemin : { de, a } — deux points du bateau : les pas vont de l'un à l'autre, sur le toit de
+  // la timonerie ou dans la cabine avant ; sans chemin, de gauche à droite, au-dessus)
+  pasSurLePont(chemin = null) {
     if (!this.actif()) return;
     const ctx = this.ctx;
     const t0 = ctx.currentTime + 0.1;
     const n = 6 + Math.floor(Math.random() * 3);
     const pas = [];
-    const largeur = decalage ? 0.2 : 1;
-    for (let i = 0; i < n; i++) pas.push([i * (0.62 + (Math.random() - 0.5) * 0.08), 0.55 + 0.25 * (i / n), Math.max(-1, Math.min(1, decalage + largeur * (-0.4 + 0.5 * (i / n))))]);
-    pas.push([n * 0.62 + 2.6, 1, 0.12]);
-    for (const [dans, force, pan] of pas) {
+    const ou = (u) => (chemin ? {
+      x: chemin.de.x + (chemin.a.x - chemin.de.x) * u, y: chemin.de.y + (chemin.a.y - chemin.de.y) * u, z: chemin.de.z + (chemin.a.z - chemin.de.z) * u,
+    } : -0.4 + 0.5 * u);
+    for (let i = 0; i < n; i++) pas.push([i * (0.62 + (Math.random() - 0.5) * 0.08), 0.55 + 0.25 * (i / n), ou(i / n)]);
+    // (et le dernier, plus lourd, après un silence : il s'est arrêté au-dessus de toi)
+    pas.push([n * 0.62 + 2.6, 1, ou(0.92)]);
+    for (const [dans, force, lieu] of pas) {
       const t = t0 + dans;
       const s = ctx.createBufferSource();
       s.buffer = this.brun;
@@ -1373,9 +1587,7 @@ export class Audio {
       g.gain.setValueAtTime(0, t);
       g.gain.linearRampToValueAtTime(1.3 * force, t + 0.012);
       g.gain.exponentialRampToValueAtTime(0.001, t + 0.22);
-      const p = ctx.createStereoPanner();
-      p.pan.value = pan;
-      s.connect(f).connect(coque).connect(g).connect(p).connect(this.bus.dedans);
+      s.connect(f).connect(coque).connect(g).connect(this.versOu(lieu, 'dedans', { pres: true }));
       s.start(t, Math.random() * 2, 0.3);
     }
     // (et le pont qui craque sous le poids, une fois)
@@ -1384,13 +1596,11 @@ export class Audio {
 
   // La porte basse de la cabine avant (pan : de son côté) : en s'ouvrant, son loquet qui saute
   // et ses gonds qui grincent, longtemps ; en se fermant, le panneau qui claque et le loquet
-  porteAvant(ouvre = true, pan = 0) {
+  porteAvant(ouvre = true, ou = 0, dans = 0.03) {
     if (!this.actif()) return;
     const ctx = this.ctx;
-    const t = ctx.currentTime + 0.03;
-    const cote = ctx.createStereoPanner();
-    cote.pan.value = pan;
-    cote.connect(this.bus.dedans);
+    const t = ctx.currentTime + dans;
+    const cote = this.versOu(ou, 'dedans', { pres: true });
     // le loquet : un claquement de laiton, bref et clair
     const c = ctx.createBufferSource();
     c.buffer = this.blanc;
@@ -1406,8 +1616,8 @@ export class Audio {
     c.start(t, Math.random(), 0.1);
     if (ouvre) {
       // les gonds : un grincement lent (un bois qui craque, ralenti), qui part un instant après
-      this.jouer('craquements', { dans: 0.25, gain: 0.7, vitesse: 0.42, pan, bus: 'dedans' });
-      this.jouer('craquements', { dans: 1.1, gain: 0.35, vitesse: 0.36, pan, bus: 'dedans' });
+      this.jouer('craquements', { dans: dans + 0.22, gain: 0.7, vitesse: 0.42, ou, pres: true, bus: 'dedans' });
+      this.jouer('craquements', { dans: dans + 1.07, gain: 0.35, vitesse: 0.36, ou, pres: true, bus: 'dedans' });
     } else {
       // le panneau qui frappe son chambranle : un coup sourd
       const s2 = ctx.createBufferSource();
@@ -1446,10 +1656,21 @@ export class Audio {
     g.gain.linearRampToValueAtTime(0.9, t0 + 1.2);
     g.gain.setValueAtTime(0.9, t0 + duree - 1.5);
     g.gain.linearRampToValueAtTime(0, t0 + duree);
-    const p = ctx.createStereoPanner();
-    p.pan.setValueAtTime(cote * 0.8, t0);
-    p.pan.linearRampToValueAtTime(-cote * 0.8, t0 + duree);
-    s.connect(f).connect(grain).connect(g).connect(p).connect(this.bus.bord);
+    // (sous la quille : il passe d'un bord à l'autre, sous nos pieds)
+    let p;
+    if (this.lieux) {
+      p = this.panneur({ x: cote * 8, y: -1.5, z: 1.5 }, { pres: true });
+      if (p.positionX) {
+        p.positionX.setValueAtTime(cote * 8, t0);
+        p.positionX.linearRampToValueAtTime(-cote * 8, t0 + duree);
+      }
+    } else {
+      p = ctx.createStereoPanner();
+      p.pan.setValueAtTime(cote * 0.8, t0);
+      p.pan.linearRampToValueAtTime(-cote * 0.8, t0 + duree);
+    }
+    p.connect(this.bus.bord);
+    s.connect(f).connect(grain).connect(g).connect(p);
     s.start(t0, Math.random() * 2);
     s.stop(t0 + duree + 0.1);
     // la coque qui gémit sous la pression : un son très grave qui glisse
@@ -1468,10 +1689,11 @@ export class Audio {
   }
 
   // Un choc énorme contre la coque, tout près (après un long calme : on sursaute)
-  coupEnorme() {
+  coupEnorme(ou = null) {
     if (!this.actif()) return;
     const ctx = this.ctx;
     const t = ctx.currentTime + 0.02;
+    const sortie = this.versOu(ou ?? (this.lieux ? { x: 0, y: 0.2, z: 0.4 } : null), 'bord', { pres: true });
     const o = ctx.createOscillator();
     o.frequency.setValueAtTime(72, t);
     o.frequency.exponentialRampToValueAtTime(28, t + 0.7);
@@ -1479,7 +1701,7 @@ export class Audio {
     g.gain.setValueAtTime(0.0001, t);
     g.gain.linearRampToValueAtTime(1.4, t + 0.008);
     g.gain.exponentialRampToValueAtTime(0.001, t + 1.1);
-    o.connect(g).connect(this.bus.bord);
+    o.connect(g).connect(sortie);
     o.start(t);
     o.stop(t + 1.2);
     const c = ctx.createBufferSource();
@@ -1492,16 +1714,16 @@ export class Audio {
     gc.gain.setValueAtTime(0, t);
     gc.gain.linearRampToValueAtTime(0.9, t + 0.003);
     gc.gain.exponentialRampToValueAtTime(0.001, t + 0.12);
-    c.connect(fc).connect(gc).connect(this.bus.bord);
+    c.connect(fc).connect(gc).connect(sortie);
     c.start(t, Math.random(), 0.2);
     for (let k = 0; k < 2; k++) this.jouer('craquements', { dans: 0.05 + k * 0.5, gain: 0.9, vitesse: 0.5, pan: (Math.random() - 0.5) });
   }
 
   // La vague scélérate s'abat sur le bateau : un fracas énorme, un coup sourd dans toute la
   // coque, et le bois qui hurle
-  chocScelerate() {
+  chocScelerate(ou = 0) {
     if (!this.actif()) return;
-    this.deferlante(1.5, 0.02);
+    this.deferlante(1.5, 0.02, ou);
     this.choc(1);
     const ctx = this.ctx;
     const t = ctx.currentTime;
@@ -1537,7 +1759,7 @@ export class Audio {
         g.gain.linearRampToValueAtTime(0.06, t + 0.005);
         g.gain.setValueAtTime(0.06, t + 0.13);
         g.gain.linearRampToValueAtTime(0, t + 0.14);
-        o.connect(g).connect(this.sortie);
+        o.connect(g).connect(this.aLieu('console', 'tete'));
         o.start(t);
         o.stop(t + 0.15);
       }
@@ -1560,7 +1782,7 @@ export class Audio {
       g.gain.linearRampToValueAtTime(0.05, t + 0.004);
       g.gain.setValueAtTime(0.05, t + 0.1);
       g.gain.linearRampToValueAtTime(0, t + 0.11);
-      o.connect(g).connect(this.sortie);
+      o.connect(g).connect(this.aLieu('console', 'tete'));
       o.start(t);
       o.stop(t + 0.12);
     }
@@ -1592,7 +1814,7 @@ export class Audio {
       for (let k = 0; k < 14; k++) g.gain.setValueAtTime(0.25 + 0.6 * Math.random(), t + k * 0.065);
       g.gain.setTargetAtTime(0.0001, t + 0.95, 0.08);
     }
-    s.connect(f).connect(g).connect(this.bus.dehors);
+    s.connect(f).connect(g).connect(this.versOu(this.lieux?.foc ?? null, 'dehors'));
     s.start(t, Math.random() * 2, 1.4);
   }
 

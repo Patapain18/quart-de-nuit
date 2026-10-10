@@ -77,6 +77,24 @@ const audio = new Audio();
 // (les vrais enregistrements se chargent en arrière-plan dès maintenant ; le son ne démarre
 // qu'au premier clic, comme l'exigent les navigateurs)
 audio.precharger(`${import.meta.env.BASE_URL}sons/`);
+// (où sont les choses à bord, pour le son : chacune sonne à sa place — repère du bateau)
+audio.fixerLieux({
+  moteur: new THREE.Vector3(0, 0.35, 4.6), // (le diesel, sous le cockpit)
+  cale: bateau.interieur.positionTrappe.clone().setY(0.35),
+  pompe: bateau.interieur.positionPompe,
+  console: bateau.interieur.positionCompas,
+  vhf: bateau.interieur.positionRadio,
+  safran: new THREE.Vector3(0, 0.6, 6.1),
+  volets: new THREE.Vector3(0, 3.0, 2.2),
+  dalots: bateau.dalots[0].clone().setX(0),
+  etrave: new THREE.Vector3(0, 1.0, -7.2),
+  foc: new THREE.Vector3(0, 5, -5.5),
+});
+// (le milieu de chaque vitre de la timonerie : d'où l'on entend le verre se fendre)
+const centresVitres = bateau.carreaux.map(({ verre }) => {
+  verre.geometry.computeBoundingBox();
+  return verre.geometry.boundingBox.getCenter(new THREE.Vector3());
+});
 const marin = new Marin();
 // (ce qui est dur à bord, tiré du modèle 3D : le marin n'y entre pas, la caméra non plus)
 marin.encombrement = construireEncombrement(bateau);
@@ -226,7 +244,7 @@ const jeu = {
     const fermer = i.porteAvantEtat !== 'fermee';
     if (fermer && i.porteAvantEtat === 'entrouverte' && nuit) nuit.ecrire('Refermé la porte de la cabine avant.');
     i.ouvrirPorteAvant(fermer ? 'fermee' : 'ouverte');
-    audio.porteAvant?.(!fermer, panVers(i.positionPorteAvant));
+    audio.porteAvant?.(!fermer, i.positionPorteAvant);
   },
   // la trappe de la cale : on la soulève pour voir l'eau (la baladeuse s'allume avec elle)
   basculerTrappe() {
@@ -326,6 +344,7 @@ function appliquerOptions(o, changements = o) {
   monde.camera.fov = o.champ;
   monde.camera.updateProjectionMatrix();
   audio.regler(o.volume);
+  audio.regler3D(o.casque);
   jeu.radio.muette = true; // (plus de voix : la radio ne parle plus, elle grésille)
   sousTitres.hidden = !o.sousTitres || !sousTitres.textContent;
   etat.aide = o.aide;
@@ -488,7 +507,7 @@ function sonScelerate() {
   return {
     scelerate: d >= 0 ? 1 - Math.min(1, d / 1000) : Math.max(0, 1 + d / 260), deferle: w.v.deferle,
     // (on l'entend venir de son côté)
-    panScelerate: panDepuis(nuit.scelerates.direction().clone().negate()),
+    ouScelerate: depuisBateau(nuit.scelerates.direction(), Math.max(25, Math.min(220, d)), 4),
   };
 }
 
@@ -719,7 +738,10 @@ function simuler(dt) {
   etat.mouvement = (etat.mouvement ?? 0) + (secousseBateau - (etat.mouvement ?? 0)) * Math.min(1, dt * 4);
   const vitesseBarre = Math.abs(physique.barre - (etat.barreAvant ?? physique.barre)) / Math.max(dt, 1e-3);
   etat.barreAvant = physique.barre;
-  audio.dansLaCabine(dedans);
+  audio.dansLaCabine(dedans, {
+    porte: bateau.descenteOuverte ? 1 : 0,
+    volets: sy ? COTES_VOLETS.filter((c) => sy.volets[c].fraction > 0.95).length : 0,
+  });
   audio.maj(dt, {
     nuit: monde.ecl.nuit,
     mouvement: etat.mouvement,
@@ -748,6 +770,11 @@ function simuler(dt) {
     voletsBougent: !!sy && sy.alimente('volets') && COTES_VOLETS.some((c) => sy.volets[c].fraction !== sy.volets[c].cible),
     alarmes: sy?.alarmes ?? null,
     dalotsBouches: nuit?.avaries.dalots === 'bouches',
+    // (l'oreille : là où sont les yeux ; l'heure : le vent respire moins au plus fort ; la trombe :
+    // d'où elle gronde)
+    ecoute: ecouteDansLeBateau(),
+    heure: nuit?.heure ?? null,
+    ouTrombe: nuit?.trombe ? versBateau(new THREE.Vector3(nuit.trombe.x, 25, nuit.trombe.z)) : null,
   });
   etat.attenteClaque = Math.max(0, etat.attenteClaque - dt);
   if (m.impactEtrave > 0.05 && etat.attenteClaque === 0) {
@@ -953,33 +980,56 @@ function vivreEtrange(nom) {
   } else if (nom === 'voix16') {
     jeu.radio.fantome('Canal 16 : une voix, très faible, noyée dans les parasites… « …ayday… mayday… ici… » … puis plus rien.', { duree: 7.5 });
   } else if (nom === 'coups') {
-    audio.coupsCoque?.(panVers(bateau.interieur.positionPorteAvant));
+    // (le monde se tait d'abord, longtemps ; puis trois coups, derrière la porte basse)
+    audio.etouffer?.(5.2, 0.82);
+    audio.coupsCoque?.(bateau.interieur.positionPorteAvant, 2.6);
   }
 }
 
-// D'où vient un point du bateau (repère du bateau), vu d'où l'on est : -1 à gauche → 1 à droite
-const _point = new THREE.Vector3();
-function panVers(pointBateau) {
-  _point.copy(pointBateau).applyMatrix4(bateau.groupe.matrixWorld).sub(monde.camera.position);
-  return panDepuis(_point);
+// ---------- D'où vient un son (dans le repère du bateau : le son le place là) ----------
+const _inverse2 = new THREE.Matrix4();
+const _qInverse2 = new THREE.Quaternion();
+// un point du monde
+function versBateau(pointMonde) {
+  return pointMonde.clone().applyMatrix4(_inverse2.copy(bateau.groupe.matrixWorld).invert());
+}
+// d'où vient ce qui va vers « vers » (une direction du monde), à « distance » mètres, à « hauteur »
+function depuisBateau(vers, distance, hauteur = 1.5) {
+  const d = vers.clone().applyQuaternion(_qInverse2.copy(bateau.groupe.quaternion).invert()).setY(0).normalize();
+  return new THREE.Vector3(-d.x * distance, hauteur, 1.5 - d.z * distance);
+}
+// l'oreille : là où sont les yeux, ce qu'ils regardent, le haut de la tête
+function ecouteDansLeBateau() {
+  const { yeux, regard, haut } = regardDansLeBateau();
+  return { position: yeux, avant: regard, haut };
 }
 
 // La peur (quart/peur.js, par la nuit) : ce qu'on entend, ce qui secoue. (Ce qu'on voit :
 // rendu/apparitions.js, à chaque image.)
 function vivrePeur(e) {
   const p = nuit?.peur;
-  if (e === 'gemissement') audio.gemissement?.((Math.random() - 0.5) * 1.6);
+  if (e === 'gemissement') {
+    const a = Math.random() * Math.PI * 2;
+    audio.gemissement?.({ x: Math.sin(a) * 300, y: 2, z: Math.cos(a) * 300 });
+  }
   else if (e === 'pas') {
     // (le monde se tait un instant : on les entend d'autant mieux ; la lumière hésite ; la porte
     // de la cabine avant ouverte, ils viennent de là)
     audio.etouffer?.(5.5, 0.55);
-    audio.pasSurLePont?.(bateau.interieur.porteAvantEtat === 'fermee' ? 0 : panVers(bateau.interieur.positionPorteAvant));
+    // (sur le toit, d'un bord à l'autre ; la porte de la cabine avant ouverte : dans la cabine,
+    // vers la porte)
+    const sens = Math.random() < 0.5 ? 1 : -1;
+    audio.pasSurLePont?.(bateau.interieur.porteAvantEtat === 'fermee'
+      ? { de: { x: -0.9 * sens, y: 3.35, z: 1.6 }, a: { x: 0.9 * sens, y: 3.35, z: 3.1 } }
+      : { de: { x: 0.6, y: 0.9, z: -1.3 }, a: bateau.interieur.positionPorteAvant.clone().setY(0.9).setZ(0.3) });
     etat.vacille = 1.2;
   } else if (e === 'porteAvant') {
     // (dans ton dos : le loquet qui saute, les gonds qui grincent ; on ne la voit qu'en se
     // retournant)
     bateau.interieur.ouvrirPorteAvant('entrouverte');
-    audio.porteAvant?.(true, panVers(bateau.interieur.positionPorteAvant));
+    // (un creux, d'abord : le monde se retire ; puis le loquet, les gonds)
+    audio.etouffer?.(3.6, 0.65);
+    audio.porteAvant?.(true, bateau.interieur.positionPorteAvant, 1.1);
     etat.porteAvantVue = false;
     etat.vacille = Math.max(etat.vacille ?? 0, 0.6);
   } else if (e === 'nom') {
@@ -987,15 +1037,15 @@ function vivrePeur(e) {
     etat.vacille = 2;
     jeu.radio.chuchoter?.(`${NOM_BATEAU}… ${NOM_BATEAU}…`, { canal: 16, sousTitre: `Canal 16 : une voix, tout près du micro, très lente : « ${NOM_BATEAU}… »` });
   } else if (e === 'coupCoque') {
-    // (un silence, d'abord : le vent, la mer se retirent… puis le choc)
-    audio.etouffer?.(1.9, 0.8);
+    // (un long silence, d'abord : le vent, la mer se retirent… puis le choc)
+    audio.etouffer?.(4.6, 0.85);
     setTimeout(() => {
       if (!nuit) return;
       audio.coupEnorme?.();
       secousse(0.9);
       audio.battement?.(1);
       etat.vacille = 1.6;
-    }, 1700);
+    }, 3800);
   } else if (e === 'chose') etat.vacille = 2.5;
   else if (e === 'eclairSilhouette') audio.battement?.(1);
   else if (e === 'echoProche') etat.vacille = 0.8;
@@ -1023,15 +1073,8 @@ function facteurVacille(dt) {
   return etat.valeurVacille;
 }
 
-// Le côté d'où vient une chose (d : vers elle, dans le monde) : -1 à gauche → 1 à droite
-function panDepuis(d) {
-  const droite = _droite.setFromMatrixColumn(monde.camera.matrixWorld, 0);
-  const l = Math.hypot(d.x, d.z) || 1;
-  return THREE.MathUtils.clamp((d.x * droite.x + d.z * droite.z) / l, -1, 1) * 0.85;
-}
-// (le côté d'une vitre de la timonerie, vu d'où l'on est)
-const SENS_COTES = { tribord: [1, 0, 0], babord: [-1, 0, 0], avant: [0, 0, -1], arriere: [0, 0, 1] };
-const panVitre = (v) => panDepuis(new THREE.Vector3(...SENS_COTES[v.cote]).applyQuaternion(physique.orientation));
+// (le milieu d'une vitre de la timonerie : d'où l'on entend le verre)
+const centreVitre = (v) => centresVitres[nuit.systemes.vitres.indexOf(v)] ?? null;
 const majuscule = (t) => t.charAt(0).toUpperCase() + t.slice(1);
 
 // Ce qui arrive aux systèmes du bord (quart/systemes.js, par la nuit) : on l'entend, on le
@@ -1051,10 +1094,10 @@ function vivreSysteme(nom, arg) {
     audio.alarme?.(2);
     afficherMessage('Le moteur a trop chauffé : il s\'est arrêté tout seul');
   } else if (nom === 'vitre-fendue') {
-    audio.vitreFendue?.(panVitre(arg));
+    audio.vitreFendue?.(centreVitre(arg));
     afficherMessage(`${majuscule(arg.nom)} s'est fendue : à la prochaine vague, elle éclate — ferme ses volets !`);
   } else if (nom === 'vitre-brisee') {
-    audio.vitreBrisee?.(panVitre(arg));
+    audio.vitreBrisee?.(centreVitre(arg));
     secousse(0.5);
     afficherMessage(`${majuscule(arg.nom)} a éclaté ! La mer entre : ferme ses volets`);
   } else if (nom === 'noir') {
@@ -1083,16 +1126,12 @@ function entendreLaFoudre(foudre, dedans) {
       const f = 1 - THREE.MathUtils.smoothstep(ev.distance, 1500, REGLAGES_FOUDRE.parasites);
       if (f > 0.03) audio.parasiteEclair?.(f);
     } else if (ev.type === 'tonnerre') {
-      const cam = monde.camera;
-      const dx = ev.x - cam.position.x;
-      const dz = ev.z - cam.position.z;
-      const droite = _droite.setFromMatrixColumn(cam.matrixWorld, 0);
-      const pan = THREE.MathUtils.clamp((dx * droite.x + dz * droite.z) / Math.max(1, Math.hypot(dx, dz)), -1, 1) * 0.85;
-      audio.tonnerre({ distance: ev.distance, duree: ev.duree, force: ev.force, pan, claque: ev.claque });
+      // (d'où l'éclair est passé, là-haut : avec un casque, on l'entend rouler de ce côté)
+      const ou = versBateau(new THREE.Vector3(ev.x, 250 + Math.min(900, ev.distance * 0.15), ev.z));
+      audio.tonnerre({ distance: ev.distance, duree: ev.duree, force: ev.force, ou, claque: ev.claque });
     } else if (ev.type === 'frappe') frappeProche(ev, dedans);
   }
 }
-const _droite = new THREE.Vector3();
 
 // La foudre tombe tout près (ou sur le mât) : le claquement en même temps que l'éclair, le
 // souffle qui secoue, les oreilles qui sifflent (le monde s'étouffe), les écrans qui hésitent ;
@@ -1200,10 +1239,13 @@ function commencerNuit({ reprise = null, heure = null } = {}) {
     .on('deferlante-annonce', (a) => {
       // (son grondement commence quand on peut l'entendre : tout de suite, ou au dernier moment
       // quand le moteur le couvre ; sa crête, on la voit courir vers nous dès maintenant)
-      audio.deferlante?.(a.force, a.dans, panDepuis(a.vers.clone().negate()), a.entendue);
+      // (la crête court à 12 m/s : elle part de 12 × a.dans mètres, de son côté, et vient frapper)
+      audio.deferlante?.(a.force, a.dans, depuisBateau(a.vers, 12 * a.dans + 8), a.entendue, depuisBateau(a.vers, 3, 1.2));
       monde.deferlantes.annoncer(a);
     })
     .on('deferlante-entendue', (a) => {
+      // (les plus grosses : le fond se retire jusqu'au choc, on n'entend plus qu'elles)
+      audio.grondementEntendu?.(a.force, a.dans);
       if (a.force > 0.9 && etat.mode === 'pied' && marin.dehors) afficherMessage(`Une grosse déferlante, ${cotePar(a.vers)} ! Tiens-toi (Maj)`);
       // (la première grosse qu'on entend : ce que veut dire ce grondement — une seule fois)
       else if (a.force > 0.8 && !premieresFois.has('grondement')) {
@@ -1261,7 +1303,7 @@ function commencerNuit({ reprise = null, heure = null } = {}) {
     .on('scelerate-choc', (c) => {
       etat.calme = 0;
       secousse(1.6);
-      audio.chocScelerate?.();
+      audio.chocScelerate?.(depuisBateau(c.vers, 6, 2));
       monde.embruns.gerbe({ vers: c.vers, force: 1.6 }, physique);
       bateau.paquet.frapper(c.vers.clone().transformDirection(bateau.groupe.matrixWorld.clone().invert()), 1.7);
       if (!monde.dansLaCabine) monde.gouttes.eclabousser(2.2);
@@ -1282,7 +1324,7 @@ function commencerNuit({ reprise = null, heure = null } = {}) {
       physique.eauCockpit = Math.min(EAU.cockpitMax, physique.eauCockpit + 220 * force);
       if (vt.lengthSq() > 0.01) bateau.paquet.frapper(vt.clone().normalize().transformDirection(bateau.groupe.matrixWorld.clone().invert()), force);
       secousse(1);
-      audio.deferlante?.(1, 0.05);
+      audio.deferlante?.(1, 0.05, vt.lengthSq() > 0.01 ? depuisBateau(vt, 5, 2) : 0);
       if (!monde.dansLaCabine) monde.gouttes.eclabousser(1.3);
       if (etat.mode === 'pied' && marin.dehors) {
         marin.glissade.addScaledVector(vt.setY(0).normalize(), 3.5 * force);
@@ -1696,7 +1738,7 @@ const TEXTES_QUALITE = {
   haute: 'L\'image prévue : il faut un ordinateur assez récent.',
   superbe: 'Le plus fin (écran Retina) : pour un ordinateur puissant.',
 };
-const CASES = ['inverser', 'secousses', 'gouttes', 'clignotements', 'sousTitres', 'bruits'];
+const CASES = ['inverser', 'secousses', 'gouttes', 'clignotements', 'sousTitres', 'bruits', 'casque'];
 {
   const zone = document.getElementById('choix-qualite');
   for (const [id, q] of Object.entries(QUALITES)) {
@@ -1839,7 +1881,7 @@ function regarder(x, y, z) {
   marin.site = Math.atan2(d.y, Math.hypot(d.x, d.z));
 }
 window.__jeu = {
-  monde, physique, bateau, etat, marin, jeu, gestes, embarquer, photographier, avancer, commandes, Audio, finir,
+  monde, physique, bateau, etat, marin, jeu, gestes, embarquer, photographier, avancer, commandes, Audio, audio, finir,
   commencerNuit, get nuit() { return nuit; }, contexteNuit, regarder, profiler, directionRelative,
   // (une caméra posée à la main : voir(x, y, z, versX, versY, versZ), dans le repère du bateau ;
   // voir() la rend au marin)

@@ -4,8 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Atelier du son · Quart de nuit</title>
-  <meta name="description" content="Écouter et mesurer le son du jeu : chaque situation de la journée et de la nuit de tempête, le mélange en direct des vrais enregistrements, et d'où vient chacun.">
-  <link rel="stylesheet" href="./src/atelier-tempete.css">
+  <meta name="description" content="Écouter et mesurer le son du jeu : chaque situation de la nuit de tempête, les signes qu'il faut entendre venir, le mélange en direct des vrais enregistrements, et d'où vient chacun.">
   <link rel="stylesheet" href="./src/atelier-son.css">
 </head>
 <body>
@@ -14,8 +13,11 @@
       <h1>Atelier du son</h1>
       <p class="chapeau">Le son du jeu est fait de <strong>vrais enregistrements</strong> (le vent, la mer,
         la pluie, le bois qui craque…), tous dans le domaine public, que le jeu mélange en direct
-        selon ce qui se passe. Ici, on écoute chaque situation, on joue avec les réglages, et on
-        <strong>mesure</strong> le volume ressenti, pour que la tempête fasse peur sans faire mal aux oreilles.</p>
+        selon ce qui se passe. Chaque son vient de sa direction (avec un casque, on entend aussi s'il est
+        devant ou derrière). Ici, on écoute chaque situation de la nuit, on joue avec les réglages, et on
+        <strong>mesure</strong> : le volume ressenti (la nuit est calme, au poste : c'est le silence qui fait
+        peur), et les signes — la grosse vague qu'on doit entendre venir, de son côté, sauf quand le moteur la
+        couvre ; le silence avant les coups.</p>
     </header>
 
     <section class="carte" aria-labelledby="titre-ecouter">
@@ -32,7 +34,7 @@
 
     <section class="carte" aria-labelledby="titre-melange">
       <h2 id="titre-melange">Le mélange, en direct</h2>
-      <p class="aide">Le volume que le jeu donne à chaque enregistrement qui tourne en boucle (0 : muet, 1 : plein volume). Dans la cabine, ce qui est dehors passe à travers la coque : étouffé.</p>
+      <p class="aide">Le volume que le jeu donne à chaque enregistrement qui tourne en boucle (0 : muet, 1 : plein volume). Dans la timonerie, ce qui est dehors passe à travers les vitres : étouffé (moins, la porte ouverte ; davantage, les volets fermés).</p>
       <div id="melange" class="melange" role="list"></div>
     </section>
 
@@ -40,8 +42,10 @@
       <h2 id="titre-mesurer">Mesurer</h2>
       <p class="aide">Le jeu calcule 9 secondes de chaque situation, sans les jouer, et mesure leur volume ressenti
         (en LUFS : −14, la musique en ligne ; −23, la télévision ; −30, très calme). La bande claire : ce que
-        l'on vise pour cette situation.</p>
-      <button type="button" id="mesurer">Mesurer toutes les situations</button>
+        l'on vise pour cette situation. Puis les signes : de combien le grondement d'une grosse vague
+        sort de tout le reste dès sa première seconde (il reste le temps de fermer ses volets), ce qu'on en
+        entend quand le moteur tourne, d'où on l'entend, et le silence avant les coups.</p>
+      <button type="button" id="mesurer">Mesurer les situations et les signes</button>
       <p class="note" id="etat-mesure"></p>
       <div id="mesures" class="mesures" hidden></div>
     </section>

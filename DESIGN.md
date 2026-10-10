@@ -131,7 +131,7 @@ ligne reste l'ancien tant que le nouveau n'est pas jouable.
 5. ✅ **L'inexpliqué et l'ambiance** — l'écho qui suit, les coups sous la coque, une voix sur la
    VHF, une forme au sondeur ; les notes de l'ancien propriétaire du bateau pour apprendre les
    commandes (à la place de Jos).
-6. **Le son** — plus silencieux, chaque son venant de sa direction, de longs creux avant les coups.
+6. ✅ **Le son** — plus silencieux, chaque son venant de sa direction, de longs creux avant les coups.
 7. **Les nuages** — corriger leurs défauts.
 8. **Finitions et mise en ligne.**
 
@@ -446,6 +446,88 @@ et il faut regarder dans la bonne direction, au bon moment).
 **À voir** : `docs/inexplique-*.jpg` (le livre de bord ouvert sur sa dernière nuit ; la cabine avant,
 porte ouverte, à la frontale).
 
+### Étape 6 : le son ✅ (10 octobre 2026)
+
+**Chaque son vient de sa place** (`son/audio.js`). L'oreille suit les yeux, à chaque image, dans
+le repère du bateau (`ecouter` : tourner la tête change les côtés), et le jeu dit où sont les
+choses à bord (`fixerLieux`) : le moteur sous le plancher, à l'arrière ; la cale et sa trappe ; la
+pompe à main ; la console ; le haut-parleur de la VHF, au plafond ; le safran (le pilote qui
+force) ; les moteurs des volets ; les dalots ; l'étrave ; le foc. Chaque bruit du bord y sonne (le
+diesel, l'eau de la cale, la pompe électrique, les bips de la console, le démarreur, les volets
+qui descendent), chaque craquement quelque part dans la timonerie. Et ce qui arrive vient de là
+où il arrive : le grondement d'une déferlante, de son côté, d'où part sa crête, et qui glisse
+jusqu'où elle frappe ; le tonnerre, de son éclair ; la trombe et la vague scélérate, suivies à
+chaque image ; une vitre qui se fend, de sa vitre ; les trois coups et la porte, de derrière la
+porte basse ; les pas, d'un bord à l'autre du toit (ou dans la cabine avant, sa porte ouverte) ;
+le gémissement de la mer, de 300 m au loin ; la quille qui racle, sous soi. Sans casque, c'est un
+panoramique franc (gauche, droite), qui s'entend aussi sur des haut-parleurs — dans les graves, la
+vraie 3D ne sépare presque pas les deux oreilles (3 dB à 300 Hz). Avec un casque, **une nouvelle
+option** (« Je joue avec un casque ») met le son en trois dimensions (HRTF) : devant, derrière,
+au-dessus.
+
+**Plus silencieux**. Dans la timonerie, le dehors passe à travers les vitres 3 dB plus bas (la
+porte ouverte aussi) ; la tempête enfle toute la nuit (le vent fort monte jusqu'à 44 nœuds, au lieu
+d'être déjà à fond à 34) : au poste, minuit −28,7 LUFS, 3 h −26,8, 5 h −25,2 (avant : −26,2,
+−24,6 et −23,1) — le calme de minuit inquiète, la tempête de 5 h écrase. La coque qui travaille
+craque 6 dB plus bas, et fait maintenant partie du fond.
+
+**De longs creux avant les coups**. Le fond du monde (le dehors, la pluie et le vent de la
+timonerie, le hurlement des ouvertures, le pilote, la coque qui craque) peut se retirer ; les
+signes (le grondement des vagues, le tonnerre, la trombe, la scélérate), les sons du bord et ceux
+de la tête (le sifflement d'angoisse, le cœur) ne s'en vont pas avec lui.
+- le vent respire tout seul (`respirer`) : un creux de 4 à 11 s où la tempête se retire de moitié,
+  toutes les 30 à 75 s à minuit, de plus en plus espacés (jusqu'à deux minutes vers 6 h) ;
+- avant l'étrange, un long creux (`etouffer`) : 5,2 s de silence (−15 dB) avant les trois coups,
+  qui frappent 2,6 s après qu'il a commencé ; 3,6 s avant que la porte basse s'entrouvre ; 4,6 s
+  avant le grand coup sous la coque (au lieu de 1,9 s) ;
+- **devant les plus grosses déferlantes** (force 0,85 et plus), dès qu'on les entend, le fond se
+  retire de 8 dB jusqu'au choc (`grondementEntendu`) : on n'entend plus qu'elle, qui gronde de son
+  côté — et le monde revient avec le fracas. Son grondement naît d'un coup, en une demi-seconde, au
+  lieu de monter du silence.
+
+**L'atelier du son, refait** (`atelier-son.html`) : les sept situations de la nuit (minuit, 3 h et
+5 h au poste ; 5 h moteur en marche, porte ouverte, volets fermés ; 4 h 30 dans le cockpit), neuf
+curseurs (dont l'heure, le moteur, la porte et les volets), des événements à déclencher (les
+vagues de chaque côté et par l'arrière, le tonnerre, un creux du vent, la voix sur le 16, les
+coups, la porte, les pas, le cœur), le mélange en direct, et **la mesure** : le volume ressenti de
+chaque situation (calculé sans le jouer, en LUFS, contre sa cible) et sept signes.
+
+**Ce qui a changé en route** :
+- le grondement des déferlantes s'arrêtait au bout de 4 s (son bruit ne bouclait pas) : les plus
+  grosses, annoncées 5 à 6 s avant, arrivaient en silence ;
+- il naissait 20 dB sous son plus fort : dans sa première seconde, il restait 8 dB sous le bruit
+  de la tempête — on ne l'entendait qu'à la fin ;
+- le moteur en marche, le grondement était couvert deux fois (on ne l'entend que dans son dernier
+  tiers, et le moteur l'étouffait encore de 8 dB) : on ne l'entendait jamais. Le moteur ne le
+  couvre plus que de 3 dB ;
+- les craquements de la coque ne se taisaient pas dans les creux, et sonnaient aussi fort que
+  toute la tempête — même dans le silence avant les coups (il ne baissait que de 2 dB) ;
+- l'atelier du son s'affichait sans sa mise en forme depuis l'étape 1 (sa feuille de style de base
+  était partie avec l'atelier de la tempête) ;
+- mesurer « de combien le grondement dépasse le bruit de la tempête » ne voulait plus rien dire,
+  puisque la tempête se retire devant lui : l'atelier calcule maintenant le grondement seul, et
+  tout le reste sans lui.
+
+**Mesuré** (l'atelier du son, « Mesurer les situations et les signes ») : les sept situations dans
+leur cible (au poste : minuit −28,7 LUFS, 3 h −26,8, 5 h −25,2, le moteur en marche −24,8, la porte
+ouverte −20,8, les volets fermés −26,0 ; le cockpit −16,4) ; une grosse déferlante de tribord sort
+de tout le reste de 7,5 dB dès sa première seconde ; le moteur en marche, on n'en entend rien
+avant son dernier tiers, puis elle gronde 3,8 dB sous le reste ; on l'entend 10,8 dB plus à droite
+qu'à gauche, et 11,5 dB plus à gauche la tête tournée vers l'arrière ; avant les trois coups, le
+monde baisse de 13,8 dB, et les coups sortent de ce silence de 13,4 dB. Dans le jeu : le creux
+suit la vague jusqu'au choc, l'option casque passe tous les sons placés en 3D, et se garde. Les 13
+tests et les essais de marche (22 sur 22) passent.
+
+**Limites** : la porte, les coups et les pas sont encore des sons calculés (des enregistrements
+libres de droits les remplaceraient mieux : il faut les télécharger, donc ton accord) ; sans
+l'option casque, un son de droite n'est que dans l'oreille droite (franc, mais peu naturel au
+casque) ; les mesures se font dans l'atelier, dans le navigateur (on ne peut pas calculer le son
+dans Node), pas dans un test `npm` ; et je ne peux rien écouter moi-même : tout est mesuré, rien
+n'est entendu — c'est à ton oreille de juger.
+
+**À voir** : `docs/son-l-atelier-mesure-la-nuit.jpg` (la mesure de l'atelier : les sept
+situations dans leur cible, et les signes).
+
 ## 4. Le moteur (ce qu'on garde de l'ancien jeu)
 
 Tout ce qui fait l'image, le son et la physique reste, et sert la nouvelle nuit. Le détail de
@@ -466,6 +548,7 @@ chacun, étape par étape, est dans l'ancien cahier (étiquette `v1-journee-et-n
   radar, le traceur, le tableau électrique.
 - **La peur** (`src/quart/peur.js`, `src/rendu/apparitions.js`) : ce qu'on voit du coin de l'œil
   et qui disparaît quand on le regarde.
-- **Le son** (`src/son/audio.js`) : de vrais enregistrements du domaine public, mélangés en direct.
+- **Le son** (`src/son/audio.js`) : de vrais enregistrements du domaine public, mélangés en direct ;
+  chaque son vient de sa place (depuis l'étape 6).
 - **Les feux de la côte** (`src/monde/feux.js`, `src/rendu/feux.js`) : au loin, au nord, le phare
   et ses faisceaux qu'on perd dans les grains.
