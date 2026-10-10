@@ -23,13 +23,16 @@ import { SaintElme } from './saint-elme.js';
 import { ChronoGPU } from './chrono-gpu.js';
 import { REGLAGES_GRAINS } from '../monde/grains.js';
 
-// Les niveaux de qualité de l'image (les options du jeu) : la finesse de l'image (au plus
+// Les niveaux de qualité de l'image (les options du jeu) : le nombre de pixels (au plus
 // tant de pixels par point de l'écran), l'anticrénelage, la taille de la carte des
 // ombres, les nuages (leur résolution et le nombre de pas pour les traverser), le
 // nombre de rayons de la toile d'araignée de la mer, la pluie et les embruns.
 // (trombe : la taille de son volume par rapport à l'écran, le nombre de pas pour le
 // traverser, et si la matière fait de l'ombre sur elle-même)
+// « Minimale » ne se choisit pas : c'est le bas de la qualité Auto (rendu/regulateur.js),
+// pour les petites cartes graphiques — les nuages moins fins, la mer plus grossière de près.
 export const QUALITES = {
+  minimale: { nom: 'Minimale', pixels: 1, msaa: 0, ombres: 512, nuages: 0.25, pas: 28, mer: 192, pluie: 0.3, particules: 0.3, trombe: { echelle: 0.25, pas: 56, ombres: false } },
   economique: { nom: 'Économique', pixels: 1, msaa: 0, ombres: 1024, nuages: 0.34, pas: 28, mer: 256, pluie: 0.45, particules: 0.4, trombe: { echelle: 0.33, pas: 72, ombres: false } },
   moyenne: { nom: 'Moyenne', pixels: 1.25, msaa: 2, ombres: 2048, nuages: 0.42, pas: 36, mer: 320, pluie: 0.7, particules: 0.7, trombe: { echelle: 0.4, pas: 96, ombres: true } },
   haute: { nom: 'Haute', pixels: 1.5, msaa: 4, ombres: 2048, nuages: 0.5, pas: 48, mer: 384, pluie: 1, particules: 1, trombe: { echelle: 0.5, pas: 128, ombres: true } },
@@ -43,6 +46,7 @@ export class Monde3D {
     this.renderer.shadowMap.enabled = true;
     this.renderer.shadowMap.type = THREE.PCFShadowMap;
     this.ratioPixelsMax = ratioPixelsMax;
+    this.finesse = 1; // (la part des pixels dessinés : voir changerFinesse)
 
     this.scene = new THREE.Scene();
     this.camera = new THREE.PerspectiveCamera(72, 1, 0.05, 40000);
@@ -125,15 +129,18 @@ export class Monde3D {
     this.eclair = { intensite: 0, eclaire: 0, actif: null, centre: null, trait: null };
     this.mesures = { houleMs: 0, imageMs: 0, ips: 0 };
     this.frein = 1; // (un faux ordinateur lent, pour les essais : voir freiner())
+    this.derniere = { calcul: 0, dessin: 0 };
     this._compteur = { images: 0, depuis: performance.now() };
     this.redimensionner();
     addEventListener('resize', () => this.redimensionner());
   }
 
-  // Change la qualité de l'image (voir QUALITES)
-  appliquerQualite(nom) {
+  // Change la qualité de l'image (voir QUALITES) ; finesse : la part des pixels de l'écran
+  // que l'on dessine (voir changerFinesse)
+  appliquerQualite(nom, finesse = this.finesse) {
     const q = QUALITES[nom] ?? QUALITES.haute;
-    this.qualite = nom;
+    this.qualite = QUALITES[nom] ? nom : 'haute';
+    this.finesse = finesse;
     this.ratioPixelsMax = q.pixels;
     this.post.changerEchantillons(q.msaa);
     const ombre = this.lumiere.shadow;
@@ -148,6 +155,15 @@ export class Monde3D {
     this.pluie.facteur = q.pluie;
     this.embruns.facteur = q.particules;
     this.trombe.reglerQualite(q.trombe);
+    this.redimensionner();
+  }
+
+  // La finesse de l'image : 1, tous les pixels que permet la qualité ; 0,7, 70 % en largeur
+  // et en hauteur (la moitié des pixels : le navigateur agrandit l'image à la taille de
+  // l'écran, un peu plus floue). Le régulateur s'en sert pour rester fluide.
+  changerFinesse(finesse) {
+    if (finesse === this.finesse) return;
+    this.finesse = finesse;
     this.redimensionner();
   }
 
@@ -225,7 +241,7 @@ export class Monde3D {
     const canvas = r.domElement;
     const largeur = canvas.clientWidth || innerWidth;
     const hauteur = canvas.clientHeight || innerHeight;
-    r.setPixelRatio(Math.min(devicePixelRatio, this.ratioPixelsMax));
+    r.setPixelRatio(Math.min(devicePixelRatio, this.ratioPixelsMax) * this.finesse);
     r.setSize(largeur, hauteur, false);
     this.camera.aspect = largeur / hauteur;
     this.camera.updateProjectionMatrix();
@@ -511,6 +527,7 @@ export class Monde3D {
     this.gouttes.maj(dt, { pluie: ici.pluie * Math.min(1, m.vent / 20), face, dehors: !this.dansLaCabine });
     this.post.reglages.uForceGouttes.value = this.dansLaCabine || !this.gouttesActives ? 0 : 1;
     this.eau.risees.maj(dt, this.etatRisees, this.camera, m);
+    const debutDessin = performance.now();
     this.mesurer('eau', () => this.eau.preparer(this.camera));
     this.mesurer('ciel', () => this.ciel.preparer(this.camera, { toutLeCube }));
     this.mesurer('trombe', () => this.trombe.preparer(this.camera));
@@ -524,6 +541,10 @@ export class Monde3D {
       if (chrono.images.length > 30000) chrono.images.shift();
     }
     this.mesures.imageMs = this.mesures.imageMs * 0.95 + (performance.now() - debut) * 0.05;
+    // (la dernière image : le temps du calcul, et celui passé à donner le dessin à la carte
+    // graphique — le régulateur les distingue)
+    this.derniere.calcul = debutDessin - debut;
+    this.derniere.dessin = performance.now() - debutDessin;
     const c = this._compteur;
     c.images++;
     const maintenant = performance.now();

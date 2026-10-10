@@ -6,15 +6,16 @@
 // plus de temps que d'habitude, rouge au-delà de 1/30 de seconde (là, l'œil voit l'à-coup).
 // Dessous : les images par seconde, le nombre d'à-coups depuis le début, et pour le
 // dernier à-coup, la partie du calcul qui a pris le plus de temps (la mer, la physique,
-// le dessin…) : de quoi me dire ce qui coince.
+// le dessin…) : de quoi me dire ce qui coince. Et la qualité de l'image en ce moment
+// (etat : ce que le jeu en dit — en Auto, le cran choisi par le régulateur).
 const NOMS = {
   houle: 'la mer (vagues)', simulation: 'la physique et le jeu', bateau: 'le bateau',
   lumiere: 'la lumière', eau: 'l\'eau', ciel: 'le ciel', rendu: 'le dessin', 'regler (mer)': 'le changement de mer',
 };
 
-export function afficherFluidite(monde) {
-  const largeur = 260;
-  const hauteur = 96;
+export function afficherFluidite(monde, { etat = null } = {}) {
+  const largeur = 300;
+  const hauteur = etat ? 124 : 96;
   const canvas = document.createElement('canvas');
   canvas.width = largeur * 2;
   canvas.height = hauteur * 2;
@@ -80,6 +81,18 @@ export function afficherFluidite(monde) {
     g.fillText(`${Math.round(1000 / mediane)} images/s · à-coups : ${acoups}`, 6, haut + 22);
     g.fillStyle = '#9fb0b3';
     g.fillText(cause ? `dernier : ${cause}` : 'aucun à-coup', 6, haut + 36);
+    if (etat) {
+      // (deux lignes au plus : on coupe la phrase entre deux mots)
+      const mots = etat().replace(/^En ce moment : /, '').split(' ');
+      const lignes = [''];
+      for (const m of mots) {
+        const essai = lignes.at(-1) ? `${lignes.at(-1)} ${m}` : m;
+        if (g.measureText(essai).width > largeur - 12 && lignes.at(-1)) lignes.push(m);
+        else lignes[lignes.length - 1] = essai;
+      }
+      g.fillStyle = '#c8b27a';
+      lignes.slice(0, 2).forEach((l, i) => g.fillText(l, 6, haut + 50 + i * 14));
+    }
   };
   requestAnimationFrame(boucle);
 }

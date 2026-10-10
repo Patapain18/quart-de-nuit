@@ -271,6 +271,7 @@ dialog fieldset { margin-bottom: var(--e4); display: grid; gap: var(--e2); }
 .choix-nuit button { text-align: center; padding-inline: var(--e2); }
 .etiquette { margin: var(--e3) 0 var(--e1); font-size: 14px; color: var(--encre-douce); }
 .choix-qualite button { text-align: center; padding-inline: var(--e2); }
+.choix-qualite button[data-qualite="auto"] { grid-column: 1 / -1; }
 .curseur { display: grid; grid-template-columns: 1fr auto; gap: 2px var(--e2); font-size: 14px; color: var(--encre-douce); }
 .curseur output { color: var(--encre); font-variant-numeric: tabular-nums; }
 .curseur input { grid-column: 1 / -1; width: 100%; accent-color: var(--ambre); }

@@ -18,6 +18,8 @@
 // par-dessus bord s'il n'est pas attaché quand le bateau se couche.
 import * as THREE from 'three';
 import { Monde3D, QUALITES } from './rendu/monde3d.js';
+import { Regulateur, CRANS, DERNIER_CRAN } from './rendu/regulateur.js';
+import { nomCarteGraphique, sansCarteGraphique } from './rendu/capacites.js';
 import { Vent } from './monde/vent.js';
 import { Grains } from './monde/grains.js';
 import { Foudre, REGLAGES_FOUDRE } from './monde/foudre.js';
@@ -99,7 +101,7 @@ const marin = new Marin();
 // (ce qui est dur à bord, tiré du modèle 3D : le marin n'y entre pas, la caméra non plus)
 marin.encombrement = construireEncombrement(bateau);
 // (jeu.html?perf : le compteur de fluidité, en haut à gauche)
-if (parametres.has('perf')) import('./atelier/fluidite.js').then((m) => m.afficherFluidite(monde));
+if (parametres.has('perf')) import('./atelier/fluidite.js').then((m) => m.afficherFluidite(monde, { etat: etatQualite }));
 // (jeu.html?frein-carte=3&frein-processeur=2 : un faux ordinateur lent, pour les essais — la
 // carte graphique fait trois fois son plus gros travail (monde3d.js, freiner), et tout le
 // calcul du processeur prend deux fois plus de temps : ici, dans la boucle, et dans le fil
@@ -346,9 +348,64 @@ jeu.radio = new Radio({
 });
 jeu.radio.canal = 16;
 
+// ---------- La qualité « Auto » (rendu/regulateur.js) ----------
+// Le jeu choisit lui-même la qualité de l'image et sa finesse, et les règle en jouant pour
+// rester fluide (le régulateur juge chaque image, dans la boucle). Le cran trouvé est
+// gardé d'une partie à l'autre : on repart de là.
+const CLE_AUTO = 'quart-de-nuit:auto';
+let regulateur = null;
+let cranGarde = null;
+function cranDeDepart() {
+  try {
+    const garde = JSON.parse(localStorage.getItem(CLE_AUTO));
+    if (Number.isInteger(garde?.cran) && garde.cran >= 0 && garde.cran <= DERNIER_CRAN) return (cranGarde = garde.cran);
+  } catch { /* rien de gardé, ou illisible */ }
+  // la première fois : selon la carte graphique, quand le navigateur dit son nom (sans
+  // carte graphique : le plus léger ; une carte Intel intégrée : économique ; sinon, moyenne)
+  const carte = nomCarteGraphique(monde.renderer.getContext());
+  if (sansCarteGraphique(carte)) return DERNIER_CRAN;
+  if (/intel/i.test(carte) && !/\barc\b/i.test(carte)) return 2;
+  return 1;
+}
+function appliquerCran(cran) {
+  const { qualite, finesse } = CRANS[cran];
+  if (monde.qualite !== qualite) monde.appliquerQualite(qualite, finesse);
+  else monde.changerFinesse(finesse);
+}
+// (le cran est gardé une fois qu'il n'a pas bougé depuis 20 secondes)
+function garderCran(maintenant) {
+  if (regulateur.cran === cranGarde || maintenant - regulateur.changeDepuis < 20000) return;
+  cranGarde = regulateur.cran;
+  try {
+    localStorage.setItem(CLE_AUTO, JSON.stringify({ cran: cranGarde }));
+  } catch { /* stockage refusé : on cherchera de nouveau la prochaine fois */ }
+}
+function appliquerQualiteChoisie(nom) {
+  if (nom === 'auto') {
+    regulateur ??= new Regulateur({ cran: cranDeDepart(), maintenant: performance.now() });
+    appliquerCran(regulateur.cran);
+  } else {
+    regulateur = null;
+    monde.appliquerQualite(nom, 1);
+  }
+}
+// (ce qu'on dit de la qualité en ce moment : les options, et le compteur de fluidité)
+function etatQualite() {
+  if (!regulateur) return `Qualité ${QUALITES[monde.qualite]?.nom ?? monde.qualite} (choisie)`;
+  const { qualite, finesse } = CRANS[regulateur.cran];
+  const { ips, limite } = regulateur.dernier;
+  let t = `En ce moment : qualité ${QUALITES[qualite].nom}`;
+  if (finesse < 1) t += `, image dessinée à ${Math.round(finesse * 100)} % puis agrandie`;
+  if (ips) t += ` — ${Math.round(ips)} images par seconde`;
+  t += '.';
+  if (limite === 'processeur') t += ' C\'est le processeur qui ne suit pas : baisser l\'image n\'y changerait rien.';
+  else if (limite === 'carte' && regulateur.cran === DERNIER_CRAN) t += ' Ton ordinateur est un peu juste pour ce jeu : c\'est déjà l\'image la plus légère.';
+  return t;
+}
+
 // ---------- Les options (src/quart/options.js) ----------
 function appliquerOptions(o, changements = o) {
-  if ('qualite' in changements) monde.appliquerQualite(o.qualite);
+  if ('qualite' in changements) appliquerQualiteChoisie(o.qualite);
   monde.camera.fov = o.champ;
   monde.camera.updateProjectionMatrix();
   audio.regler(o.volume);
@@ -1741,6 +1798,7 @@ document.addEventListener('pointerlockchange', () => {
 // ---------- La fenêtre des options ----------
 const fenetreOptions = document.getElementById('options');
 const TEXTES_QUALITE = {
+  auto: 'Le jeu choisit lui-même selon ton ordinateur, et ajuste en jouant pour rester fluide.',
   economique: 'Pour un ordinateur modeste : moins de pixels, de nuages et de pluie.',
   moyenne: 'Un bon équilibre pour la plupart des ordinateurs.',
   haute: 'L\'image prévue : il faut un ordinateur assez récent.',
@@ -1749,11 +1807,11 @@ const TEXTES_QUALITE = {
 const CASES = ['inverser', 'secousses', 'gouttes', 'clignotements', 'sousTitres', 'bruits', 'casque'];
 {
   const zone = document.getElementById('choix-qualite');
-  for (const [id, q] of Object.entries(QUALITES)) {
+  for (const id of ['auto', 'economique', 'moyenne', 'haute', 'superbe']) {
     const b = document.createElement('button');
     b.type = 'button';
     b.dataset.qualite = id;
-    b.textContent = q.nom;
+    b.textContent = id === 'auto' ? 'Auto (conseillé)' : QUALITES[id].nom;
     b.addEventListener('click', () => changerOptions({ qualite: id }));
     zone.append(b);
   }
@@ -1772,10 +1830,18 @@ const CASES = ['inverser', 'secousses', 'gouttes', 'clignotements', 'sousTitres'
   for (const b of document.querySelectorAll('[data-nuit]')) b.addEventListener('click', () => changerOptions({ nuit: b.dataset.nuit }));
   majFenetreOptions.curseurs = curseurs;
 }
+// (en Auto, la note dit aussi où en est le jeu : elle se met à jour tant que la fenêtre est ouverte)
+function majNoteQualite() {
+  const note = document.getElementById('note-qualite');
+  note.textContent = options.qualite === 'auto' ? `${TEXTES_QUALITE.auto} ${etatQualite()}` : TEXTES_QUALITE[options.qualite];
+}
+setInterval(() => {
+  if (fenetreOptions?.open && options.qualite === 'auto') majNoteQualite();
+}, 500);
 function majFenetreOptions() {
   if (!fenetreOptions) return;
   for (const b of document.querySelectorAll('[data-qualite]')) b.setAttribute('aria-pressed', String(b.dataset.qualite === options.qualite));
-  document.getElementById('note-qualite').textContent = TEXTES_QUALITE[options.qualite];
+  majNoteQualite();
   for (const [cle, texte] of Object.entries(majFenetreOptions.curseurs ?? {})) {
     document.getElementById(`o-${cle}`).value = options[cle];
     document.getElementById(`v-${cle}`).textContent = texte(options[cle]);
@@ -1891,6 +1957,7 @@ function regarder(x, y, z) {
 window.__jeu = {
   monde, physique, bateau, etat, marin, jeu, gestes, embarquer, photographier, avancer, commandes, Audio, audio, finir,
   commencerNuit, get nuit() { return nuit; }, contexteNuit, regarder, profiler, directionRelative,
+  get regulateur() { return regulateur; },
   // (une caméra posée à la main : voir(x, y, z, versX, versY, versZ), dans le repère du bateau ;
   // voir() la rend au marin)
   voir: (...v) => { etat.cameraLibre = v.length ? { position: new THREE.Vector3(v[0], v[1], v[2]), cible: new THREE.Vector3(v[3], v[4], v[5]) } : null; },
@@ -1937,7 +2004,8 @@ window.__jeu = {
   },
 };
 function boucle(maintenant) {
-  const dt = Math.min((maintenant - dernier) / 1000, 0.05);
+  const intervalle = maintenant - dernier;
+  const dt = Math.min(intervalle / 1000, 0.05);
   dernier = maintenant;
   // (les outils de mise au point font avancer le jeu eux-mêmes, image par image)
   if (etat.fige) { requestAnimationFrame(boucle); return; }
@@ -1956,6 +2024,13 @@ function boucle(maintenant) {
   if (freinProcesseur > 1) {
     const fin = performance.now() + (performance.now() - debut) * (freinProcesseur - 1);
     while (performance.now() < fin);
+  }
+  // (la qualité « Auto » : le régulateur juge chaque image — son intervalle, et le temps du
+  // calcul, sans celui passé à donner le dessin à la carte graphique)
+  if (regulateur) {
+    const cran = regulateur.noter(intervalle, performance.now() - debut - monde.derniere.dessin, maintenant);
+    if (cran !== null) appliquerCran(cran);
+    garderCran(maintenant);
   }
   requestAnimationFrame(boucle);
 }

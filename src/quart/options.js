@@ -6,9 +6,12 @@
 // Si le navigateur refuse de garder quoi que ce soit (navigation privée), les options
 // marchent quand même, le temps de la visite.
 const CLE = 'quart-de-nuit:options';
+// (la version des options gardées : à la 2, la qualité « Auto » est arrivée — ceux qui
+// avaient gardé une qualité sans jamais la choisir y passent)
+const VERSION = 2;
 
 export const OPTIONS_DE_BASE = {
-  qualite: 'haute', // l'image : 'economique', 'moyenne', 'haute' ou 'superbe'
+  qualite: 'auto', // l'image : 'auto' (le jeu la choisit et la règle, rendu/regulateur.js), 'economique', 'moyenne', 'haute' ou 'superbe'
   sensibilite: 1, // la souris : de 0,3 (lente) à 2,5 (vive)
   inverser: false, // inverser le regard haut / bas
   champ: 72, // le champ de vision (degrés, de haut en bas) : 60 à 90
@@ -27,7 +30,7 @@ export const OPTIONS_DE_BASE = {
 // Les valeurs permises : une valeur inconnue (une vieille version, une valeur modifiée à
 // la main…) est remplacée par celle de base, pour que le jeu ne casse jamais
 const LISTES = {
-  qualite: ['economique', 'moyenne', 'haute', 'superbe'],
+  qualite: ['auto', 'economique', 'moyenne', 'haute', 'superbe'],
   nuit: ['encre', 'tres-sombre', 'sombre'],
 };
 const BORNES = { sensibilite: [0.3, 2.5], champ: [60, 90], stabilisation: [0, 1], volume: [0, 1] };
@@ -35,12 +38,6 @@ function valide(cle, valeur) {
   if (LISTES[cle]) return LISTES[cle].includes(valeur);
   if (BORNES[cle]) return typeof valeur === 'number' && valeur >= BORNES[cle][0] && valeur <= BORNES[cle][1];
   return typeof valeur === typeof OPTIONS_DE_BASE[cle];
-}
-
-// Un ordinateur modeste ? (peu de cœurs) : une image moins fine par défaut
-function qualiteParDefaut() {
-  const coeurs = typeof navigator !== 'undefined' ? navigator.hardwareConcurrency ?? 8 : 8;
-  return coeurs <= 4 ? 'moyenne' : 'haute';
 }
 
 let enMemoire = null;
@@ -52,8 +49,9 @@ export function lireOptions() {
     const brut = localStorage.getItem(CLE);
     if (brut) gardees = JSON.parse(brut);
   } catch { /* stockage refusé ou illisible : on garde ce qu'on a */ }
-  const options = { ...OPTIONS_DE_BASE, qualite: qualiteParDefaut() };
+  const options = { ...OPTIONS_DE_BASE };
   for (const cle of Object.keys(OPTIONS_DE_BASE)) {
+    if (cle === 'qualite' && gardees?.version !== VERSION) continue;
     if (gardees && valide(cle, gardees[cle])) options[cle] = gardees[cle];
   }
   return options;
@@ -64,9 +62,9 @@ export function changerOptions(changements) {
   for (const [cle, valeur] of Object.entries(changements)) {
     if (cle in OPTIONS_DE_BASE && valide(cle, valeur)) options[cle] = valeur;
   }
-  enMemoire = options;
+  enMemoire = { ...options, version: VERSION };
   try {
-    localStorage.setItem(CLE, JSON.stringify(options));
+    localStorage.setItem(CLE, JSON.stringify(enMemoire));
   } catch { /* stockage refusé : elles restent en mémoire */ }
   for (const f of abonnes) f(options, changements);
   return options;
