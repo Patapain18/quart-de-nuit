@@ -721,10 +721,9 @@ function simuler(dt) {
     baro: barometre.aiguille === null ? null : { p: barometre.aiguille, dp: null, historique: barometre.historique, heure: heureIci() },
     vacille,
   });
-  // les essuie-glaces : sous la pluie, ou quand les embruns arrosent le pare-brise ; et l'eau
-  // qui ruisselle sur les vitres de la timonerie
+  // l'eau qui ruisselle sur les vitres de la timonerie : la pluie, les embruns, et l'eau que
+  // le vent fort arrache aux crêtes
   const eauDansLAir = Math.min(1, ici.pluie * 1.3 + (monde.embruns.densiteAutour ?? 0) * 2.5 + Math.max(0, meteo.vent - 28) / 30);
-  bateau.balayage = eauDansLAir > 0.05 ? Math.min(1, eauDansLAir * 1.2) : 0;
   bateau.pluieSurLesVitres = eauDansLAir;
   mouillerLePont(dt);
   // l'eau embarquée : dans le cockpit, et dans la cale (au naufrage, elle passe sur le

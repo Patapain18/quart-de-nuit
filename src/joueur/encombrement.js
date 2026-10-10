@@ -15,7 +15,7 @@
 // Ce qui ne compte pas : les voiles, les câbles fins, l'eau, les cordages, et les pièces mobiles
 const IGNORER = new Set([
   'grand-voile', 'foc', 'haubans', 'filieres', 'lignes-de-vie', 'cordages', 'eau-cockpit', 'eau-cabine',
-  'pivot-bome', 'pivot-safran', 'voile-ferlee', 'porte-timonerie', 'essuie-glace', 'pompe', 'trappe-cale', 'volets', 'timonerie-felure',
+  'pivot-bome', 'pivot-safran', 'voile-ferlee', 'porte-timonerie', 'pompe', 'trappe-cale', 'volets', 'timonerie-felure',
   'dalot', 'dalots-bouches', 'porte-cabine-avant',
 ]);
 const IGNORER_TOUJOURS = new Set(['grand-voile', 'foc', 'haubans', 'filieres', 'lignes-de-vie', 'cordages', 'eau-cockpit', 'eau-cabine']);

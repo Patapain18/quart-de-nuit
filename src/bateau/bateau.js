@@ -1,6 +1,6 @@
 // Le voilier complet : le modèle 3D, les voiles, et ses pièces qui bougent (la bôme, le
-// safran et la roue, la porte de la timonerie, les essuie-glaces, le levier de la pompe, la
-// trappe de la cale, les volets de tempête).
+// safran et la roue, la porte de la timonerie, le levier de la pompe, la trappe de la cale,
+// les volets de tempête).
 // (La vraie physique est dans physique/voilier.js ; flotter() ne sert qu'aux ateliers.)
 import * as THREE from 'three';
 import { construireBateau } from './modele.js';
@@ -18,17 +18,14 @@ import { LARGEUR_BATTANT } from './timonerie.js';
 
 export class Bateau {
   constructor() {
-    const { groupe, materiaux, pivotBome, pivotSafran, roue, mesures, porte, essuieGlaces, carreaux } = construireBateau();
+    const { groupe, materiaux, pivotBome, pivotSafran, roue, mesures, porte, carreaux } = construireBateau();
     // les vitres de la timonerie, une par une (dans l'ordre de quart/systemes.js, VITRES)
     this.carreaux = carreaux;
     this.roue = roue; // (elle tourne avec le safran : le pilote la fait tourner)
     this.porte = porte; // la porte coulissante de la timonerie, vers le cockpit
-    this.essuieGlaces = essuieGlaces;
-    this.balayage = 0; // (les essuie-glaces : 0 arrêtés → 1 au plus vite, réglé par le jeu)
     // la pluie sur les vitres de la timonerie (réglée par le jeu : pluie 0 → 1)
     this.vitres = mouillerLesVitres(materiaux.vitreTimonerie);
     this.pluieSurLesVitres = 0;
-    this._phaseEssuie = 0;
     this.groupe = groupe;
     this.materiaux = materiaux;
     this.pivotBome = pivotBome;
@@ -258,20 +255,10 @@ export class Bateau {
     this.roue.rotation.z = -(r.angleSafran ?? 0) * 7.7;
     this.voiles.maj(dt, r);
     this.cordages.maj(dt);
-    // les essuie-glaces : un aller-retour d'une seconde et demie (ou deux par seconde au plus
-    // vite), qui finit son balayage avant de s'arrêter
-    if (this.balayage > 0.01 || Math.sin(this._phaseEssuie) > 0.02) {
-      this._phaseEssuie += dt * (1.6 + 3 * this.balayage);
-      if (this.balayage <= 0.01 && Math.sin(this._phaseEssuie) <= 0.02) this._phaseEssuie = 0;
-    }
-    // (au repos, couchés en bas de la vitre ; ils balayent ensemble jusqu'à la verticale)
-    const balai = Math.max(0, Math.sin(this._phaseEssuie)) ** 0.8;
-    for (const e of this.essuieGlaces) e.balancier.rotation.z = e.repos * (1 - balai);
     // (l'eau sur les vitres : elle arrive vite, et met un moment à s'égoutter)
     const v = this.vitres;
     v.uTempsVitre.value += dt;
     v.uPluieVitre.value += (this.pluieSurLesVitres - v.uPluieVitre.value) * Math.min(1, dt * (this.pluieSurLesVitres > v.uPluieVitre.value ? 1.5 : 0.08));
-    v.uEssuie.value += ((this.balayage > 0.01 ? 1 : 0) - v.uEssuie.value) * Math.min(1, dt * 2);
   }
 
   // Les points de vue à bord (repère du bateau)

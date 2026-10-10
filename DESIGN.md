@@ -778,6 +778,14 @@ l'image (les cent maillages de la timonerie et de la cabine, l'ombre redessinée
 cube des reflets) — en le mesurant sur un tel ordinateur. Quand la carte graphique lâche, on ne
 tente pas de la reprendre sans recharger (il faudrait tout refaire : chaque image, chaque shader).
 
+### Retouche : plus d'essuie-glaces (10 octobre 2026)
+
+Mathis ne les trouvait pas réalistes : les trois essuie-glaces du pare-brise sont retirés (le
+modèle, leur balayage, et l'eau qu'ils chassaient du pare-brise). Le pare-brise ruisselle
+maintenant comme les autres vitres de la timonerie sous la pluie et les embruns. Ils ne servaient
+qu'à l'image : ni courant, ni son, ni commande. À voir : `docs/sans-essuie-glaces.jpg` (la
+timonerie vue du pont avant, avant et après).
+
 ## 4. Le moteur (ce qu'on garde de l'ancien jeu)
 
 Tout ce qui fait l'image, le son et la physique reste, et sert la nouvelle nuit. Le détail de

@@ -1,5 +1,5 @@
-// La timonerie, vue de dehors : ses parois vitrées, son pare-brise, son toit, la porte
-// coulissante vers le cockpit et les essuie-glaces.
+// La timonerie, vue de dehors : ses parois vitrées, son pare-brise, son toit et la porte
+// coulissante vers le cockpit.
 //
 // Les mesures sont dans forme.js (TIMONERIE). Les parois prolongent les côtés du rouf vers
 // le haut ; chaque surface est une grille dont certaines cases sont laissées vides : ce sont
@@ -535,45 +535,6 @@ function creerPorte(materiaux) {
   return groupe;
 }
 
-// Les essuie-glaces des trois vitres du pare-brise : chacun tourne autour d'un axe au coin
-// bas de sa vitre (côté axe du bateau pour les vitres de côté), couché le long du bas de la
-// vitre au repos, et balaye jusqu'à la verticale (un quart de cercle, dans la vitre)
-function creerEssuieGlaces(materiaux) {
-  const liste = [];
-  // [bord gauche, bord droit, côté de l'axe (0 : gauche, 1 : droite)]
-  const vitres = vitresPareBrise().map(([c0, c1], k) => [c0, c1, k === 0 ? 1 : 0]);
-  for (const [c0, c1, coin] of vitres) {
-    const yb = Y_VITRE_BAS + 0.07;
-    const gauche = new THREE.Vector3(...pointPareBrise(c0, yb));
-    const droite = new THREE.Vector3(...pointPareBrise(c1, yb));
-    const haut = new THREE.Vector3(...pointPareBrise((c0 + c1) / 2, Y_VITRE_HAUT - 0.05));
-    const largeur = gauche.distanceTo(droite);
-    const hauteur = haut.distanceTo(new THREE.Vector3(...pointPareBrise((c0 + c1) / 2, yb)));
-    const longueur = Math.min(largeur, hauteur) - 0.08;
-    const axe = (coin === 0 ? gauche : droite).clone();
-    axe.x += coin === 0 ? 0.04 : -0.04;
-    // (le sens du balayage : vers l'autre bord de la vitre)
-    const sens = coin === 0 ? 1 : -1;
-    const pivot = new THREE.Group();
-    pivot.name = 'essuie-glace';
-    pivot.position.copy(axe).add(new THREE.Vector3(0, 0, -0.02));
-    // (le plan du pare-brise : il penche vers l'arrière)
-    pivot.rotation.x = Math.atan2(haut.z - axe.z, haut.y - axe.y);
-    const bras = new THREE.Mesh(new THREE.BoxGeometry(0.01, longueur, 0.01), materiaux.noir);
-    bras.position.y = longueur / 2;
-    const balai = new THREE.Mesh(new THREE.BoxGeometry(0.016, longueur * 0.8, 0.016), materiaux.noir);
-    balai.position.set(0, longueur * 0.58, -0.006);
-    const balancier = new THREE.Group();
-    balancier.add(bras, balai);
-    pivot.add(balancier);
-    // repos : couché le long du bas de la vitre (vers l'autre bord)
-    const repos = sens * -Math.PI / 2 * 0.97;
-    balancier.rotation.z = repos;
-    liste.push({ pivot, balancier, longueur, repos });
-  }
-  return liste;
-}
-
 export function construireTimonerie(materiaux) {
   return {
     blanc: mergeGeometries([...geometrieCotes(), geometriePareBrise(), geometrieToit(), geometrieParoiArriere()].map((g) => (g.index ? g.toNonIndexed() : g))),
@@ -582,7 +543,6 @@ export function construireTimonerie(materiaux) {
     joints: geometrieJoints(),
     mains: geometrieMainsCourantes(),
     porte: creerPorte(materiaux),
-    essuieGlaces: creerEssuieGlaces(materiaux),
   };
 }
 

@@ -1,7 +1,6 @@
 // La pluie sur les vitres de la timonerie : des gouttes posées qui grossissent puis
-// s'effacent, et des filets d'eau qui coulent en zigzag en laissant une traînée. Le
-// pare-brise est tenu à peu près dégagé par les essuie-glaces ; les vitres de côté et de
-// l'arrière ruissellent.
+// s'effacent, et des filets d'eau qui coulent en zigzag en laissant une traînée. Toutes les
+// vitres ruissellent, le pare-brise comme les autres.
 //
 // Tout est calculé dans le shader des vitres (une seule matière, sans texture) : la
 // position sur la vitre vient du modèle (le repère du bateau). Une goutte est un peu plus
@@ -10,7 +9,6 @@
 const GLSL = /* glsl */ `
 uniform float uPluieVitre;  // 0 → 1
 uniform float uTempsVitre;
-uniform float uEssuie;      // 0 → 1 : le pare-brise balayé
 varying vec3 vPosVitre;
 varying vec3 vNormaleVitre;
 
@@ -49,9 +47,7 @@ float eauSurLaVitre(vec3 p, vec3 n) {
   if (uPluieVitre < 0.01) return 0.0;
   // (sur les côtés, la vitre est dans le plan (z, y) ; ailleurs, dans le plan (x, y))
   vec2 q = abs(n.x) > 0.5 ? vec2(p.z, p.y) : vec2(p.x, p.y);
-  // le pare-brise (devant, bas) est essuyé ; les autres vitres ruissellent
-  bool pareBrise = p.z < 0.75;
-  float d = uPluieVitre * (pareBrise ? 1.0 - 0.85 * uEssuie : 1.0);
+  float d = uPluieVitre;
   float e = gouttesPosees(q * 62.0, uTempsVitre, 0.25 + 0.6 * d) * smoothstep(0.0, 0.3, d);
   e = max(e, filets(q * vec2(33.0, 33.0), uTempsVitre, 0.2 + 0.55 * d) * smoothstep(0.15, 0.6, d));
   return e;
@@ -63,7 +59,6 @@ export function mouillerLesVitres(materiau) {
   const uniforms = {
     uPluieVitre: { value: 0 },
     uTempsVitre: { value: 0 },
-    uEssuie: { value: 0 },
   };
   materiau.onBeforeCompile = (shader) => {
     Object.assign(shader.uniforms, uniforms);

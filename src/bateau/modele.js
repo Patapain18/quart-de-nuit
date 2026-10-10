@@ -630,7 +630,7 @@ export function construireBateau() {
   const rouf = geometrieRouf();
   ajouter(rouf.blanc, materiaux.gelcoat, 'rouf');
   ajouter(mergeGeometries([rouf.antiderapant, geometrieCorniches()]), materiaux.antiderapant, 'rouf-toit');
-  // la timonerie (timonerie.js) : ses parois, ses vitres, sa porte, ses essuie-glaces
+  // la timonerie (timonerie.js) : ses parois, ses vitres, sa porte
   const timonerie = construireTimonerie(materiaux);
   ajouter(timonerie.blanc, materiaux.gelcoat, 'timonerie');
   // (les vitres, une par une : chacune peut se fendre, puis éclater — quart/systemes.js)
@@ -645,7 +645,6 @@ export function construireBateau() {
   ajouter(timonerie.mains, materiaux.inox, 'timonerie-mains-courantes');
   const porte = timonerie.porte;
   groupe.add(porte);
-  for (const e of timonerie.essuieGlaces) groupe.add(e.pivot);
   ajouter(rouf.verre, materiaux.vitre, 'hublots').castShadow = false;
   ajouter(rouf.rideaux, new THREE.MeshStandardMaterial({ color: 0x2b2520, roughness: 1, side: THREE.DoubleSide }), 'rideaux-cabine-avant');
   ajouter(rouf.teck, materiaux.teck, 'rouf-teck');
@@ -714,5 +713,5 @@ export function construireBateau() {
   for (const m2 of roue.children) m2.castShadow = true;
   groupe.add(roue);
 
-  return { groupe, materiaux, pivotBome, pivotSafran, roue, mesures: m, porte, essuieGlaces: timonerie.essuieGlaces, carreaux };
+  return { groupe, materiaux, pivotBome, pivotSafran, roue, mesures: m, porte, carreaux };
 }
