@@ -765,6 +765,11 @@ veille, un pilote qui redémarre), le jeu s'arrête, coupe le son, rend la souri
 recharger la page (la nuit reprendra au début de l'heure, quand elle est gardée). Pour voir ces
 messages : `jeu.html?impossible=webgl2`, `?impossible=flottants`, `?sans-carte`.
 
+**À voir** : `docs/partout-trois-crans.jpg` (la même vue de la timonerie à 5 h 50, en Haute, en
+Économique à 85 % et en Minimale à 50 %, agrandies comme le fait le navigateur) et
+`docs/partout-regulateur-avant-apres.svg` (le relevé, avant et après la règle de « la plus lente
+des secondes »).
+
 **Ce que je n'ai pas pu vérifier** : tout est mesuré sur un seul ordinateur, rapide. Je n'ai essayé
 ni une vraie petite carte graphique (Intel intégrée), ni Windows, ni Firefox, ni Safari. Sur une
 carte graphique dix à vingt fois plus lente que celle du Mac, même le dernier cran pourrait rester
