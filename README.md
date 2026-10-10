@@ -19,6 +19,8 @@ npm run dev
 
 Puis ouvrir http://localhost:5190/jeu.html (et `jeu.html?heure=27.4` pour commencer directement à 3 h 24, pour vérifier). Les ateliers (les coulisses) : `atelier-mer.html` (la mer, le ciel et la lumière), `atelier-trombe.html` (la bête : sa vie de la naissance à la corde, dans la nuit du jeu ou au crépuscule, sous les éclairs, de près, de loin, d'en haut), `atelier-eclairs.html` (la foudre : un éclair dans le nuage, jusqu'à la mer, en araignée, tout près ou sur le mât, au ralenti ; le tonnerre qu'on entend arriver ; le feu de Saint-Elme), `atelier-grains.html` (faire passer un grain sur le bateau : sa rafale, ses éclairs, ce qu'il fait au bateau en courbes, et le radar), `atelier-son.html` (écouter chaque situation de la nuit, déclencher ses événements, et mesurer : le volume ressenti de chacune, la grosse vague qu'on entend venir de son côté, le silence avant les coups). `jeu.html?peur` ouvre, à droite du jeu, l'atelier de la peur (la tension, chaque chose étrange, un bouton pour la provoquer, sauter à une heure de la nuit).
 
+Pour la fluidité : `jeu.html?perf` affiche en haut à gauche le temps entre deux images, les à-coups et leur cause, et la qualité en ce moment (en Auto, le cran choisi par le jeu). `?frein-carte=3&frein-processeur=2` fait du Mac un faux ordinateur lent (la carte graphique fait trois fois son plus gros travail, le processeur met deux fois plus de temps), pour voir la qualité Auto descendre ; `?impossible=webgl2`, `?impossible=flottants` et `?sans-carte` montrent les messages d'un navigateur qui ne peut pas faire tourner le jeu.
+
 ## Comment on joue
 
 Au clavier (français) et à la souris. La souris tourne la tête.
@@ -37,6 +39,8 @@ Au clavier (français) et à la souris. La souris tourne la tête.
 - **la porte de la timonerie** : fermée, sinon les vagues qui remplissent le cockpit entrent à l'intérieur ; cockpit plein, ne l'ouvre pas ;
 - **le foc** (la première sortie) : s'il se met à battre (son écoute a cassé), il secoue le bateau et le pilote force — sors le rouler (la bosse d'enrouleur, dans le cockpit, à tribord), harnais accroché ; **dehors**, accroche toujours ton harnais (X), et tiens-toi (Maj) quand une vague arrive ;
 - **les dalots** (la seconde sortie) : s'ils se bouchent, le cockpit ne se vide plus et son eau passe sous la porte — sors les dégager, aux coins arrière du cockpit, derrière la roue (tiens E quatre secondes).
+
+**L'image** s'adapte à ton ordinateur : en qualité **Auto** (le choix de départ, dans les options), le jeu choisit lui-même la qualité et la finesse de l'image, et les ajuste en jouant pour rester fluide (60 images par seconde). Tu peux aussi en choisir une toi-même.
 
 Et le reste, tu le verras : les grains, la foudre, la trombe qu'on ne voit qu'à la lueur des éclairs, les vagues scélérates qu'on entend gronder longtemps avant… et ce qui ne s'explique pas. Il y a un an, jour pour jour, on a retrouvé *Morgane* à la dérive, la timonerie vide ; le livre de bord de son ancien propriétaire, Yves Le Bihan, est toujours à bord. Une page de sa dernière nuit se lit à chaque heure.
 
@@ -58,11 +62,12 @@ npm run test-grains     # un grain passe sur le bateau : tout arrive dans le bon
 npm run test-risees     # une risée arrive à l'heure, on la voit venir, le vent ne forcit que quand elle est là
 npm run test-eclairs    # les éclairs partent des nuages d'orage ; le tonnerre à l'heure ; le mât attire la foudre ; une nuit, cent grains
 npm run test-feux       # les feux de la côte : leurs éclats, leur portée, ce qu'on en voit cette nuit
+npm run test-regulateur # la qualité Auto sur des ordinateurs pour rire (rapide, moyen, petit, processeur lent, navigateur qui économise la batterie) : elle trouve le bon cran, sans aller-retour sans fin
 ```
 
 ## Mettre en ligne
 
-Le jeu est publié sur **GitHub Pages**, à l'adresse https://patapain18.github.io/quart-de-nuit/. Il n'y a rien à faire à la main : à chaque envoi (« push ») sur la branche `main`, un ordinateur de GitHub suit la recette `.github/workflows/mettre-en-ligne.yml` : il installe les outils (`npm ci`), fabrique le site (`npm run build`), puis le publie. Le nouveau jeu vit sur la branche `la-nuit-seule` : il ne sera publié qu'une fois jouable, en la versant dans `main`.
+Le jeu est publié sur **GitHub Pages**, à l'adresse https://patapain18.github.io/quart-de-nuit/. Il n'y a rien à faire à la main : à chaque envoi (« push ») sur la branche `main`, un ordinateur de GitHub suit la recette `.github/workflows/mettre-en-ligne.yml` : il installe les outils (`npm ci`), fabrique le site (`npm run build`), puis le publie. Chaque chantier se fait sur sa branche (le dernier : `partout`), versée dans `main` une fois fini : c'est ce qui le publie.
 
 ## Comment c'est fait
 
@@ -75,6 +80,7 @@ Le cahier de conception, avec la nouvelle direction et ce qu'on a appris en rout
 - **Les grains** (`src/monde/grains.js`) : des averses d'orage qui existent à un endroit, leur rafale, leur pluie, leur nuage ; **les risées** (`src/monde/risees.js`) ; **la foudre** (`src/monde/foudre.js`) qui part de leurs nuages.
 - **Le voilier** : un 14 m à grande timonerie, construit par le code (`src/bateau/` : la coque, la timonerie et ses volets, la cale sous son plancher), et sa physique (`src/physique/voilier.js`) : 352 morceaux de coque qui flottent, l'eau embarquée qui pèse.
 - **La peur** (`src/quart/peur.js`, `src/rendu/apparitions.js`) : ce qu'on voit du coin de l'œil et qui disparaît quand on le regarde en face, la porte de la cabine avant qui s'ouvre dans ton dos ; **le livre de bord** de l'ancien propriétaire (`src/quart/livre-de-bord.js`), qui apprend les commandes et raconte sa dernière nuit.
+- **Partout** : la qualité Auto (`src/rendu/regulateur.js`) juge chaque seconde le temps entre deux images et passe d'un cran à l'autre parmi huit (de Haute à Minimale, l'image dessinée à 50 % puis agrandie) ; avant de lancer le jeu, on vérifie que le navigateur peut le faire tourner (`src/rendu/capacites.js`, `src/entree.js`), sinon on dit pourquoi et quoi faire.
 - **Le son** : de vrais enregistrements, tous dans le domaine public (CC0 : BigSoundBank de Joseph Sardin — et Axeline T. —, et Freesound), coupés et réglés par `npm run sons`, puis mélangés en direct par la Web Audio API (`src/son/audio.js`) ; chaque son vient de sa place (le moteur sous le plancher, la VHF au plafond, la vague de son côté…), et l'oreille suit la tête.
 
 Fait avec Three.js (licence MIT) et Vite. Inspiré d'une vidéo d'Isaac Johnson (un voilier sous l'orage, en Three.js). Kervalen et *Morgane* sont inventés.

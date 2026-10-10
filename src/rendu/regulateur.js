@@ -37,6 +37,16 @@ export const CRANS = [
   { qualite: 'minimale', finesse: 0.5 },
 ];
 export const DERNIER_CRAN = CRANS.length - 1;
+// Ce que coûte chaque cran à la carte graphique, comparé au premier : mesuré sur le Mac de
+// Mathis (1280×800 points, la carte graphique freinée 4 fois pour que ce soit elle qui
+// compte ; d'un essai à l'autre, ±30 %), sur son écran Retina et comme sur un écran ordinaire
+// (un pixel par point : la qualité Haute n'y a déjà pas plus de pixels que la Moyenne, les
+// premiers crans y gagnent peu). Le régulateur s'en sert pour prévoir s'il tiendra au cran
+// du dessus.
+export const COUTS = {
+  retina: [1, 0.7, 0.41, 0.32, 0.28, 0.23, 0.2, 0.18],
+  ordinaire: [1, 0.91, 0.75, 0.62, 0.53, 0.43, 0.38, 0.33],
+};
 
 export const CIBLE = 60; // images par seconde
 // (sous 54 images par seconde, l'écran qui en affiche 60 montre certaines images deux fois :
@@ -56,13 +66,16 @@ const GAIN_MINIMUM = 1.04; // (une descente qui gagne moins de 4 % n'a servi à 
 const PROCESSEUR = 0.85; // (le calcul prend plus de 85 % de l'image : le processeur est au bout)
 
 export class Regulateur {
-  constructor({ cran = 1, maintenant = 0 } = {}) {
+  // couts : COUTS.retina ou COUTS.ordinaire, selon l'écran
+  constructor({ cran = 1, maintenant = 0, couts = COUTS.retina } = {}) {
     this.cran = Math.min(DERNIER_CRAN, Math.max(0, Math.round(cran)));
+    this.couts = couts;
     this.debut = maintenant;
     this.calmeJusqua = maintenant + CALME;
     this.fenetre = null;
     this.lentes = 0;
     this.aisees = 0;
+    this.ipsAisees = []; // (les images par seconde de ces secondes à l'aise)
     this.echecs = CRANS.map(() => 0);
     this.interditJusqua = CRANS.map(() => 0);
     this.monte = null; // (le dernier cran essayé en montant, et quand)
@@ -140,6 +153,7 @@ export class Regulateur {
 
     if (lente) {
       this.aisees = 0;
+      this.ipsAisees = [];
       if (processeur) {
         this.lentes = 0;
         return null;
@@ -161,17 +175,22 @@ export class Regulateur {
     this.lentes = 0;
     if (ips < AISE && ips < ipsEcran * 0.95) {
       this.aisees = 0;
+      this.ipsAisees = [];
       return null;
     }
     this.aisees++;
+    this.ipsAisees.push(ips);
     const attente = maintenant - this.debut < DEBUT ? 3 : AISEES_POUR_MONTER;
     if (this.aisees < attente || this.cran === 0) return null;
     const haut = this.cran - 1;
     if (maintenant < this.interditJusqua[haut]) return null;
-    // (assez de marge pour un cran qui coûte jusqu'à 30 % de plus ? Quand l'écran plafonne
-    // le rythme, on ne le sait pas : on essaie)
-    const plafonne = ips >= ipsEcran * 0.95;
-    if (!plafonne && ips / 1.3 < LENT) return null;
+    // (assez de marge ? On prend la plus lente de ces secondes à l'aise — la scène change, une
+    // seconde rapide ne dit rien — et ce que le cran du dessus coûte de plus. Quand l'écran
+    // plafonne le rythme, on ne connaît pas la marge : on essaie)
+    const pire = Math.min(...this.ipsAisees);
+    const plafonne = pire >= ipsEcran * 0.93;
+    const prevu = (pire * this.couts[this.cran]) / this.couts[haut];
+    if (!plafonne && prevu < AISE) return null;
     this.monte = { quand: maintenant, vers: haut };
     return this.aller(haut, maintenant, 'aise');
   }
@@ -180,6 +199,7 @@ export class Regulateur {
     this.cran = cran;
     this.lentes = 0;
     this.aisees = 0;
+    this.ipsAisees = [];
     this.fenetre = null;
     this.calmeJusqua = maintenant + CALME;
     this.changeDepuis = maintenant;

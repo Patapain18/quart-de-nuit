@@ -18,7 +18,7 @@
 // par-dessus bord s'il n'est pas attaché quand le bateau se couche.
 import * as THREE from 'three';
 import { Monde3D, QUALITES } from './rendu/monde3d.js';
-import { Regulateur, CRANS, DERNIER_CRAN } from './rendu/regulateur.js';
+import { Regulateur, CRANS, DERNIER_CRAN, COUTS } from './rendu/regulateur.js';
 import { nomCarteGraphique, sansCarteGraphique, derniereVerification } from './rendu/capacites.js';
 import { Vent } from './monde/vent.js';
 import { Grains } from './monde/grains.js';
@@ -382,7 +382,9 @@ function garderCran(maintenant) {
 }
 function appliquerQualiteChoisie(nom) {
   if (nom === 'auto') {
-    regulateur ??= new Regulateur({ cran: cranDeDepart(), maintenant: performance.now() });
+    // (ce que coûte chaque cran dépend de l'écran : deux pixels par point, ou un seul)
+    const couts = devicePixelRatio >= 1.5 ? COUTS.retina : COUTS.ordinaire;
+    regulateur ??= new Regulateur({ cran: cranDeDepart(), maintenant: performance.now(), couts });
     appliquerCran(regulateur.cran);
   } else {
     regulateur = null;

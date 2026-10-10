@@ -654,6 +654,125 @@ siennes sous une autre clé, avec un numéro de version, et vérifie les options
 sur `main` : https://patapain18.github.io/quart-de-nuit/ — la nuit seule remplace l'ancien jeu, qui
 reste dans git (étiquette `v1-journee-et-nuit`).
 
+### Chantier « Partout » ✅ (10 octobre 2026)
+
+**Le but** : que le jeu tourne bien sur un ordinateur modeste (il était réglé sur le Mac de
+Mathis, un M4 Pro), et qu'il dise clairement quand il ne peut pas tourner du tout. Fait sur la
+branche `partout`, en trois étapes, puis versé dans `main`.
+
+**Ce que coûte une image** — mesuré sur le Mac (écran Retina 120 Hz, fenêtre de 1280×800 points),
+la nuit, à 3 h. Pour chronométrer la carte graphique, il faut l'attendre : `gl.finish()` ne suffit
+pas (Chrome n'attend pas vraiment : le ciel « coûtait » 0,05 ms) ; on lit un pixel, ce qui oblige
+tout le dessin d'avant à être fini (`monde.attendreCarte()`, dont se sert `__jeu.profiler()`).
+
+| En Haute (1920×1200 pixels) | par image |
+|---|---|
+| la carte graphique : la scène (mer, bateau, pluie) et son halo | 6,4 ms |
+| la carte graphique : le ciel (nuages, cube des reflets) | 3,0 ms |
+| la carte graphique : préparer la mer | 0,5 ms |
+| le processeur (le calcul du jeu, la houle étant dans son fil) | 2,4 ms |
+
+Environ 2,5 ms de travail de la carte graphique restent quelle que soit la taille de l'image (les
+maillages du bateau, les ombres, la mer et ses 267 000 sommets, le cube des reflets) : baisser le
+nombre de pixels ne suffit donc pas, il faut aussi des réglages plus légers. Et sur un écran
+ordinaire (un pixel par point), les qualités Économique à Haute ont toutes le même nombre de pixels :
+elles ne changeaient presque rien au coût.
+
+**Un faux ordinateur lent**, pour essayer sans en avoir : `jeu.html?frein-carte=3` (la carte
+graphique refait trois fois les nuages et la scène : 120 → 68 → 47 → 34 images par seconde pour un
+frein de 1 à 4) et `?frein-processeur=4` (tout le calcul du processeur, dans la boucle et dans le fil
+de la houle, prend quatre fois plus de temps). Ils ne remplacent pas un vrai ordinateur modeste,
+mais montrent comment le jeu réagit.
+
+**Étape 1 — la houle qui doublait le travail.** Quand le fil de la houle avait du retard (un
+processeur lent), le jeu recalculait toute la mer lui-même, au pire moment. En direct, il garde
+maintenant la mer de l'image d'avant (un quart de seconde au plus) et demande au fil la mer de
+l'instant où sa réponse arrivera. Processeur 4 fois plus lent : 66 → 88 images par seconde, les
+images les plus lentes passent de 25 à 17 ms, et la mer avance 6 images sur 10. Les outils d'essai,
+qui enchaînent les images sans rendre la main au navigateur, calculent toujours tout eux-mêmes.
+
+**Étape 2 — la qualité Auto** (`src/rendu/regulateur.js`), la qualité par défaut. Le jeu choisit
+lui-même un cran parmi huit, et le règle en jouant pour tenir 60 images par seconde :
+
+| cran | qualité | finesse | coût (Retina) | coût (écran ordinaire) |
+|---|---|---|---|---|
+| 0 | Haute | 100 % | 1 | 1 |
+| 1 | Moyenne | 100 % | 0,70 | 0,91 |
+| 2 | Économique | 100 % | 0,41 | 0,75 |
+| 3 | Économique | 85 % | 0,32 | 0,62 |
+| 4 | Économique | 70 % | 0,28 | 0,53 |
+| 5 | Minimale | 70 % | 0,23 | 0,43 |
+| 6 | Minimale | 60 % | 0,20 | 0,38 |
+| 7 | Minimale | 50 % | 0,18 | 0,33 |
+
+La *finesse* est la part des pixels de l'écran que l'on dessine, en largeur et en hauteur (70 % : la
+moitié des pixels) ; le navigateur agrandit ensuite l'image, un peu plus floue. *Minimale* ne se
+choisit pas soi-même : les nuages en quart de résolution, la mer à 192 rayons (plus grossière de
+près), des ombres de 512 pixels, moins de pluie et d'embruns. Les coûts sont mesurés en freinant la
+carte graphique 4 fois (pour que ce soit elle qui compte) ; d'un essai à l'autre, ils varient de
+30 % (la scène change). Du premier au dernier cran, la carte graphique travaille 5,6 fois moins sur
+un écran Retina, 3 fois moins sur un écran ordinaire.
+
+Le régulateur juge chaque seconde le temps entre deux images (ce que l'œil voit : le calcul comme
+le dessin) :
+- **trop lent** (moins de 54 images par seconde, deux secondes de suite) : un cran plus bas (deux
+  sous 36). Sous 54, un écran à 60 Hz montre certaines images deux fois : la mer avance par
+  à-coups — mieux vaut un cran plus léger à 60 bien réguliers ;
+- **longtemps à l'aise** (8 secondes ; 3 pendant les 20 premières) : il essaie le cran au-dessus,
+  s'il prévoit d'y tenir 58 images par seconde — d'après la plus lente de ces secondes (la scène
+  change : une seconde rapide ne dit rien) et ce que coûte le cran du dessus (le tableau, selon
+  l'écran) — ou si c'est l'écran qui plafonne le rythme (alors on ne connaît pas la marge : on
+  essaie). Trop lent dans les 10 secondes, c'est un échec : il redescend aussitôt, et ne réessaie
+  ce cran qu'une minute plus tard (puis deux, quatre, cinq au plus : la nuit change, ce qui était
+  trop lourd peut ne plus l'être) ;
+- **une descente qui ne change rien** (moins de 4 % de gain, deux fois de suite) : ce n'est pas la
+  carte graphique qui freine — le processeur, l'écran, un navigateur qui économise la batterie et
+  plafonne à 30 images par seconde. Il remonte d'où il venait, et ne redescend plus d'une minute
+  (puis quatre, puis plus de la partie) ;
+- **le processeur au bout** (le calcul prend plus de 85 % de l'image) : il ne descend pas ;
+- après chaque changement, une seconde et demie sans juger ; rien quand l'onglet est caché (le
+  navigateur y ralentit exprès les images).
+
+Le cran trouvé est gardé d'une partie à l'autre (`quart-de-nuit:auto`) ; la première fois, on
+part selon le nom de la carte graphique (Intel intégrée : Économique ; sans carte graphique : le
+dernier cran ; sinon : Moyenne). Changer de cran coûte de 1 à 6 ms (57 ms la première fois). La
+fenêtre des options dit où en est le jeu (« qualité Minimale, image dessinée à 50 % puis agrandie —
+75 images par seconde »), comme le compteur de fluidité (`jeu.html?perf`). Les anciens joueurs
+passent en Auto une fois (les options gardées ont maintenant un numéro de version) ; on peut
+toujours choisir une qualité soi-même.
+
+`npm run test-regulateur` lui fait vivre des parties de 5 minutes sur des ordinateurs pour rire
+(une carte graphique plus ou moins rapide, un processeur, un écran souple ou strict à 30, 60 ou
+120 Hz, une scène dont le coût saute de ±30 % toutes les quelques secondes, un ordinateur qui ne
+coûte pas ce que croit le tableau), sur écran Retina et ordinaire : 64 vérifications. Dans le jeu,
+sur le Mac : de Moyenne, il passe en Haute en 4,5 s (106 images par seconde) ; la carte graphique
+freinée 4 fois, il s'arrête en Économique (75) ; freinée 8 fois, il descend en Minimale en
+20 secondes (70 à 80). Freinée 6 fois, relevé seconde par seconde pendant 80 s : la scène varie
+de 55 à 100 images par seconde d'une seconde à l'autre ; avant la règle de « la plus lente des
+secondes », il changeait 11 fois de cran (il remontait sur une seconde à 89 images/s, puis devait
+redescendre) ; après, 4 fois, en descendant seulement, sans essai raté.
+
+**Étape 3 — ceux qui ne peuvent pas** (`src/rendu/capacites.js`, `src/entree.js`). Avant de lancer
+quoi que ce soit, le jeu essaie sur une petite toile à part ce qu'il demande : WebGL 2, et le droit
+de dessiner dans des images « à virgule » (`EXT_color_buffer_float` : la lumière de la nuit, du noir
+d'encre à l'éclair, ne tient pas dans les 256 niveaux d'une image ordinaire). S'il manque l'un ou
+l'autre, l'accueil devient un message : pourquoi, et quoi faire (un navigateur à jour, où réactiver
+l'accélération graphique dans Chrome, Edge et Firefox, le pilote à mettre à jour), au lieu d'une page
+noire. Un navigateur qui dessine sans carte graphique (il refuse la toile quand on exclut les « gros
+défauts de performance », ou son moteur s'appelle SwiftShader, llvmpipe…) peut jouer, prévenu que ce
+sera très lent. Si la carte graphique lâche en pleine partie (trop de travail d'un coup, la mise en
+veille, un pilote qui redémarre), le jeu s'arrête, coupe le son, rend la souris et propose de
+recharger la page (la nuit reprendra au début de l'heure, quand elle est gardée). Pour voir ces
+messages : `jeu.html?impossible=webgl2`, `?impossible=flottants`, `?sans-carte`.
+
+**Ce que je n'ai pas pu vérifier** : tout est mesuré sur un seul ordinateur, rapide. Je n'ai essayé
+ni une vraie petite carte graphique (Intel intégrée), ni Windows, ni Firefox, ni Safari. Sur une
+carte graphique dix à vingt fois plus lente que celle du Mac, même le dernier cran pourrait rester
+sous 30 images par seconde : il faudrait alors alléger ce qui coûte quelle que soit la taille de
+l'image (les cent maillages de la timonerie et de la cabine, l'ombre redessinée à chaque image, le
+cube des reflets) — en le mesurant sur un tel ordinateur. Quand la carte graphique lâche, on ne
+tente pas de la reprendre sans recharger (il faudrait tout refaire : chaque image, chaque shader).
+
 ## 4. Le moteur (ce qu'on garde de l'ancien jeu)
 
 Tout ce qui fait l'image, le son et la physique reste, et sert la nouvelle nuit. Le détail de

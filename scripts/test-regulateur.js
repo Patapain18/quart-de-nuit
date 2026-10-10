@@ -3,7 +3,7 @@
 // carte graphique plus ou moins rapide, un processeur, un écran. À chaque image, l'ordinateur
 // met le temps de son morceau le plus lent (le dessin ou le calcul), arrondi au rythme de son
 // écran ; le régulateur voit passer ces images, comme dans le jeu, et choisit son cran.
-import { Regulateur, CRANS, DERNIER_CRAN } from '../src/rendu/regulateur.js';
+import { Regulateur, CRANS, DERNIER_CRAN, COUTS } from '../src/rendu/regulateur.js';
 
 let echecs = 0;
 const verifier = (condition, message) => {
@@ -11,15 +11,8 @@ const verifier = (condition, message) => {
   if (!condition) echecs++;
 };
 
-// Ce que coûte chaque cran à la carte graphique, comparé au premier : mesuré sur le Mac de
-// Mathis (1280×800, la carte graphique freinée 4 fois pour que ce soit elle qui compte),
-// sur son écran Retina et comme sur un écran ordinaire (un pixel par point) — voir
-// DESIGN.md, « Partout ». Sur un écran ordinaire, les premiers crans gagnent peu (la
-// qualité Haute n'y a déjà pas plus de pixels que la Moyenne).
-const COUTS = {
-  retina: [1, 0.7, 0.41, 0.32, 0.28, 0.23, 0.2, 0.18],
-  ordinaire: [1, 0.91, 0.75, 0.62, 0.53, 0.43, 0.38, 0.33],
-};
+// Ce que coûte chaque cran à la carte graphique, comparé au premier (COUTS : mesuré sur le
+// Mac, voir regulateur.js) ; l'ordinateur pour rire suit le même tableau que le régulateur
 let COUT = COUTS.retina;
 
 // (un hasard qui se répète d'une fois à l'autre)
@@ -35,8 +28,10 @@ function hasard(graine) {
 // (images par seconde) ; stricte : l'image attend le prochain passage de l'écran (16,7 ou
 // 33,3 ms…) au lieu de partir dès qu'elle est prête ; charge(s) : la scène plus ou moins
 // lourde au fil de la partie. Rend le cran à chaque instant et les changements.
-function partie({ carte, processeur = 3, ecran = 60, stricte = false, secondes = 300, cran = 1, charge = () => 1, graine = 7 }) {
-  const r = new Regulateur({ cran, maintenant: 0 });
+// (vrais : ce que coûte vraiment chaque cran à cet ordinateur, quand il ne suit pas le
+// tableau du régulateur)
+function partie({ carte, processeur = 3, ecran = 60, stricte = false, secondes = 300, cran = 1, charge = () => 1, graine = 7, vrais = COUT }) {
+  const r = new Regulateur({ cran, maintenant: 0, couts: COUT });
   const h = hasard(graine);
   const periode = 1000 / ecran;
   const crans = []; // (le cran, seconde par seconde)
@@ -44,7 +39,7 @@ function partie({ carte, processeur = 3, ecran = 60, stricte = false, secondes =
   let t = 0;
   let prochainAcoup = 4000;
   while (t < secondes * 1000) {
-    const dessin = carte * COUT[r.cran] * charge(t / 1000) * (0.94 + 0.12 * h());
+    const dessin = carte * vrais[r.cran] * charge(t / 1000) * (0.94 + 0.12 * h());
     const calcul = processeur * (0.94 + 0.12 * h());
     let travail = Math.max(dessin, calcul);
     // (de temps en temps, un à-coup : le ramasse-miettes, un shader à préparer…)
@@ -142,6 +137,27 @@ for (const [ecran, couts] of Object.entries(COUTS)) {
     verifier(apres < pendant, `et remonte après : cran ${apres}`);
     verifier(p.ips(110, 200) > 55, `pendant : ${p.ips(110, 200).toFixed(0)} images/s`);
     verifier(p.changements() <= 12, `${p.changements()} changement(s) en tout (${raconter(p)})`);
+  }
+
+  console.log('Une scène qui change tout le temps (±30 % toutes les quelques secondes, comme une vraie nuit)');
+  {
+    // (la charge saute au hasard entre 0,7 et 1,3, toutes les 2 à 6 secondes)
+    const h = hasard(11);
+    const sauts = [];
+    for (let s = 0, c = 1; s < 400; s += 2 + 4 * h()) sauts.push([s, (c = 0.7 + 0.6 * h())]);
+    const charge = (s) => sauts.findLast(([d]) => d <= s)?.[1] ?? 1;
+    const p = partie({ carte: 40, secondes: 400, charge });
+    const parMinute = (p.changements(60, 400) / 340) * 60;
+    verifier(parMinute <= 2, `peu de changements : ${parMinute.toFixed(1)} par minute après la première (${p.changements()} en tout)`);
+    verifier(p.ips(60, 400) > 54, `${p.ips(60, 400).toFixed(0)} images/s en moyenne`);
+  }
+
+  console.log('Un ordinateur qui ne coûte pas ce que croit le régulateur (l\'autre tableau)');
+  {
+    const vrais = ecran === 'retina' ? COUTS.ordinaire : COUTS.retina;
+    const p = partie({ carte: 30, vrais });
+    verifier(p.changements(100) <= 3, `il finit par se poser : ${p.changements(100)} changement(s) en 200 s (${raconter(p)})`);
+    verifier(p.ips(100, 300) > 55, `${p.ips(100, 300).toFixed(0)} images/s`);
   }
 
   console.log('On repart d\'où l\'on était : un cran gardé d\'une partie à l\'autre, trop bas');
