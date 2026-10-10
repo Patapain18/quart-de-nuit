@@ -12,9 +12,10 @@ const pas = 1 / 30;
 // (un bateau pour rire : sa barre, et son safran bien dans l'eau)
 const bateau = (barre = 0) => ({ barre, tenueSafran: 1 });
 // faire tourner les systèmes t secondes (vent, mer, heure ; barre : la barre du pilote en
-// fonction du temps ; jusqua : on s'arrête dès que c'est vrai — et la fonction rend quand)
-function tourner(sy, t, { eau = { cale: 0, cockpit: 0 }, vent = 38, mer = 5, heure = 26, barre = (s) => 0.1 * Math.sin(s * 2), jusqua = null } = {}) {
-  const b = bateau();
+// fonction du temps ; jusqua : on s'arrête dès que c'est vrai — et la fonction rend quand ;
+// voilier : ce qu'on veut changer au bateau pour rire, le foc qui bat…)
+function tourner(sy, t, { eau = { cale: 0, cockpit: 0 }, vent = 38, mer = 5, heure = 26, barre = (s) => 0.1 * Math.sin(s * 2), jusqua = null, voilier = {} } = {}) {
+  const b = { ...bateau(), ...voilier };
   const evts = [];
   evts.quand = null;
   for (let s = 0; s < t; s += pas) {
@@ -150,6 +151,43 @@ console.log('Les vitres et les volets');
   const sansCourant = new Systemes();
   sansCourant.batterie.charge = 0;
   verifier(!sansCourant.fermerVolets('avant', true), 'sans courant, les volets ne bougent pas');
+}
+
+console.log('Les volets, les portes de FNAF');
+{
+  const sy = new Systemes({ hasard: () => 0.5 });
+  sy.basculerDisjoncteur('pilote'); // (sans le pilote, ce que tire le bord ne bouge plus)
+  tourner(sy, 1);
+  const ouverts = sy.consommation();
+  sy.fermerVolets('arriere', true);
+  sy.fermerVolets('tribord', true);
+  tourner(sy, 3);
+  const tenus = sy.consommation() - ouverts;
+  verifier(Math.abs(tenus - 2 * CONSO.voletsTenus) < 0.05, `fermés, leurs moteurs les tiennent : deux côtés tirent ${tenus.toFixed(1).replace('.', ',')} A de plus`);
+  sy.basculerDisjoncteur('volets');
+  verifier(sy.protection('arriere') === 0.5 && Math.abs(sy.consommation() - ouverts) < 0.05, 'leur disjoncteur coupé, ils ne tirent plus rien… et ne protègent plus qu\'à moitié');
+  for (let k = 0; k < 2; k++) sy.frapper(1, 170, 1, 0.9);
+  const forcees = sy.vitres.filter((v) => v.cote === 'arriere');
+  const tenue = new Systemes({ hasard: () => 0.5 });
+  tenue.fermerVolets('arriere', true);
+  tourner(tenue, 3);
+  for (let k = 0; k < 2; k++) tenue.frapper(1, 170, 1, 0.9);
+  verifier(forcees.some((v) => v.integrite < 1) && tenue.vitres.filter((v) => v.cote === 'arriere').every((v) => v.integrite === 1),
+    `deux grosses vagues : derrière des volets tenus, rien ; derrière des volets que plus rien ne tient, les vitres s'abîment (${forcees.map((v) => pourcent(v.integrite)).join(', ')})`);
+}
+
+console.log('Ce qui fait forcer le pilote');
+{
+  const travail = (options) => {
+    const sy = new Systemes();
+    tourner(sy, 30, { vent: 40, barre: () => 0, ...options });
+    return sy.pilote.travail;
+  };
+  const base = travail({});
+  const foc = travail({ voilier: { ecouteFocLibre: true, deroule: 0.15 } });
+  const plein = travail({ eau: { cale: 0, cockpit: 750 } });
+  verifier(Math.abs(foc / base - PILOTE.focBat) < 0.01, `le foc qui bat secoue le bateau : le pilote force ${(foc / base).toFixed(2).replace('.', ',')} fois plus`);
+  verifier(plein / base > 1.8 && travail({ eau: { cale: 0, cockpit: 250 } }) === base, `le cockpit plein d'eau (750 L) alourdit l'arrière : ${(plein / base).toFixed(2).replace('.', ',')} fois plus (rien sous 300 L)`);
 }
 
 console.log('Garder, reprendre');

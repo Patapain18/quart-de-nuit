@@ -19,6 +19,10 @@ function tournees() {
     { nom: 'la porte de la timonerie', chemin: [[0, 3.3]], geste: 'descente' },
     // dehors : l'enrouleur, puis le tour du pont
     { nom: 'la bosse d\'enrouleur', chemin: [[0, 4.4], [0.6, 4.3]], geste: 'enrouleur' },
+    // (les dalots, aux coins arrière du cockpit : on contourne la roue, d'un mètre de large)
+    { nom: 'le dalot tribord, derrière la roue', chemin: [[0.7, 4.8], [0.75, 5.7]], geste: 'dalots-tribord' },
+    { nom: 'le dalot bâbord', chemin: [[0, 5.82], [-0.35, 5.8]], geste: 'dalots' },
+    { nom: 'revenir devant la roue', chemin: [[0.75, 5.7], [0.7, 4.8], [0.6, 4.4]], geste: null },
     {
       nom: 'le pied de l\'étai, par tribord',
       chemin: [[0.6, 4.4], [1.2, 4.4], [1.65, 4.4], [1.7, 2.4], [1.6, 0.5], [1.4, -1.5], [0.9, -3.5], [0.35, -5.3], [0.12, zDe(0.93)]],

@@ -20,6 +20,7 @@ export const OPTIONS_DE_BASE = {
   volume: 0.8, // le son : 0 → 1
   voix: true, // Jos parle (sinon : seulement les sous-titres)
   sousTitres: true, // les sous-titres de la radio
+  bruits: false, // les bruits qui comptent, écrits à l'écran (les vagues qu'on entend venir, et d'où)
   aide: true, // les touches, en bas à gauche
   barreAssistee: true, // Q et D donnent le cap, la barre le tient (sinon : la vraie barre)
   difficulte: 'marin', // la dernière difficulté choisie pour la nuit

@@ -186,10 +186,14 @@ const jeu = {
     }
     physique.deroule = THREE.MathUtils.clamp(physique.deroule + sens * 0.22, 0, 1);
   },
-  // passer une nouvelle écoute de foc (à l'avant), réarmer le pilote (au tableau)
+  // passer une nouvelle écoute de foc (à l'avant), réarmer le pilote (au tableau), dégager les
+  // dalots (dans le cockpit, derrière la roue)
   reparer(nom) {
     if (!nuit?.reparer(nom, contexteNuit(0))) return false;
-    afficherMessage(nom === 'pilote' ? 'Disjoncteur réarmé : le pilote reprend la barre' : 'Nouvelle écoute de foc passée');
+    afficherMessage({
+      pilote: 'Disjoncteur réarmé : le pilote reprend la barre',
+      dalots: 'Dalots dégagés : le cockpit se vide. Attends qu\'il soit vide pour rouvrir la porte : son eau entrerait avec toi',
+    }[nom] ?? 'Nouvelle écoute de foc passée');
     audio.clic?.();
     return true;
   },
@@ -467,7 +471,11 @@ function sonScelerate() {
   const w = nuit?.scelerates?.vague;
   if (!w || !w.faites.has('grondement')) return { scelerate: 0, deferle: 0 };
   const d = w.distance;
-  return { scelerate: d >= 0 ? 1 - Math.min(1, d / 1000) : Math.max(0, 1 + d / 260), deferle: w.v.deferle };
+  return {
+    scelerate: d >= 0 ? 1 - Math.min(1, d / 1000) : Math.max(0, 1 + d / 260), deferle: w.v.deferle,
+    // (on l'entend venir de son côté)
+    panScelerate: panDepuis(nuit.scelerates.direction().clone().negate()),
+  };
 }
 
 // ---------- La simulation (appelée par le monde 3D une fois la houle calculée) ----------
@@ -629,8 +637,9 @@ function simuler(dt) {
     temps: monde.temps,
   });
   bateau.allumerFeux((sy ? sy.alimente('feux') : etat.feux) ? 1 : 0);
-  // les vitres de la timonerie (fendues, brisées)
+  // les vitres de la timonerie (fendues, brisées) ; les dalots du cockpit (bouchés)
   if (sy) bateau.montrerVitres(sy.vitres.map((v) => v.etat));
+  bateau.montrerDalots(nuit?.avaries.dalots === 'bouches', physique.eauCockpit);
   // le baromètre du bord : il montre la pression d'ici ; le bateau qui tape dans la mer décolle
   // son aiguille
   barometre.maj(dt, pressionIci(), { secousse: etat.mouvement ?? 0, heure: heureIci(), passe: (h) => pressionDuJour(h - 1.15) });
@@ -723,6 +732,7 @@ function simuler(dt) {
     pompeElectrique: sy?.pompe.marche ?? false,
     voletsBougent: !!sy && sy.alimente('volets') && COTES_VOLETS.some((c) => sy.volets[c].fraction !== sy.volets[c].cible),
     alarmes: sy?.alarmes ?? null,
+    dalotsBouches: nuit?.avaries.dalots === 'bouches',
   });
   etat.attenteClaque = Math.max(0, etat.attenteClaque - dt);
   if (m.impactEtrave > 0.05 && etat.attenteClaque === 0) {
@@ -1126,17 +1136,36 @@ function commencerNuit({ reprise = null, heure = null } = {}) {
   }
   nuit
     .on('journal', majCarnet)
-    .on('heure', (h) => {
-      if (h > HEURE_DEBUT || reprise) annoncer(h === HEURE_DEBUT ? 'Minuit' : 'La nuit', heureRonde(h));
+    .on('heure', (h, signe) => {
+      if (h > HEURE_DEBUT || reprise) annoncer(h === HEURE_DEBUT ? 'Minuit' : signe, heureRonde(h));
       majCarnet();
       // (la partie est gardée au début de chaque heure)
       garderPartie({ heure: h, graine: nuit.graine, sauvegarde: nuit.instantaneAGarder(), journal: nuit.journal.slice(-40) });
     })
     .on('deferlante-annonce', (a) => {
-      audio.deferlante?.(a.force, a.dans, panDepuis(a.vers.clone().negate()));
+      // (son grondement commence quand on peut l'entendre : tout de suite, ou au dernier moment
+      // quand le moteur le couvre ; sa crête, on la voit courir vers nous dès maintenant)
+      audio.deferlante?.(a.force, a.dans, panDepuis(a.vers.clone().negate()), a.entendue);
       monde.deferlantes.annoncer(a);
-      if (a.force > 0.9 && etat.mode === 'pied' && marin.dehors) afficherMessage(`Une grosse déferlante, ${cotePar(a.vers)} ! Tiens-toi (Maj)`);
     })
+    .on('deferlante-entendue', (a) => {
+      if (a.force > 0.9 && etat.mode === 'pied' && marin.dehors) afficherMessage(`Une grosse déferlante, ${cotePar(a.vers)} ! Tiens-toi (Maj)`);
+      // (la première grosse qu'on entend : ce que veut dire ce grondement — une seule fois)
+      else if (a.force > 0.8 && !premieresFois.has('grondement')) {
+        premieresFois.add('grondement');
+        afficherMessage(`Ce grondement : une grosse déferlante arrive, ${cotePar(a.vers)}. Ferme vite les volets de ce côté (la commande est au plafond) !`);
+      }
+      if (a.force >= 0.6) sousTitrer(`[${a.force > 1 ? 'Une énorme déferlante gronde' : 'Une déferlante gronde'}, ${cotePar(a.vers)}]`);
+    })
+    .on('deferlante-eclair', (a) => {
+      // un éclair loin derrière sa crête : elle se découpe, blanche, sur le ciel (la crête court
+      // à 12 m/s : elle est à 12 × a.dans mètres)
+      if (monde.ecl.nuit < 0.3) return;
+      const p = physique.position;
+      const loin = 12 * a.dans + 450;
+      monde.eclairSur(p.x - a.vers.x * loin, p.z - a.vers.z * loin);
+    })
+    .on('scelerate', (w) => sousTitrer(`[Un grondement énorme, ${directionRelative(w.relatif)}]`, 5))
     .on('deferlante', (f) => {
       etat.calme = 0;
       secousse(0.35 + f.force * 0.9);
@@ -1154,7 +1183,8 @@ function commencerNuit({ reprise = null, heure = null } = {}) {
       if (nom === 'pilote') audio.alarme?.();
       else audio.dechirure?.(nom === 'ecouteFoc' ? 'claque' : 'dechire');
       afficherMessage({
-        ecouteFoc: 'L\'écoute du foc a cassé : il bat ! Sors le rouler (la bosse d\'enrouleur, dans le cockpit)',
+        ecouteFoc: 'L\'écoute du foc a cassé : il bat ! Il secoue le bateau et le pilote force : sors le rouler (la bosse d\'enrouleur, dans le cockpit)',
+        dalots: 'Le cockpit ne se vide plus : ses dalots sont bouchés ! Son eau passe sous la porte : sors les dégager (à l\'arrière du cockpit, derrière la roue)',
         foc: 'Le foc s\'est déchiré',
         pilote: raison === 'surchauffe'
           ? 'Alarme : le pilote a trop chauffé, son disjoncteur a sauté ! Il se réarme au tableau… une fois refroidi'
@@ -1344,6 +1374,7 @@ function afficherHeure() {
   if (brisees) alertes.push(`${brisees} vitre${brisees > 1 ? 's' : ''} brisée${brisees > 1 ? 's' : ''}`);
   else if (fendues) alertes.push(`${fendues} vitre${fendues > 1 ? 's' : ''} fendue${fendues > 1 ? 's' : ''}`);
   if (nuit.avaries.ecouteFoc === 'cassee' && physique.deroule > 0.03) alertes.push('Le foc bat');
+  if (nuit.avaries.dalots === 'bouches') alertes.push('Dalots bouchés');
   if (bateau.descenteOuverte) alertes.push('Porte ouverte');
   // (la batterie, sous l'heure, comme le courant qui reste dans FNAF ; le moteur qui tourne)
   const batterie = sy.courant ? `Batterie ${Math.round(sy.batterie.charge * 100)} %${sy.moteurEnMarche ? ' · moteur' : ''}` : 'Batterie —';
@@ -1362,6 +1393,11 @@ function basculerCarnet() {
   document.getElementById('carnet').hidden = !etat.carnet;
   if (etat.carnet) majCarnet();
 }
+// (ses consignes se déroulent à la molette — même quand la souris est prise par le jeu)
+document.addEventListener('wheel', (e) => {
+  if (!etat.carnet || e.target.closest?.('#carnet')) return;
+  document.querySelector('#carnet .gauche').scrollTop += e.deltaY;
+}, { passive: true });
 function majCarnet() {
   const journal = document.getElementById('carnet-journal');
   journal.innerHTML = (nuit?.journal ?? []).slice(-16).map((e) => `<li><span class="h">${heureEnTexte(e.heure)}</span><span>${e.texte}</span></li>`).join('');
@@ -1458,6 +1494,18 @@ function majAide() {
   const liste = AIDE[etat.mode] ?? AIDE.poste;
   document.getElementById('aide-touches').innerHTML = liste.map(([t, d]) => `<dt>${t}</dt><dd>${d}</dd>`).join('')
     + '<dt>Échap</dt><dd>pause</dd>';
+}
+
+// Les bruits qui comptent (une vague qu'on entend venir, et d'où), écrits à l'écran : seulement
+// si on l'a demandé (les options : pour jouer sans le son), au-dessus des sous-titres de la radio
+let minuterieBruit = null;
+function sousTitrer(texte, duree = 3.2) {
+  const b = document.getElementById('bruits');
+  if (!options.bruits || !b) return;
+  b.textContent = texte;
+  b.hidden = false;
+  clearTimeout(minuterieBruit);
+  minuterieBruit = setTimeout(() => { b.hidden = true; }, duree * 1000);
 }
 
 let minuterieMessage = null;
@@ -1581,7 +1629,7 @@ const TEXTES_QUALITE = {
   haute: 'L\'image prévue : il faut un ordinateur assez récent.',
   superbe: 'Le plus fin (écran Retina) : pour un ordinateur puissant.',
 };
-const CASES = ['inverser', 'secousses', 'gouttes', 'clignotements', 'sousTitres'];
+const CASES = ['inverser', 'secousses', 'gouttes', 'clignotements', 'sousTitres', 'bruits'];
 {
   const zone = document.getElementById('choix-qualite');
   for (const [id, q] of Object.entries(QUALITES)) {

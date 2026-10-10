@@ -13,7 +13,7 @@ import { Radar } from './radar.js';
 import { PaquetDeMer } from './paquet-de-mer.js';
 import { Electronique } from './electronique.js';
 import { mouillerLesVitres } from './vitres.js';
-import { zDe, demiLargeur, COCKPIT, MAT, hauteurLivet, hauteurPont } from './forme.js';
+import { zDe, demiLargeur, COCKPIT, MAT, hauteurLivet, hauteurPont, DALOTS_COCKPIT } from './forme.js';
 import { LARGEUR_BATTANT } from './timonerie.js';
 
 export class Bateau {
@@ -46,6 +46,7 @@ export class Bateau {
     this.radar = new Radar(this, this.interieur); // (sur la console de la timonerie, et son répétiteur dans le cockpit)
     this.electronique = new Electronique(this, this.interieur, this.instruments); // (le traceur, le pilote)
     this.paquet = new PaquetDeMer(this); // (l'eau verte qui balaie le pont quand une déferlante frappe)
+    this.creerDalots();
     this.eauABord = new EauABord(this); // l'eau embarquée (la nuit de tempête)
     this.descenteOuverte = true;
     this.ouvrirDescente(true);
@@ -120,6 +121,66 @@ export class Bateau {
       c.felure.visible = etat === 'fendue';
       c.eclats.visible = etat === 'brisee';
     });
+  }
+
+  // Les dalots du cockpit : ses deux trous d'évacuation (75 mm), aux coins arrière du plancher,
+  // derrière la roue, sous leur grille. Quand une déferlante les bouche (vers 4 h 30), un paquet
+  // de cordage arraché et un lambeau de la housse de la roue sont plaqués dessus.
+  creerDalots() {
+    const C = COCKPIT;
+    const z = zDe(C.uArriere) - 0.14;
+    const y = C.plancher + 0.004;
+    this.dalots = DALOTS_COCKPIT.map((x) => new THREE.Vector3(x, y, z));
+    for (const p of this.dalots) {
+      // (la grille : un disque noir, et ses barreaux d'inox)
+      const grille = new THREE.Mesh(new THREE.CircleGeometry(0.055, 20).rotateX(-Math.PI / 2), this.materiaux.noir);
+      grille.position.copy(p);
+      grille.name = 'dalot';
+      this.groupe.add(grille);
+      for (const dx of [-0.03, 0, 0.03]) {
+        const barreau = new THREE.Mesh(new THREE.BoxGeometry(0.008, 0.004, 0.09), this.materiaux.inox);
+        barreau.position.set(p.x + dx, y + 0.002, p.z);
+        barreau.name = 'dalot';
+        this.groupe.add(barreau);
+      }
+    }
+    // ce qui les bouche : le paquet de cordage (deux boucles écrasées et un bout qui traîne vers
+    // l'autre dalot) et le lambeau de housse, bleu marine, plaqué par l'eau
+    const bouchon = new THREE.Group();
+    bouchon.name = 'dalots-bouches';
+    const [a, b] = this.dalots;
+    for (const [r, dy, rot] of [[0.075, 0.02, 0.3], [0.06, 0.04, 1.4]]) {
+      const boucle = new THREE.Mesh(new THREE.TorusGeometry(r, 0.012, 6, 22), this.materiaux.cordage);
+      boucle.rotation.set(-Math.PI / 2 + 0.25, 0, rot);
+      boucle.scale.set(1, 0.6, 1);
+      boucle.position.set(a.x + 0.02, a.y + dy, a.z - 0.01);
+      bouchon.add(boucle);
+    }
+    const trajet = new THREE.CatmullRomCurve3([
+      new THREE.Vector3(a.x + 0.06, a.y + 0.02, a.z),
+      new THREE.Vector3(a.x * 0.3, a.y + 0.012, a.z - 0.09),
+      new THREE.Vector3(b.x * 0.4, b.y + 0.012, b.z + 0.03),
+      new THREE.Vector3(b.x - 0.02, b.y + 0.015, b.z - 0.01),
+    ]);
+    bouchon.add(new THREE.Mesh(new THREE.TubeGeometry(trajet, 40, 0.011, 6), this.materiaux.cordage));
+    const toile = new THREE.PlaneGeometry(0.26, 0.2, 6, 5);
+    const pos = toile.attributes.position;
+    for (let i = 0; i < pos.count; i++) pos.setZ(i, 0.012 * Math.sin(pos.getX(i) * 40 + pos.getY(i) * 23) + 0.006 * Math.cos(pos.getY(i) * 61));
+    toile.computeVertexNormals();
+    const lambeau = new THREE.Mesh(toile, new THREE.MeshStandardMaterial({ color: 0x1e2c44, roughness: 0.9, side: THREE.DoubleSide }));
+    lambeau.rotation.set(-Math.PI / 2, 0, 0.5);
+    lambeau.position.set(b.x, b.y + 0.016, b.z);
+    bouchon.add(lambeau);
+    bouchon.visible = false;
+    this.groupe.add(bouchon);
+    this.bouchonDalots = bouchon;
+  }
+
+  // Les dalots bouchés (ou dégagés) ; litres : l'eau du cockpit (ce qui les bouche flotte à
+  // moitié, juste sous sa surface : on le voit, même le cockpit plein)
+  montrerDalots(bouches, litres = 0) {
+    if (this.bouchonDalots.visible !== bouches) this.bouchonDalots.visible = bouches;
+    if (bouches) this.bouchonDalots.position.y = Math.max(0, Math.min(0.5, litres / 2100) - 0.025);
   }
 
   // Le levier de la pompe de cale (angle en radians, de -0,7 à 0,7 : de haut en bas ; il

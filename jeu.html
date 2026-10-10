@@ -40,22 +40,25 @@
         <p class="bateau">Voilier <em>Morgane</em> · au large de Kervalen</p>
         <h3>Ce qu'il faut surveiller</h3>
         <ul id="carnet-consignes">
+          <li><strong>Chaque heure est pire.</strong> Les déferlantes viennent de plus en plus souvent, et de plus en plus grosses. On les entend gronder avant qu'elles frappent, <em>du côté d'où elles viennent</em> ; la nuit, un éclair montre parfois leur crête.</li>
           <li><strong>Le courant.</strong> La batterie (sa jauge est au tableau électrique, sur la console, et sous l'heure) : tout ce qui est électrique la vide, le pilote surtout. Coupe au tableau ce dont tu peux te passer. Vide, tout s'éteint.</li>
-          <li><strong>Le moteur</strong> (son tableau, à gauche de la console). Il recharge la batterie et soulage le pilote… mais il chauffe dans la grosse mer, et il couvre tous les bruits : on n'entend plus venir les vagues. Sans courant, il ne démarre plus.</li>
+          <li><strong>Le moteur</strong> (son tableau, à gauche de la console). Il recharge la batterie et soulage le pilote… mais il chauffe dans la grosse mer, et il couvre tous les bruits : tant qu'il tourne, on n'entend plus les vagues qu'au dernier moment. Sans courant, il ne démarre plus.</li>
           <li><strong>Le pilote.</strong> Il chauffe quand il force (sa température est sur son écran) ; trop chaud, il disjoncte et le bateau se met en travers des vagues. En veille, il refroidit. Son disjoncteur se réarme au tableau, une fois refroidi.</li>
           <li><strong>L'eau à bord.</strong> La pompe électrique se met en route toute seule, tant qu'il y a du courant. Pour voir l'eau, soulève la trappe du plancher (derrière le siège, à bâbord) ; la pompe à main est juste à côté. Si l'eau atteint les batteries, c'est le noir : pompe à la main, puis réarme le coupe-batterie (la clé rouge, derrière la pompe).</li>
-          <li><strong>Les vitres et leurs volets.</strong> Chaque vague qui frappe un côté fend ses vitres si leurs volets sont ouverts ; fendue, la suivante la brise, et la mer entre. La commande des volets est au plafond, devant le siège… mais volets fermés, on ne voit plus dehors, et sans courant, ils ne bougent plus.</li>
-          <li><strong>La porte de la timonerie.</strong> Fermée : sinon, les vagues qui remplissent le cockpit entrent à l'intérieur.</li>
-          <li><strong>Le foc.</strong> S'il se met à battre, sors le rouler : la bosse d'enrouleur est dans le cockpit, à tribord. Dehors, accroche toujours ton harnais (X), et tiens-toi (Maj) quand une vague arrive.</li>
+          <li><strong>Les vitres et leurs volets.</strong> Chaque vague qui frappe un côté fend ses vitres si leurs volets sont ouverts ; fendue, la suivante la brise, et la mer entre. La commande des volets est au plafond, devant le siège : ferme le côté d'où tu entends venir une grosse vague. Mais volets fermés, on ne voit plus dehors ; leurs moteurs les tiennent serrés, ils tirent un peu sur la batterie ; et sans courant, plus rien ne les tient : la mer les force.</li>
+          <li><strong>La porte de la timonerie.</strong> Fermée : sinon, les vagues qui remplissent le cockpit entrent à l'intérieur. Cockpit plein, n'ouvre pas : son eau entrerait avec toi.</li>
+          <li><strong>Le foc.</strong> S'il se met à battre, il secoue le bateau et le pilote force : sors le rouler (la bosse d'enrouleur est dans le cockpit, à tribord). Dehors, accroche toujours ton harnais (X), et tiens-toi (Maj) quand une vague arrive.</li>
+          <li><strong>Les dalots du cockpit.</strong> S'ils se bouchent, le cockpit ne se vide plus : son eau passe sous la porte, et l'arrière alourdi fait forcer le pilote. Sors les dégager, aux coins arrière du cockpit, derrière la roue.</li>
         </ul>
       </div>
       <div class="page droite">
         <h3>Journal de la nuit</h3>
         <ol id="carnet-journal"></ol>
-        <p class="fermer"><kbd>L</kbd> fermer le carnet</p>
+        <p class="fermer">molette : faire défiler les consignes · <kbd>L</kbd> fermer le carnet</p>
       </div>
     </aside>
     <p id="annonce" aria-hidden="true"></p>
+    <p id="bruits" hidden aria-live="polite"></p>
     <p id="sous-titres" hidden aria-live="polite"></p>
     <p id="message" role="status"></p>
   </div>
@@ -133,6 +136,7 @@
         <legend>Son</legend>
         <label class="curseur">Volume <output id="v-volume"></output><input type="range" id="o-volume" min="0" max="1" step="0.05"></label>
         <label class="case"><input type="checkbox" id="o-sousTitres"> Les sous-titres de la radio</label>
+        <label class="case"><input type="checkbox" id="o-bruits"> Écrire les bruits qui comptent (les vagues qu'on entend venir, et d'où) : pour jouer sans le son</label>
       </fieldset>
       <button type="submit" class="principal" value="fermer">Fermer</button>
     </form>

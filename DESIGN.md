@@ -53,31 +53,37 @@ arrivent, chacune avec ses signes et sa parade :
 | L'eau qui monte (les fuites s'aggravent d'heure en heure, chaque vague en apporte) | l'alarme de cale, l'eau noire qu'on voit monter par la trappe, vers les batteries | la pompe électrique (elle tire sur la batterie) ; la pompe à main ; noyées, les batteries coupent tout |
 | Le pilote qui chauffe, puis disjoncte (de plus en plus, la nuit avançant) | sa température sur son écran, son alarme, le bateau qui se met en travers | le moteur le soulage ; en veille, il refroidit ; son disjoncteur se réarme au tableau, une fois froid |
 | Le moteur qui chauffe | sa température, son alarme ; il se coupe tout seul | l'arrêter avant ; et tant qu'il tourne, on n'entend plus venir les vagues |
-| Les vitres | une vague qui frappe un côté les fend (le claquement, la toile d'araignée), la suivante les brise | fermer les volets de ce côté — mais derrière, on ne voit plus |
-| Les déferlantes | leur grondement, de leur côté ; l'éclair qui les montre | fermer la porte ; se tenir (Maj) dehors |
-| Le foc qui bat (son écoute casse) | son claquement, le bateau qui part | sortir le rouler, harnais accroché |
-| La trombe, vers 3 h 30 | l'écho au radar, et rien d'autre : on ne la voit qu'à la lueur des éclairs | tenir |
+| Les vitres | une vague qui frappe un côté les fend (le claquement, la toile d'araignée), la suivante les brise | fermer les volets de ce côté — mais derrière, on ne voit plus, et fermés ils tirent sur la batterie |
+| Les déferlantes (une toutes les 40 s à minuit, toutes les 12 s à 5 h) | leur grondement, de leur côté, de 2,5 s (les petites) à 6 s (les plus grosses) avant le choc — le moteur le couvre : on ne l'entend plus qu'au dernier tiers ; la nuit, un éclair montre la crête des plus grosses | fermer les volets de ce côté ; la porte ; se tenir (Maj) dehors |
+| Le foc qui bat (son écoute casse, vers 3 h) | son claquement, le bateau qui part, le pilote qui chauffe plus vite (il force 1,6 fois plus) | sortir le rouler, harnais accroché |
+| Les dalots bouchés (vers 4 h 30) | le cockpit reste plein (on le voit par la porte et les fenêtres arrière), on n'entend plus l'eau s'écouler ; l'alarme de cale | sortir les dégager, derrière la roue — sans rouvrir la porte tant que le cockpit est plein |
+| La trombe (née vers 3 h 30, elle passe vers 4 h 15, à 150 m au moins) | l'écho au radar, et rien d'autre : on ne la voit qu'à la lueur des éclairs | tenir |
 | Deux vagues scélérates (2 h 30, 5 h 20) | un grondement énorme, une minute avant ; un éclair montre le mur | tenir |
 | La foudre | les éclairs, le tonnerre de plus en plus proche, le feu de Saint-Elme | réarmer ce qui a sauté |
 | L'inexpliqué | un écho qui suit, des pas sur le pont, une voix sur le 16, des coups sous la coque… | rien : ce n'est jamais confirmé |
 
 **Les volets de tempête** sont les portes de FNAF : on les ferme côté par côté, depuis le siège,
-quand une vague arrive de ce côté-là… mais volet fermé, on ne voit plus rien de ce côté, et sans
-courant ils ne bougent plus. **Le moteur** est la grande tentation : il recharge la batterie et
+quand une vague arrive de ce côté-là… mais volet fermé, on ne voit plus rien de ce côté ; leurs
+moteurs les tiennent serrés contre la mer (1,5 A par côté fermé) ; et sans courant (ou leur
+disjoncteur coupé), ils ne bougent plus, et plus rien ne les tient : la mer les force, ils ne
+protègent plus qu'à moitié. (Sinon, il suffirait de tout fermer pour la nuit.) **Le moteur** est la grande tentation : il recharge la batterie et
 soulage le pilote, mais il chauffe, et tant qu'il tourne on n'entend plus le grondement qui
 annonce les vagues (on les entend venir de leur côté : c'est ce qui dit quels volets fermer).
 
 ### Les heures
 
-| | Le vent | Ce qui arrive |
-|---|---|---|
-| minuit | 32 nœuds, la mer déjà grosse | on prend ses marques |
-| 1 h | 35 | un premier grain passe ; le pilote lâche une première fois |
-| 2 h | 38 | une voix sur le 16 ; la première vague scélérate (vers 2 h 30) ; l'écoute du foc casse |
-| 3 h | 41 | la trombe, vers 3 h 30, dans le noir |
-| 4 h | 43 | le front passe vers 4 h 30 : le vent tourne de 25°, la mer croise |
-| 5 h | 46 | le plus fort : le grain le plus violent, la seconde vague scélérate, des coups sous la coque |
-| 6 h | il tombe enfin | la première lueur : la nuit est finie |
+Comme les nuits de FNAF, chacune plus dure que la précédente (`HEURES`, dans `quart/nuit.js`).
+Quand elle sonne, l'heure s'affiche avec son signe, et le journal le note.
+
+| | Son signe | Le vent | Les déferlantes | Ce qui arrive |
+|---|---|---|---|---|
+| minuit | « La mer est déjà grosse. » | 32 nœuds | une toutes les 40 s, ×0,85 | on prend ses marques |
+| 1 h | « Le baromètre baisse. » | 35 | toutes les 32 s, ×0,9 | un premier grain passe |
+| 2 h | « La mer se creuse. » | 38 | toutes les 26 s, ×0,95 | une voix sur le 16 ; la première vague scélérate (vers 2 h 30) |
+| 3 h | « Des éclairs, tout autour. » | 41 | toutes les 15 s, ×1 (la scélérate les fait taire un quart d'heure) | l'écoute du foc casse (la première sortie) ; la trombe naît vers 3 h 30, dans le noir |
+| 4 h | « Le baromètre n'a jamais été si bas. » | 43 | toutes les 17 s, ×1,05 | la trombe passe, à 150 m au moins ; le front vers 4 h 30 (le vent tourne de 25°, la mer croise) ; les dalots se bouchent (la seconde sortie) |
+| 5 h | « Le vent hurle dans le gréement. » | 46 | toutes les 12 s, ×1,1 | le plus fort : le grain le plus violent, la seconde vague scélérate, des coups sous la coque |
+| 6 h | | il tombe enfin | | la première lueur : la nuit est finie |
 
 La nuit est gardée au début de chaque heure : après un naufrage, on reprend à cette heure-là
 (ou à minuit).
@@ -106,7 +112,7 @@ ligne reste l'ancien tant que le nouveau n'est pas jouable.
 3. ✅ **Les systèmes du bord** — la batterie et ce qui la vide, le moteur qui la recharge mais couvre
    les bruits, l'eau qui monte et les deux pompes, le pilote qui chauffe et disjoncte, les volets
    et les vitres qui éclatent ; les veilleurs automatiques pour régler la difficulté.
-4. **Les heures** — chaque heure plus dure, chaque menace annoncée par ses signes (le grondement
+4. ✅ **Les heures** — chaque heure plus dure, chaque menace annoncée par ses signes (le grondement
    qui vient d'un côté, le radar, l'éclair qui montre la vague) ; les deux sorties forcées.
 5. **L'inexpliqué et l'ambiance** — l'écho qui suit, les coups sous la coque, une voix sur la
    VHF, une forme au sondeur ; les notes de l'ancien propriétaire du bateau pour apprendre les
@@ -277,6 +283,90 @@ un vrai joueur qu'à eux. Les sons sont fonctionnels, ils seront repris à l'ét
 
 **À voir** : `docs/systemes-*.jpg` (la console, le tableau électrique, celui du moteur, les vitres
 fendues vues du cockpit, et le noir quand le courant meurt).
+
+### Étape 4 : les heures ✅ (10 octobre 2026)
+
+**Chaque heure plus dure** (`HEURES`, dans `quart/nuit.js`) : chaque heure a son signe (« Le
+baromètre baisse. », « Le vent hurle dans le gréement. »…), écrit à l'écran quand elle sonne et
+noté au journal, et sa mer : une déferlante toutes les 40 s à minuit, toutes les 12 s à 5 h, et de
+plus en plus grosses (×0,85 à ×1,1). Les déferlantes viennent maintenant à un rythme régulier
+(l'attente entre deux est tirée autour de la période de l'heure) : avec l'ancien tirage (une
+chance par seconde), une nuit pouvait en jeter cinq à minuit et deux à 1 h.
+
+**Chaque menace annoncée par ses signes** :
+- une déferlante gronde dès qu'elle s'annonce, de son côté : 2,5 s avant le choc pour les petites,
+  6 s pour les plus grosses (`preavis`, dans `monde/deferlantes.js`) — le temps de fermer les
+  volets de ce côté, qui mettent 2,5 s à descendre. Mais **le moteur couvre son grondement** : tant
+  qu'il tourne, on ne l'entend plus que dans le dernier tiers (`ENTENDRE`), trop tard pour les
+  volets. Sa crête, elle, court toujours vers le bateau, et on peut la voir… volets ouverts ;
+- la nuit, sous l'orage, les plus grosses (force 0,8 et plus) se découpent trois fois sur quatre
+  sur un éclair, 3,2 s avant de frapper (`ECLAIR_VAGUE`) ;
+- la vague scélérate gronde elle aussi de son côté (on l'entend à 980 m, le moteur en marche à
+  600 m) ;
+- la première grosse vague qu'on entend, un message dit ce que veut dire ce grondement (une seule
+  fois) ; et pour jouer sans le son, une option écrit les bruits qui comptent (« [Une déferlante
+  gronde, par la hanche tribord] »), décochée d'abord : on joue à l'oreille.
+
+**Les volets coûtent quelque chose**, comme les portes de FNAF : fermés, leurs moteurs les tiennent
+serrés (1,5 A par côté) ; sans courant, la mer les force (ils ne protègent plus qu'à moitié). Sans
+cela, il suffisait de tout fermer pour la nuit.
+
+**Les deux sorties forcées** :
+- **le foc qui bat** (son écoute casse vers 3 h, souvent dans la rafale du deuxième grain) : il
+  secoue le bateau, le pilote force 1,6 fois plus et chauffe — sortir le rouler ;
+- **les dalots bouchés**, vers 4 h 30 (le front est passé, la mer croise ; s'il y a la trombe à
+  moins de 300 m, quand elle est passée) : la première déferlante qui remplit le cockpit y jette un
+  bout de cordage et un lambeau de la housse de la roue. Le cockpit ne se vide plus (6 % de ses
+  dalots) ; plein, son eau passe sous la porte fermée (un litre par seconde par 90 L au-dessus de
+  300 L : jusqu'à 5 L/s, plus que la pompe électrique) et l'arrière alourdi fait forcer le pilote
+  (jusqu'à 1,9 fois à 750 L). Il faut sortir, contourner la roue, et tenir E quatre secondes sur
+  l'un des deux dalots (aux coins arrière du cockpit) — et ne pas rouvrir la porte tant que le
+  cockpit est plein : 220 L entrent le temps de passer. Ce qui les bouche flotte sous la surface,
+  le bruit de l'eau qui s'écoule se tait, l'heure affiche « Dalots bouchés ».
+
+**Ce qui a changé en route** :
+- le cockpit restait plein toute la nuit, même sans dalots bouchés : ses dalots de 5 L/s ne
+  suivaient pas une vague toutes les 15 s. Ils font maintenant 75 mm, comme sur un 14 m de haute
+  mer (12 L/s à 500 L : plein, le cockpit se vide en une minute trois quarts), et les petites
+  déferlantes soulèvent l'arrière sans presque rien jeter à bord (l'eau embarquée suit
+  maintenant leur force au-delà de 0,3) ;
+- la trombe : personne ne barre, mais le moteur change l'allure du bateau, et elle finissait par
+  passer sur lui (33 m à l'étape 3, 12 m pour un veilleur sans pilote, qui dérivait). Elle s'écarte
+  maintenant de sa route, de côté, pour passer à 150 m au moins (`ecarterBete`) : on la sent, elle
+  ne vient pas sur nous ;
+- **la nuit pâlissait dès 4 h 10** : le ciel gardait la date de l'ancien jeu (la fin août, le soleil
+  levé à 5 h 16). Les deux heures les plus dures se jouaient donc dans l'aube, et les éclairs qui
+  montrent les vagues ne s'y voyaient pas. La nuit est maintenant celle du 10 octobre (la
+  déclinaison du soleil à −7°) : noire jusqu'à 5 h 20, la première lueur à 6 h ;
+- le carnet de bord coupait la moitié de ses consignes (1 164 px de texte pour une page de 580) : la
+  page se déroule à la molette, même quand la souris est prise par le jeu.
+
+**Les veilleurs entendent comme toi** : une vague, ils ne la connaissent qu'à son grondement (le
+moteur en marche, trop tard), et il leur faut 0,4 s pour réagir. L'attentif garde donc fermés,
+tant que le moteur tourne, les volets du côté d'où viennent les vagues ; il sort dégager les dalots
+au bout de huit secondes, et attend dehors, attaché, que le cockpit se vide avant de rouvrir la
+porte. Le distrait sort au bout d'une minute, sans s'attacher.
+
+**Mesuré** (`npm run test-heures`, 21 vérifications ; `npm run test-systemes`, 42 ;
+`npm run test-nuit` ; quatre nuits, graines 3, 5, 7 et 11) :
+- les déferlantes de l'attentif, d'heure en heure, en moyenne : 3 ; 3,75 ; 4,75 ; 5 ; 7,75 ; 7 (à
+  5 h, la seconde scélérate les fait taire un moment), et les grosses : 0,75 ; 0,25 ; 0,75 ; 1,25 ;
+  1,5 ; 2. Sur la nuit d'essai (graine 3) : 7 de minuit à 2 h, 14 de 4 h à 6 h ;
+- **l'attentif voit l'aube 4 fois sur 4**, sans jamais perdre le courant (batterie au plus bas
+  38 %), sans une vitre brisée, avec 114 à 231 L d'eau à bord au plus ; ses dalots se bouchent entre
+  4 h 40 et 4 h 58 et il les a dégagés huit minutes plus tard ; la trombe passe à 112-276 m ;
+- **le distrait coule 4 fois sur 4, mais tard** (entre 4 h 35 et 5 h 26 : à l'étape 3, il voyait
+  l'aube deux fois sur trois) ; **l'absent coule entre 3 h 12 et 3 h 58** ;
+- tous les essais passent ; les essais de marche, 20 sur 20 (les deux dalots, derrière la roue).
+
+**Limites** : un joueur entendra moins bien que les veilleurs (sur des haut-parleurs d'ordinateur,
+la gauche et la droite se distinguent mal : un casque aide) ; les sons des vagues et du moteur
+sont encore ceux de l'étape 3, ils seront repris à l'étape 6 ; l'eau du cockpit est presque
+transparente vue de près. Le distrait ne voit plus jamais l'aube : la nuit est dure pour qui ne
+ferme pas les volets et laisse la porte ouverte — mais on reprend toujours au début de l'heure.
+
+**À voir** : `docs/heures-*.jpg` (5 h qui sonne, dans le noir ; les dalots bouchés, vus accroupi
+dans le cockpit ; l'éclair qui montre une grosse déferlante, 2,7 s avant qu'elle frappe).
 
 ## 4. Le moteur (ce qu'on garde de l'ancien jeu)
 

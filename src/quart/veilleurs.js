@@ -6,21 +6,27 @@
 // le dos). Chacun a sa façon de veiller (les systèmes du bord : quart/systemes.js) :
 //  - l'attentif garde la porte fermée et son harnais ; il lance le moteur quand la batterie
 //    baisse ou que le pilote chauffe (et l'arrête avant qu'il ne chauffe trop) ; il ferme les
-//    volets du côté d'où vient une grosse vague, et les rouvre après ; il pompe à la main
-//    quand l'eau monte malgré la pompe électrique ; il réarme le pilote dès qu'il peut ; il
-//    sort rouler le foc qui bat ;
+//    volets du côté d'où il entend venir une grosse vague, et les rouvre après — et tant que
+//    le moteur tourne (il n'entendrait rien venir à temps), il garde fermés ceux du côté d'où
+//    viennent les vagues ; il pompe à la main quand l'eau monte malgré la pompe électrique ;
+//    il réarme le pilote dès qu'il peut ; il sort rouler le foc qui bat, et dégager les
+//    dalots bouchés ;
 //  - le distrait ne lance le moteur qu'à l'alarme de la batterie, ne touche pas aux volets,
-//    pompe tard, réarme le pilote au bout d'une minute, laisse parfois la porte ouverte ;
+//    pompe tard, réarme le pilote au bout d'une minute, laisse parfois la porte ouverte, sort
+//    tard (sans s'attacher) ;
 //  - l'absent ne fait rien du tout (la pompe électrique travaille pour lui… tant qu'il y a
 //    du courant).
+// Ils n'en savent pas plus qu'un joueur : une vague, ils ne la connaissent que quand ils
+// l'entendent (quart/nuit.js : ENTENDRE — le moteur en marche, trop tard), et il leur faut le
+// temps de réagir. Quand ils sortent, ils ouvrent la porte (l'eau du cockpit plein entre).
 // Tous font la même nuit : même mer, mêmes rafales, mêmes déferlantes (même graine).
 import { Vector3 } from 'three';
 import { PhysiqueVoilier } from '../physique/voilier.js';
 import { reglerAutomatiquement } from '../physique/regleur.js';
 import { Houle, CASCADES } from '../mer/houle.js';
 import { Vent } from '../monde/vent.js';
-import { etatMer } from '../monde/meteo.js';
-import { Nuit } from './nuit.js';
+import { etatMer, angleVers } from '../monde/meteo.js';
+import { Nuit, ENTENDRE, EAU } from './nuit.js';
 import { COTES, exposition, BATTERIE, MOTEUR, EAU_BATTERIES } from './systemes.js';
 
 const ecartAngle = (a, b) => ((a - b + 540) % 360) - 180;
@@ -41,7 +47,12 @@ export const VEILLEURS = {
     // le moteur : lancé quand la batterie descend sous 45 % ou que le pilote chauffe, arrêté
     // quand elle est pleine ou qu'il chauffe trop
     moteur: { batterie: [0.45, 0.92], pilote: 0.78 },
-    volets: true, // il ferme les volets du côté d'une grosse vague
+    volets: true, // il ferme les volets du côté d'une grosse vague qu'il entend
+    voletsMoteur: true, // (et, le moteur en marche, ceux du côté d'où viennent les vagues)
+    reaction: 0.4, // s entre le grondement et sa main sur le bouton des volets
+    dalots: 8, // s avant de sortir dégager les dalots bouchés
+    degager: 9, // s dehors pour y aller, les dégager, revenir
+    attendreQueCaSeVide: true, // (dégagés, il attend dehors que le cockpit se vide avant de rouvrir la porte)
   },
   distrait: {
     nom: 'le distrait',
@@ -51,6 +62,8 @@ export const VEILLEURS = {
     rouleLeFoc: 90,
     moteur: { batterie: [BATTERIE.faible, 0.7], pilote: null },
     volets: false,
+    dalots: 60,
+    degager: 12,
     // (de temps en temps, il laisse la porte ouverte un moment)
     porteOuverte: (nuit) => (Math.floor(nuit.t / 50) % 4) === 1,
   },
@@ -62,8 +75,11 @@ export const VEILLEURS = {
     rouleLeFoc: null,
     moteur: null,
     volets: false,
+    dalots: null,
   },
 };
+// (la porte reste ouverte le temps de passer : en sortant, en rentrant)
+const PASSER_LA_PORTE = 1.2;
 
 // Le pilote (ou la barre lâchée) : il garde l'angle du vent ; sans lui, la barre revient au
 // milieu et le bateau finit par se mettre en travers
@@ -100,7 +116,7 @@ export function jouerLaNuit({
     Object.assign(b, TOILE_DE_NUIT);
     const e = {
       cle, veilleur, nuit, b, vent: new Vent(21 + graine), attentePilote: 0, attenteFoc: 0, pompe: false,
-      avaries: [], fin: null, dehors: 0, voletsJusqua: 0,
+      avaries: [], fin: null, dehors: 0, voletsJusqua: 0, attenteDalots: 0, travailDalots: 0, attenteVidange: 0, porte: 0, etaitDehors: false,
       serie: { t: [], heure: [], vent: [], hs: [], gite: [], vitesse: [], cale: [], cockpit: [], batterie: [], pilote: [], moteur: [], moteurEnMarche: [] },
       deferlantes: [], scelerates: [],
     };
@@ -134,7 +150,7 @@ export function jouerLaNuit({
       if (e.fin) continue;
       const { b, nuit, veilleur } = e;
       const m = b.mesures;
-      const aBord = { ...veilleur.aBord, descenteOuverte: veilleur.aBord.descenteOuverte || !!veilleur.porteOuverte?.(nuit), dehors: e.dehors > 0 };
+      const aBord = { ...veilleur.aBord, descenteOuverte: veilleur.aBord.descenteOuverte || !!veilleur.porteOuverte?.(nuit) || e.porte > 0, dehors: e.dehors > 0 };
       const ctx = { dt: pas, m, physique: b, houle, mode: 'pied', aBord, evenements: [] };
       e.ctx = ctx;
       nuit.maj(pas, ctx);
@@ -159,16 +175,27 @@ export function jouerLaNuit({
         if (!sy.moteurEnMarche && sy.moteur.etat === 'arrete' && (charge < mo.batterie[0] || chaud) && sy.moteur.temperature < MOTEUR.refroidi) sy.demarrerMoteur();
         if (sy.moteurEnMarche && ((charge > mo.batterie[1] && sy.pilote.temperature < (mo.pilote ?? 2) - 0.15) || sy.moteur.temperature > MOTEUR.alarme + 0.04)) sy.arreterMoteur();
       }
-      // les volets : une grosse vague s'annonce, il ferme ceux de son côté ; il les rouvre
-      // quelques secondes après
+      // les volets : il entend une grosse vague venir (ou la vague scélérate gronder), il ferme
+      // ceux de son côté ; il les rouvre quelques secondes après. Le moteur en marche, il
+      // n'entendrait rien venir à temps : il garde fermés ceux du côté d'où viennent les vagues.
       if (veilleur.volets) {
+        const menaces = [];
         const a = nuit.deferlantes.annonce;
+        if (a && a.force > 0.55 && a.dans <= a.entendue - veilleur.reaction) menaces.push(a.vers);
         const w = nuit.scelerates?.vague;
-        const menace = a && a.force > 0.55 ? a.vers : w && w.distance < 900 && w.distance > -60 ? nuit.scelerates.direction() : null;
-        if (menace) {
-          const local = menace.clone().applyQuaternion(b.orientation.clone().invert());
-          const angle = (Math.atan2(Math.abs(local.x), local.z) * 180) / Math.PI;
-          for (const c of COTES) if (exposition(c, angle, local.x > 0 ? -1 : 1) > 0.25 && !sy.voletsFermes(c)) sy.fermerVolets(c, true);
+        const portee = sy.moteurEnMarche ? ENTENDRE.scelerateMoteur : ENTENDRE.scelerate;
+        if (w && w.distance < portee - 80 && w.distance > -60) menaces.push(nuit.scelerates.direction());
+        if (veilleur.voletsMoteur && sy.moteur.etat !== 'arrete') {
+          const av = angleVers(nuit.meteo.directionVent);
+          menaces.push(new Vector3(Math.cos(av), 0, Math.sin(av)));
+        }
+        if (menaces.length) {
+          const inverse = b.orientation.clone().invert();
+          for (const menace of menaces) {
+            const local = menace.clone().applyQuaternion(inverse);
+            const angle = (Math.atan2(Math.abs(local.x), local.z) * 180) / Math.PI;
+            for (const c of COTES) if (exposition(c, angle, local.x > 0 ? -1 : 1) > 0.25 && !sy.voletsFermes(c)) sy.fermerVolets(c, true);
+          }
           e.voletsJusqua = nuit.t + 7;
         } else if (nuit.t > e.voletsJusqua) {
           for (const c of COTES) if (sy.voletsFermes(c)) sy.fermerVolets(c, false);
@@ -176,7 +203,7 @@ export function jouerLaNuit({
       }
       // les batteries noyées : l'eau redescendue, il réarme le coupe-batterie
       if (veilleur.pompe && sy.batterie.coupee && nuit.eau.cale < EAU_BATTERIES.mouillees) sy.rearmerBatterie(nuit.eau.cale);
-      // le foc bat (son écoute a cassé) : il sort le rouler
+      // les sorties forcées. Le foc bat (son écoute a cassé) : il sort le rouler
       if (nuit.avaries.ecouteFoc === 'cassee' && b.deroule > 0.02 && veilleur.rouleLeFoc !== null) {
         e.attenteFoc += pas;
         if (e.attenteFoc > veilleur.rouleLeFoc) {
@@ -184,7 +211,32 @@ export function jouerLaNuit({
           b.deroule = Math.max(0, b.deroule - 0.22 * pas);
         }
       }
+      // les dalots sont bouchés : il sort les dégager (le temps d'y aller, d'enlever ce qui les
+      // bouche, de revenir)
+      if (nuit.avaries.dalots === 'bouches' && veilleur.dalots !== null) {
+        e.attenteDalots += pas;
+        if (e.attenteDalots > veilleur.dalots) {
+          e.dehors = Math.max(e.dehors, 2);
+          e.travailDalots += pas;
+          if (e.travailDalots >= veilleur.degager - 2) {
+            nuit.reparer('dalots', ctx);
+            e.attenteVidange = veilleur.attendreQueCaSeVide ? 30 : 0;
+          }
+        }
+      }
+      // (l'attentif reste dehors, attaché, le temps que le cockpit se vide sous le seuil de la porte)
+      if (e.attenteVidange > 0) {
+        e.attenteVidange -= pas;
+        if (nuit.eau.cockpit > EAU.seuil) e.dehors = Math.max(e.dehors, 0.5);
+        else e.attenteVidange = 0;
+      }
       e.dehors = Math.max(0, e.dehors - pas);
+      // (il passe la porte : en sortant, en rentrant — elle reste ouverte un instant)
+      if ((e.dehors > 0) !== e.etaitDehors) {
+        e.etaitDehors = e.dehors > 0;
+        e.porte = PASSER_LA_PORTE;
+      }
+      e.porte = Math.max(0, e.porte - pas);
       piloter(b, sy.piloteEnMarche, pas);
       reglerAutomatiquement(b, pas);
       // la pompe à main : 4 litres par seconde, quand il y a trop d'eau (en plus de la pompe

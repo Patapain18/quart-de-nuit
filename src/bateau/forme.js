@@ -40,6 +40,8 @@ export const COCKPIT = {
   demiLargeurPuits: 0.95, // le puits entre les bancs
   hiloire: 0.24, // les hiloires dépassent du pont de 24 cm
 };
+// Les dalots du cockpit : ses deux trous d'évacuation, aux coins arrière du plancher (x)
+export const DALOTS_COCKPIT = [-0.68, 0.68];
 export const ROUF = {
   uArriere: 0.2,
   uAvant: 0.64,

@@ -12,7 +12,7 @@
 // qu'elle aboutisse : passer une nouvelle écoute de foc demande 6 secondes, tout à l'avant).
 // (« dedans » : un geste qu'on ne fait que de l'intérieur de la timonerie)
 import { Vector3 } from 'three';
-import { COCKPIT, TIMONERIE, zDe, hauteurPont, hauteurLivet } from '../bateau/forme.js';
+import { COCKPIT, TIMONERIE, DALOTS_COCKPIT, zDe, hauteurPont, hauteurLivet } from '../bateau/forme.js';
 import { SIEGE, surPupitre } from '../bateau/interieur-timonerie.js';
 import { UW_ENROULEUR } from '../bateau/modele.js';
 import { NOMS_DISJONCTEURS } from '../quart/systemes.js';
@@ -37,6 +37,23 @@ export function creerGestes(jeu, interieur) {
       titre: () => 'Bosse d\'enrouleur (le foc)',
       principal: { texte: 'rouler le foc', maintenir: true, faire: (dt) => jeu.enrouler(-dt) },
     },
+    // les dalots du cockpit, aux coins arrière du plancher, derrière la roue : bouchés (vers
+    // 4 h 30), on les dégage à la main, dans l'eau du cockpit (il faut tenir quatre secondes) ;
+    // un seul suffit à dégager l'autre (le bout qui les bouche passe de l'un à l'autre)
+    ...DALOTS_COCKPIT.map((x) => ({
+      id: x < 0 ? 'dalots' : 'dalots-tribord',
+      point: new Vector3(x, COCKPIT.plancher + 0.15, zDe(COCKPIT.uArriere) - 0.19),
+      rayon: 0.3,
+      soi: ['dalot', 'dalots-bouches', 'cockpit', 'cockpit-teck', 'eau-cockpit'],
+      titre: () => (jeu.nuit?.avaries.dalots === 'bouches' ? 'Les dalots du cockpit : bouchés !' : `Le dalot ${x < 0 ? 'bâbord' : 'tribord'} du cockpit`),
+      principal: {
+        texte: 'les dégager',
+        duree: 4,
+        possible: () => jeu.nuit?.avaries.dalots === 'bouches',
+        refus: () => 'Les dalots sont dégagés : l\'eau du cockpit s\'écoule',
+        faire: () => jeu.reparer('dalots'),
+      },
+    })),
     {
       // tout à l'avant, au pied de l'étai : le tambour de l'enrouleur et le point d'écoute
       // du foc roulé (pour passer une nouvelle écoute quand elle a cassé)

@@ -1,20 +1,27 @@
 // La nuit de tempête : de minuit à six heures. Seul à bord, pas de radio pour t'aider : le
 // pilote tient le bateau vent arrière, les vagues dans le dos, et toi, tu le gardes en vie
 // jusqu'à l'aube. Six heures de deux minutes chacune (douze minutes en tout) ; chaque heure
-// est pire que la précédente : le vent monte de 32 à 46 nœuds, la mer se creuse, les
-// déferlantes et les fuites se multiplient, les grains passent, chargés d'éclairs.
+// est pire que la précédente, comme les nuits de FNAF (HEURES) : le vent monte de 32 à 46
+// nœuds, la mer se creuse, les déferlantes viennent plus souvent et plus grosses, les fuites se
+// multiplient, les grains passent, chargés d'éclairs.
 //
 // Ce qui arrive pendant la nuit :
-//  - les déferlantes frappent le bateau (on les entend venir quelques secondes avant) ;
-//  - l'eau embarque : le cockpit se remplit et se vide par ses nables, la cabine prend
-//    l'eau si la porte de la timonerie est ouverte, le bateau « travaille » et suinte de
-//    plus en plus ; on pompe ;
+//  - les déferlantes frappent le bateau ; chacune s'annonce par ses signes : son grondement,
+//    de son côté, quelques secondes avant (les plus grosses, plus tôt ; le moteur le couvre :
+//    on ne l'entend plus qu'au dernier moment), et pour les plus grosses, un éclair qui montre
+//    leur crête ;
+//  - l'eau embarque : le cockpit se remplit et se vide par ses dalots, la cabine prend l'eau
+//    si la porte de la timonerie est ouverte (et sous la porte fermée, quand le cockpit est
+//    plein), le bateau « travaille » et suinte de plus en plus ; on pompe ;
 //  - les systèmes du bord (quart/systemes.js) : la batterie que tout vide, le moteur qui la
 //    recharge mais chauffe et couvre les bruits, le pilote qui chauffe et disjoncte (on le
 //    réarme au tableau, une fois refroidi), la pompe électrique, les vitres que les vagues
 //    fendent puis brisent si leurs volets sont ouverts ;
-//  - des avaries : l'écoute du foc qui casse (le foc bat : il faut sortir le rouler), la
-//    foudre ou une vague scélérate qui font sauter le pilote ;
+//  - des avaries, et deux sorties forcées dans la tempête : l'écoute du foc qui casse vers 3 h
+//    (le foc bat, il secoue le bateau et fait forcer le pilote : il faut sortir le rouler) ; les
+//    dalots du cockpit bouchés vers 4 h 30 (le cockpit ne se vide plus, l'eau passe sous la
+//    porte : il faut sortir les dégager) ; la foudre ou une vague scélérate qui font sauter le
+//    pilote ;
 //  - des grains : des averses d'orage qui passent, chacune avec sa rafale (monde/grains.js) ;
 //  - la foudre, qui part de leurs nuages (monde/foudre.js), et peut tomber tout près — ou sur
 //    le mât ;
@@ -35,7 +42,7 @@
 // eclair, noir, danger, calme. (Le pilote, le moteur, la batterie : this.systemes.)
 import { Vector3 } from 'three';
 import { AMBIANCES, etatMeteo, interpoler, angleVers } from '../monde/meteo.js';
-import { Deferlantes } from '../monde/deferlantes.js';
+import { Deferlantes, preavis } from '../monde/deferlantes.js';
 import { Scelerates, chocScelerate } from '../monde/scelerates.js';
 import { Grains, PORTEUR } from '../monde/grains.js';
 import { Foudre } from '../monde/foudre.js';
@@ -67,6 +74,43 @@ const secondesDe = (heures) => heures * DUREE_HEURE;
 // servira à d'autres nuits : la première, la plus dure…)
 export const NIVEAU = { deferlantes: 1, force: 1, fuite: 1, avaries: 1, scelerates: 2, hauteurScelerate: 20, grains: 1 };
 
+// ---------- Les heures ----------
+// Comme les nuits de FNAF, chaque heure est plus dure que la précédente. Pour chacune : le
+// signe qu'on remarque quand elle sonne (dit à l'écran et noté au journal), et ce qu'elle fait
+// à la mer — une déferlante toutes les « periode » secondes, en moyenne (de 40 s à minuit à
+// 12 s à 5 h), et leur taille (× leur force). (Quand une vague scélérate arrive, les autres se
+// taisent un bon quart d'heure — vers 3 h, puis vers 5 h 40 — : le reste de ces heures-là,
+// elles viennent plus serrées.)
+export const HEURES = [
+  { signe: 'La mer est déjà grosse.', periode: 40, force: 0.85 }, // minuit : on prend ses marques
+  { signe: 'Le baromètre baisse.', periode: 32, force: 0.9 },
+  { signe: 'La mer se creuse.', periode: 26, force: 0.95 },
+  { signe: 'Des éclairs, tout autour.', periode: 15, force: 1 },
+  { signe: 'Le baromètre n\'a jamais été si bas.', periode: 17, force: 1.05 },
+  { signe: 'Le vent hurle dans le gréement.', periode: 12, force: 1.1 }, // le plus fort
+];
+export const programmeDe = (heure) => HEURES[Math.min(HEURES.length - 1, Math.max(0, Math.floor(heure + 1e-6) - HEURE_DEBUT))];
+const FORCE_MAX = 1.25; // (la plus grosse déferlante)
+
+// Ce qu'on entend venir. Une déferlante gronde dès qu'elle s'annonce (monde/deferlantes.js :
+// preavis) ; quand le moteur tourne, on ne l'entend plus que dans le dernier tiers (son
+// grondement est couvert : trop tard pour fermer les volets, qui mettent 2,5 s à descendre).
+// La vague scélérate : on l'entend gronder à 980 m ; le moteur en marche, à 600 m seulement.
+// (Le jeu le fait entendre ainsi ; les veilleurs automatiques n'en savent pas plus.)
+export const ENTENDRE = { moteur: 0.35, scelerate: 980, scelerateMoteur: 600 };
+// L'éclair qui montre la vague : la nuit, sous l'orage, les plus grosses déferlantes (force
+// 0,8 et plus) se découpent sur un éclair trois secondes avant de frapper (trois fois sur
+// quatre) — même quand le moteur couvre leur grondement, on peut les voir venir… volets ouverts
+export const ECLAIR_VAGUE = { force: 0.8, avant: 3.2, chance: 0.75, orage: 0.4 };
+
+// Les dalots du cockpit (ses deux trous d'évacuation, à l'arrière, derrière la roue). Vers 4 h 30,
+// quand le front est passé et que la mer croise, une déferlante qui remplit le cockpit y jette
+// des débris (un bout de cordage arraché, des morceaux de la housse de la roue) : les dalots se
+// bouchent. Le cockpit ne se vide presque plus ; plein, son eau passe sous la porte fermée
+// (au-delà de 300 L, un litre par seconde tous les 90 L), et l'arrière alourdi fait forcer le
+// pilote (quart/systemes.js). Il faut sortir les dégager.
+export const DALOTS = { heure: [28.45, 28.65], litres: 60, vidange: 0.06, suinte: [300, 90] };
+
 // ---------- Le temps qu'il fait pendant la nuit ----------
 // Le vent monte d'heure en heure ; vers 4 h 30 le front passe : le vent tourne de 25° (la mer
 // croise, les déferlantes viennent de plus de côtés) et forcit encore ; à 6 h, la première
@@ -86,6 +130,12 @@ const ETAPES_METEO = [
   [HEURE_AUBE, { ...AMBIANCES.aube, vent: 30, directionVent: 252, nuages: 0.8, orage: 0.3, pluie: 0.25, brume: 0.42, houle: { hs: 3.2, periode: 13, direction: 250 } }],
   [HEURE_LEVER, { ...AMBIANCES.aube, vent: 18, directionVent: 262, nuages: 0.45, orage: 0, pluie: 0, brume: 0.28, front: 0.4, houle: { hs: 3, periode: 14, direction: 250 } }],
 ];
+// (la nuit du 10 octobre : la déclinaison du soleil est de −7° ; il se lève à 6 h 30, la nuit
+// reste noire jusqu'à 5 h 20, et la première lueur paraît à 6 h — avec la déclinaison de la fin
+// août de l'ancien jeu, le ciel pâlissait dès 4 h 10, et les deux heures les plus dures se
+// jouaient dans l'aube)
+const DECLINAISON_NUIT = -7;
+for (const [, etape] of ETAPES_METEO) etape.declinaison = DECLINAISON_NUIT;
 export function meteoDeLaNuit(heure, niveau = NIVEAU) {
   let i = 0;
   while (i < ETAPES_METEO.length - 2 && heure > ETAPES_METEO[i + 1][0]) i++;
@@ -117,8 +167,11 @@ export const RAYON_TOUCHE = 95;
 // La bête (la trombe de la nuit) : elle vit 200 s (une heure trois quarts de la nuit) ; quand elle naît, elle est à moins d'un
 // kilomètre du bateau, et s'il garde sa route, elle passe derrière lui à 250 m, une minute
 // trois quarts à deux minutes et demie plus tard ; son tourbillon (de Rankine) : un cœur de
-// 50 m, 38 m/s à son bord (74 nœuds). Son grain : force 0,6, plein d'éclairs.
-export const BETE = { duree: 200, loin: 850, passe: [100, 150], ecart: 250, coeur: 50, vmax: 38, force: 0.6, orage: 1 };
+// 50 m, 38 m/s à son bord (74 nœuds). Son grain : force 0,6, plein d'éclairs. Personne ne barre :
+// si le bateau change d'allure (le moteur qu'on lance ou qu'on arrête), elle s'écarte doucement
+// de sa route pour passer à au moins 150 m (passeMin) — on la sent, mais elle ne vient pas sur
+// lui.
+export const BETE = { duree: 200, loin: 850, passe: [100, 150], ecart: 250, coeur: 50, vmax: 38, force: 0.6, orage: 1, passeMin: 150 };
 
 // Où doit naître la bête pour passer derrière le bateau, à « ecart » mètres, s'il garde sa
 // route : on se place dans le repère du bateau (elle y avance à w = sa vitesse − celle du
@@ -192,13 +245,18 @@ export class Nuit {
     this.annonceVue = null;
     this.suiviCoup = null;
     this.eau = { cockpit: 0, cale: 0 };
-    this.avaries = { ecouteFoc: 'ok', foc: 'ok', pilote: 'ok' };
+    this.avaries = { ecouteFoc: 'ok', foc: 'ok', pilote: 'ok', dalots: 'ok' };
     this.fatigue = { foc: 0 };
     // l'heure (de la nuit) où arriveront les imprévus
     this.prevu = {
       ecouteFoc: 26.9 + this.hasard() * 0.5,
       trombe: 27.35 + this.hasard() * 0.2,
     };
+    // (les dalots, et les éclairs qui montrent les vagues : des hasards à part, pour que les
+    // imprévus d'avant ne changent pas)
+    const hd = generateur(graine * 3571 + 17);
+    this.prevu.dalots = DALOTS.heure[0] + hd() * (DALOTS.heure[1] - DALOTS.heure[0]);
+    this.hasardEclairs = generateur(graine * 6007 + 23);
     // les systèmes du bord (un hasard à part : pour les vitres)
     this.systemes = new Systemes({ hasard: generateur(graine * 271 + 9), dureeHeure: DUREE_HEURE });
     // l'étrange (jamais expliqué) — une lumière sur l'eau, une voix sur le 16, des coups contre
@@ -257,6 +315,8 @@ export class Nuit {
   on(nom, f) { (this.ecouteurs[nom] ??= []).push(f); return this; }
   emettre(nom, ...args) { for (const f of this.ecouteurs[nom] ?? []) f(...args); }
   get progression() { return (this.heure - HEURE_DEBUT) / (HEURE_AUBE - HEURE_DEBUT); }
+  // ce que l'heure en cours fait à la mer (HEURES)
+  get programme() { return programmeDe(this.heure); }
   ecrire(texte) {
     const entree = { heure: this.heure, texte };
     this.journal.push(entree);
@@ -318,19 +378,21 @@ export class Nuit {
   avancerHeure(dt, ctx) {
     const avant = Math.floor(this.heure + 1e-6);
     this.heure = Math.min(HEURE_AUBE, this.heure + dt / DUREE_HEURE);
-    if (Math.floor(this.heure + 1e-6) > avant && this.heure < HEURE_AUBE) this.commencerHeure(ctx);
+    if (Math.floor(this.heure + 1e-6) > avant && Math.floor(this.heure + 1e-6) < HEURE_AUBE) this.commencerHeure(ctx);
   }
 
-  // Une heure commence : on la note, et la partie est gardée (on pourra la reprendre là)
+  // Une heure commence : on la note (avec son signe), et la partie est gardée (on pourra la
+  // reprendre là)
   commencerHeure(ctx) {
     const h = Math.floor(this.heure + 1e-6);
     this.sauvegarde = this.instantane(ctx);
     this.heureSauvegarde = h;
     const m = this.meteo;
+    const { signe } = programmeDe(h);
     this.ecrire(h === HEURE_DEBUT
       ? `Minuit. Vent ${Math.round(m.vent)} nœuds, la mer est déjà grosse. Six heures avant l'aube.`
-      : `${heureRonde(h)}. Vent ${Math.round(m.vent)} nœuds.`);
-    this.emettre('heure', h);
+      : `${heureRonde(h)}. Vent ${Math.round(m.vent)} nœuds. ${signe}`);
+    this.emettre('heure', h, signe);
   }
 
   // ---------- Les déferlantes ----------
@@ -338,21 +400,42 @@ export class Nuit {
     // (quand une vague scélérate arrive, les autres vagues se taisent : plus de déferlantes)
     const d = this.scelerates?.vague?.distance ?? Infinity;
     const calme = d < 420 && d > -220;
-    const frappe = this.deferlantes.maj(dt, this.meteo, calme ? 0 : this.niveau.deferlantes);
+    // (chaque heure en amène davantage, et de plus grosses : HEURES — une toutes les « periode »
+    // secondes, en moyenne)
+    const heure = this.programme;
+    const frappe = this.deferlantes.maj(dt, this.meteo, calme ? 0 : this.niveau.deferlantes, heure.periode);
     const a = this.deferlantes.annonce;
     if (a && a !== this.annonceVue) {
       this.annonceVue = a;
-      a.force *= this.niveau.force;
+      a.force = Math.min(FORCE_MAX, a.force * this.niveau.force * heure.force);
+      a.dans = a.duree = preavis(a.force);
+      // ce qu'on en entendra : son grondement dès maintenant… ou, le moteur en marche, dans son
+      // dernier tiers seulement (ENTENDRE)
+      a.entendue = a.dans * (this.systemes.moteurEnMarche ? ENTENDRE.moteur : 1);
       this.emettre('deferlante-annonce', a);
+    }
+    if (a && !a.ouie && a.dans <= a.entendue) {
+      a.ouie = true;
+      this.emettre('deferlante-entendue', a);
+    }
+    // (les plus grosses, la nuit, sous l'orage : un éclair montre leur crête)
+    if (a && !a.eclair && a.force >= ECLAIR_VAGUE.force && a.dans <= ECLAIR_VAGUE.avant) {
+      a.eclair = true;
+      if (this.meteo.orage > ECLAIR_VAGUE.orage && this.hasardEclairs() < ECLAIR_VAGUE.chance) this.emettre('deferlante-eclair', a);
     }
     if (frappe) {
       const p = ctx.physique;
       const angle = p.deferlante(frappe.vers, frappe.force); // 0 : de face, 90 : de travers, 180 : de l'arrière
-      // l'eau qui embarque : de travers, ou par l'arrière (le cockpit est « pooppé »)
+      // l'eau qui embarque : de travers, ou par l'arrière (le cockpit est « pooppé ») ; les
+      // petites soulèvent l'arrière sans presque rien jeter à bord, les grosses le remplissent
       const r = (angle * Math.PI) / 180;
       const prise = angle < 90 ? 0.15 + 0.85 * Math.sin(r) : 0.75 + 0.25 * Math.sin(r);
-      const litres = frappe.force * prise * 380;
+      const litres = 420 * prise * Math.min(1, Math.max(0, (frappe.force - 0.3) / 0.9));
       this.eau.cockpit = Math.min(EAU.cockpitMax, this.eau.cockpit + litres);
+      // (vers 4 h 30, celle qui remplit le cockpit y jette des débris : ses dalots se bouchent
+      // — pas avec la trombe tout près : chaque chose en son temps)
+      if (this.avaries.dalots === 'ok' && this.heure >= this.prevu.dalots && (litres >= DALOTS.litres || this.heure > this.prevu.dalots + 0.35)
+        && !(this.trombe && this.trombe.force > 0.1 && this.trombe.distance < 300)) this.avarie('dalots', ctx);
       // (et un peu passe toujours à l'intérieur : sous la porte, par les aérateurs)
       this.eau.cale += frappe.force * prise * (ctx.aBord.descenteOuverte ? 70 : 6);
       // les vitres de ce côté-là, volets ouverts, en prennent un coup (et la mer entre par
@@ -389,8 +472,10 @@ export class Nuit {
     const e = this.eau;
     const gite = Math.abs(ctx.m.gite);
     const ouverte = ctx.aBord.descenteOuverte;
-    // le cockpit se vide par ses deux nables (lentement : d'autant plus vite qu'il est plein)
-    e.cockpit = Math.max(0, e.cockpit - dt * 5 * Math.sqrt(e.cockpit / 500));
+    // le cockpit se vide par ses deux dalots de 75 mm (d'autant plus vite qu'il est plein :
+    // 12 L/s à 500 L, plein, il se vide en une minute trois quarts ; bouchés, presque plus)
+    const vidange = this.avaries.dalots === 'bouches' ? DALOTS.vidange : 1;
+    e.cockpit = Math.max(0, e.cockpit - dt * 12 * vidange * Math.sqrt(e.cockpit / 500));
     // couché, il ramasse la mer par le bord qui trempe
     if (gite > 55) e.cockpit = Math.min(EAU.cockpitMax, e.cockpit + dt * (gite - 55) * 9);
     if (ouverte) {
@@ -400,8 +485,14 @@ export class Nuit {
       e.cockpit -= coule;
       e.cale += coule;
       if (gite > 75) e.cale += dt * (gite - 75) * 14;
-    } else if (gite > 80) {
-      e.cale += dt * (gite - 80) * 0.6; // les joints suintent
+    } else {
+      // porte fermée : le cockpit plein passe sous la porte (ses joints ne tiennent pas une
+      // telle charge d'eau)
+      const [plein, parLitre] = DALOTS.suinte;
+      const suinte = Math.min(e.cockpit, (Math.max(0, e.cockpit - plein) / parLitre) * dt);
+      e.cockpit -= suinte;
+      e.cale += suinte;
+      if (gite > 80) e.cale += dt * (gite - 80) * 0.6; // les joints suintent
     }
     // le bateau « travaille » dans la tempête : il suinte de partout, de plus en plus d'heure
     // en heure (les joints fatiguent)
@@ -477,6 +568,7 @@ export class Nuit {
     if (av.ecouteFoc === 'ok' && av.foc === 'ok' && lHeure('ecouteFoc') && p.deroule > 0.08) this.avarie('ecouteFoc', ctx, rafale);
     if (av.ecouteFoc === 'cassee' && p.deroule < 0.03 && !this.faits.has('foc-roule')) {
       this.faits.add('foc-roule');
+      this.stats.focRoule = this.heure;
       this.ecrire('Le foc qui battait est roulé.');
       this.emettre('foc-roule');
     }
@@ -486,7 +578,7 @@ export class Nuit {
   // 'surchauffe' — son disjoncteur thermique a sauté —, ou 'vague' — la barre arrachée)
   avarie(nom, ctx, dansLaRafale = false, foudre = false, raison = null) {
     const p = ctx.physique;
-    this.avaries[nom] = nom === 'pilote' ? 'panne' : nom === 'ecouteFoc' ? 'cassee' : 'dechiree';
+    this.avaries[nom] = { pilote: 'panne', ecouteFoc: 'cassee', dalots: 'bouches' }[nom] ?? 'dechiree';
     if (nom === 'pilote') this.systemes.pilote.disjoncte = true;
     this.stats.avaries++;
     const journal = {
@@ -494,6 +586,7 @@ export class Nuit {
       foc: 'Le foc s\'est déchiré.',
       pilote: foudre ? 'La foudre est tombée sur le mât : le pilote a disjoncté.'
         : raison === 'surchauffe' ? 'Le pilote a trop chauffé : son disjoncteur a sauté.' : 'Le pilote automatique a lâché.',
+      dalots: 'Une déferlante a rempli le cockpit et bouché ses dalots : il ne se vide plus.',
     }[nom];
     if (nom === 'ecouteFoc') p.ecouteFocLibre = true;
     if (nom === 'foc') p.focDechire = true;
@@ -501,10 +594,15 @@ export class Nuit {
     this.emettre('avarie', nom, { foudre, raison });
   }
 
-  // Réparer : passer une nouvelle écoute (à l'avant), réarmer le pilote (au tableau)
+  // Réparer : passer une nouvelle écoute (à l'avant), réarmer le pilote (au tableau), dégager
+  // les dalots (dans le cockpit, derrière la roue)
   reparer(nom, ctx) {
     const p = ctx.physique;
-    if (nom === 'ecouteFoc' && this.avaries.ecouteFoc === 'cassee') {
+    if (nom === 'dalots' && this.avaries.dalots === 'bouches') {
+      this.avaries.dalots = 'degages';
+      this.stats.dalotsDegages = this.heure;
+      this.ecrire('Les dalots sont dégagés : le cockpit se vide.');
+    } else if (nom === 'ecouteFoc' && this.avaries.ecouteFoc === 'cassee') {
       this.avaries.ecouteFoc = 'reparee';
       p.ecouteFocLibre = false;
       p.ecouteFoc = Math.min(1.2, Math.max(0.3, Math.abs(p.angleFoc)));
@@ -643,6 +741,9 @@ export class Nuit {
     t.vz = (uz * Math.cos(w) + ux * Math.sin(w)) * V;
     t.x += t.vx * dt;
     t.z += t.vz * dt;
+    // (si le bateau a changé d'allure — le moteur —, elle passerait sur lui : elle s'en écarte
+    // doucement, de côté, pour passer à au moins BETE.passeMin mètres)
+    this.ecarterBete(t, ctx, dt);
     t.force = lisse(0, 15, t.age) * (1 - lisse(t.duree - 30, t.duree, t.age));
     t.distance = Math.hypot(p.x - t.x, p.z - t.z);
     if (g) {
@@ -668,6 +769,37 @@ export class Nuit {
       if (g) g.crochet = null;
       this.ecrire('La trombe s\'est dissipée.');
     }
+  }
+
+  // Où passera-t-elle au plus près, si le bateau (tel qu'il va maintenant : sans pilote, il
+  // dérive) et elle gardent leur route ? Si c'est trop près, elle glisse de côté (à 4 m/s au
+  // plus), loin du bateau ; et si elle est déjà trop près, elle s'en éloigne
+  ecarterBete(t, ctx, dt) {
+    const p = ctx.physique.position;
+    const v = ctx.physique.vitesse;
+    const rx = t.x - p.x;
+    const rz = t.z - p.z;
+    const d = Math.hypot(rx, rz);
+    if (d < BETE.passeMin && d > 1) {
+      const recule = 4 * (1 - d / BETE.passeMin);
+      t.x += (rx / d) * recule * dt;
+      t.z += (rz / d) * recule * dt;
+    }
+    const wx = t.vx - v.x;
+    const wz = t.vz - v.z;
+    const w2 = wx * wx + wz * wz;
+    if (w2 < 0.01) return;
+    const dans = -(rx * wx + rz * wz) / w2; // secondes jusqu'au plus près
+    if (dans < 2) return;
+    const cx = rx + wx * dans;
+    const cz = rz + wz * dans;
+    const cpa = Math.hypot(cx, cz);
+    if (cpa >= BETE.passeMin) return;
+    const w = Math.sqrt(w2);
+    const [nx, nz] = cpa > 1 ? [cx / cpa, cz / cpa] : [-wz / w, wx / w];
+    const pousse = Math.min(4, (BETE.passeMin - cpa) / Math.max(dans, 8));
+    t.x += nx * pousse * dt;
+    t.z += nz * pousse * dt;
   }
 
   // La bête naît, sous l'avant de son grain
@@ -1014,12 +1146,24 @@ export class Nuit {
       ['Gîte la plus forte', `${Math.round(s.giteMax)}°`],
       ['Eau pompée', `${Math.round(s.pompee)} litres à la main, ${Math.round(this.systemes.pompe.pompee)} par la pompe électrique (au plus ${Math.round(s.caleMax)} à bord)`],
       ['Avaries', avaries.length ? avaries.join(', ') : 'aucune'],
+      ['Les sorties', this.bilanSorties()],
       ['La trombe', s.trombeDistance === Infinity ? 'pas vue' : `passée à ${metres(s.trombeDistance)}`],
       ['Les vagues scélérates', s.scelerates ? `${s.scelerates}${s.sceleratesCouche ? ` (dont ${s.sceleratesCouche} qui t'${s.sceleratesCouche > 1 ? 'ont' : 'a'} couché)` : ', passées sans être couché'}` : 'aucune'],
       ['Les grains', s.grains ? `${s.grains}, rafales jusqu'à ${Math.round(s.rafaleMax)} nœuds` : 'aucun sur toi'],
       ['La foudre', s.surLeMat ? `${s.eclairs} éclairs, et un sur le mât !` : s.eclairs ? `${s.eclairs} éclair${s.eclairs > 1 ? 's' : ''}, le plus proche à ${metres(s.eclairPlusPres ?? Infinity)}` : 'pas un éclair'],
       ...this.bilanSystemes(),
     ];
+  }
+
+  // les deux sorties forcées : le foc qui battait, les dalots bouchés
+  bilanSorties() {
+    const s = this.stats;
+    const av = this.avaries;
+    const sorties = [
+      av.ecouteFoc !== 'ok' && (s.focRoule ? `le foc roulé à ${heureEnTexte(s.focRoule)}` : 'le foc a battu jusqu\'au bout'),
+      av.dalots !== 'ok' && (s.dalotsDegages ? `les dalots dégagés à ${heureEnTexte(s.dalotsDegages)}` : 'les dalots sont restés bouchés'),
+    ].filter(Boolean);
+    return sorties.length ? sorties.join(' ; ') : 'aucune';
   }
 
   bilanSystemes() {
@@ -1055,9 +1199,9 @@ export class Nuit {
   // Une déferlante tout de suite (force 0 → 1,3), pour vérifier
   provoquerDeferlante(force = 1) {
     const a = angleVers(this.meteo.directionVent);
-    this.deferlantes.annonce = { force, vers: new Vector3(Math.cos(a), 0, Math.sin(a)), dans: 3.5, duree: 3.5 };
+    this.deferlantes.annonce = { force, vers: new Vector3(Math.cos(a), 0, Math.sin(a)), dans: preavis(force), duree: preavis(force) };
     this.annonceVue = null;
-    this.deferlantes.annonce.force /= this.niveau.force; // (maj() la multipliera)
+    this.deferlantes.annonce.force /= this.niveau.force * this.programme.force; // (maj() la multipliera)
   }
 
   // ---------- Reprendre au début de l'heure (après un naufrage) ----------
@@ -1094,7 +1238,7 @@ export class Nuit {
   restaurer(s, ctx) {
     if (!s) return;
     Object.assign(this, {
-      heure: s.heure, eau: { ...s.eau }, avaries: { ...s.avaries }, fatigue: { ...s.fatigue },
+      heure: s.heure, eau: { ...s.eau }, avaries: { dalots: 'ok', ...s.avaries }, fatigue: { ...s.fatigue },
       prevu: { ...this.prevu, ...s.prevu }, faits: new Set(s.faits),
       stats: {
         ...s.stats,

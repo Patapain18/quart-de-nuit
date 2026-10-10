@@ -179,7 +179,12 @@ button.principal:hover { background: #f6c47a; }
   background-image: repeating-linear-gradient(180deg, transparent 0 27px, rgba(60, 90, 130, 0.17) 27px 28px);
   background-position: 0 70px;
 }
-#carnet .gauche { box-shadow: inset -22px 0 26px -24px rgba(70, 50, 20, 0.55); border-right: 1px solid rgba(90, 70, 40, 0.28); }
+#carnet .gauche {
+  box-shadow: inset -22px 0 26px -24px rgba(70, 50, 20, 0.55); border-right: 1px solid rgba(90, 70, 40, 0.28);
+  /* (les consignes sont plus longues que la page : elle se déroule, à la molette) */
+  overflow-y: auto; scrollbar-width: thin; scrollbar-color: rgba(90, 70, 40, 0.45) transparent;
+  background-attachment: local;
+}
 #carnet .droite { box-shadow: inset 22px 0 26px -24px rgba(70, 50, 20, 0.55); display: grid; grid-template-rows: auto 1fr auto; }
 #carnet h2 { margin: 0; font: 600 28px/1.1 var(--titre); color: #1b2538; }
 #carnet .bateau { margin: 2px 0 6px; font: italic 14px/1.4 var(--titre); color: #5d4a2c; }
@@ -200,6 +205,13 @@ button.principal:hover { background: #f6c47a; }
   max-width: min(720px, 90vw); margin: 0; text-align: center; text-wrap: balance;
   background: rgba(4, 9, 12, 0.78); border-radius: var(--rayon); padding: var(--e2) var(--e4);
   font-size: 16px;
+}
+/* (les bruits qui comptent : au-dessus des sous-titres de la radio, en italique) */
+#bruits {
+  position: absolute; left: 50%; bottom: 150px; transform: translateX(-50%);
+  max-width: min(720px, 90vw); margin: 0; text-align: center; text-wrap: balance;
+  background: rgba(4, 9, 12, 0.6); border-radius: var(--rayon); padding: var(--e1) var(--e3);
+  font-size: 15px; font-style: italic; color: #d8dee6;
 }
 
 @media (prefers-reduced-motion: reduce) {

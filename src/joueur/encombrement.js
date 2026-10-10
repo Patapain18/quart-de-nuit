@@ -16,6 +16,7 @@
 const IGNORER = new Set([
   'grand-voile', 'foc', 'haubans', 'filieres', 'lignes-de-vie', 'cordages', 'eau-cockpit', 'eau-cabine',
   'pivot-bome', 'pivot-safran', 'voile-ferlee', 'porte-timonerie', 'essuie-glace', 'pompe', 'trappe-cale', 'volets', 'timonerie-felure',
+  'dalot', 'dalots-bouches',
 ]);
 const IGNORER_TOUJOURS = new Set(['grand-voile', 'foc', 'haubans', 'filieres', 'lignes-de-vie', 'cordages', 'eau-cockpit', 'eau-cabine']);
 const Y_MIN = -0.7; // (sous le fond de la cale et au-dessus de la tête, debout sur le rouf : inutile)

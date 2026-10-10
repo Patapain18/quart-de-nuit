@@ -313,15 +313,17 @@ export class Audio {
     // la vague scélérate : un grondement grave qui enfle pendant qu'elle approche, et
     // dessous une pulsation sourde (deux notes très graves, presque pareilles, qui battent
     // lentement l'une contre l'autre : on la sent plus qu'on ne l'entend)
-    this.scelerate = { filtre: filtre('lowpass', 120, 0.8), gain: gain(), pulsation: gain() };
-    source(this.brun, 0.6).connect(this.scelerate.filtre).connect(this.scelerate.gain).connect(this.bus.dehors);
+    // (on l'entend venir de son côté : cote)
+    this.scelerate = { filtre: filtre('lowpass', 120, 0.8), gain: gain(), pulsation: gain(), cote: ctx.createStereoPanner() };
+    this.scelerate.cote.connect(this.bus.dehors);
+    source(this.brun, 0.6).connect(this.scelerate.filtre).connect(this.scelerate.gain).connect(this.scelerate.cote);
     for (const f of [43, 45.5, 87]) {
       const o = ctx.createOscillator();
       o.frequency.value = f;
       o.connect(gain(f > 80 ? 0.25 : 0.5)).connect(this.scelerate.pulsation);
       o.start();
     }
-    this.scelerate.pulsation.connect(this.bus.dehors);
+    this.scelerate.pulsation.connect(this.scelerate.cote);
     // l'angoisse : un bourdonnement très grave, deux notes qui battent lentement, et tout
     // en haut un sifflement à peine audible ; il monte avec la tension de la nuit
     this.angoisse = { gain: gain(), aigu: gain() };
@@ -549,7 +551,7 @@ export class Audio {
     const cale = Math.min(1, (e.eauCale ?? 0) / 900);
     const roule = Math.min(1, Math.abs(e.roulis ?? 0) / 0.4);
     this.vers(this.clapotis.gain.gain, cale * (0.12 + 0.5 * roule), 0.15);
-    this.vers(this.gargouille.gain.gain, Math.min(0.22, (e.eauCockpit ?? 0) / 900), 0.4);
+    this.vers(this.gargouille.gain.gain, Math.min(0.22, (e.eauCockpit ?? 0) / 900) * (e.dalotsBouches ? 0.08 : 1), 0.4);
     // la trombe et le cargo, selon leur distance (0 : loin, 1 : sur nous) : la trombe
     // gronde de loin, de plus en plus aigu en approchant, puis hurle
     const tr = e.trombe ?? 0;
@@ -578,6 +580,7 @@ export class Audio {
     const df = e.deferle ?? 0;
     this.niveaux.scelerate = sc;
     this.vers(this.scelerate.gain.gain, 1.4 * sc ** 1.5, 0.9);
+    this.vers(this.scelerate.cote.pan, (e.panScelerate ?? 0) * (1 - 0.6 * lisse(0.75, 1, sc)), 0.4);
     this.vers(this.scelerate.filtre.frequency, 90 + 650 * sc * sc, 0.9);
     this.vers(this.scelerate.pulsation.gain, 0.22 * Math.min(1, sc * 1.6), 1.5);
     const rugit = this.boucles['scelerate-mer-forte'];
@@ -1021,25 +1024,31 @@ export class Audio {
   // secondes), puis elle s'écrase sur le bateau (fracas enregistré, et un coup sourd dans
   // la coque)
   // (pan : -1 → 1, d'où elle vient : on l'entend arriver de son côté)
-  deferlante(force = 0.5, dans = 3.5, pan = 0) {
+  // (entendue : à combien de secondes du choc on commence à l'entendre — tout de suite, ou
+  // plus tard quand le moteur la couvre : quart/nuit.js, ENTENDRE)
+  deferlante(force = 0.5, dans = 3.5, pan = 0, entendue = dans) {
     if (!this.actif()) return;
     const ctx = this.ctx;
     const t = ctx.currentTime;
     const impact = t + dans;
+    const debut = impact - Math.max(0.05, Math.min(dans, entendue));
     const v = 0.35 + 0.7 * force;
     const cote = ctx.createStereoPanner();
     cote.pan.value = pan;
     cote.connect(this.bus.dehors);
-    // le grondement : du bruit grave qui monte et s'éclaircit en approchant
+    // le grondement : du bruit grave qui naît d'un coup (on l'entend), monte et s'éclaircit en
+    // approchant
     const g1 = ctx.createBufferSource();
     g1.buffer = this.brun;
     const f1 = ctx.createBiquadFilter();
     f1.type = 'bandpass';
     f1.Q.value = 0.6;
-    f1.frequency.setValueAtTime(180, t);
+    f1.frequency.setValueAtTime(180, debut);
     f1.frequency.exponentialRampToValueAtTime(700, impact);
     const a1 = ctx.createGain();
     a1.gain.setValueAtTime(0.0001, t);
+    a1.gain.setValueAtTime(0.0001, debut);
+    a1.gain.exponentialRampToValueAtTime(v * 0.09, debut + Math.min(0.25, (impact - debut) / 2));
     a1.gain.exponentialRampToValueAtTime(v * 0.9, impact);
     a1.gain.setTargetAtTime(0.0001, impact + 0.1, 0.5);
     g1.connect(f1).connect(a1).connect(cote);

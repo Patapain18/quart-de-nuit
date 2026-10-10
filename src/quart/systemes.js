@@ -19,8 +19,11 @@
 //    (près de la trappe), mais elles y ont perdu la moitié de leur charge.
 //  - Les vitres : chaque déferlante qui frappe un côté fatigue les vitres de ce côté dont le
 //    volet est ouvert ; elles se fendent, puis éclatent. Une vitre brisée laisse entrer la mer
-//    à chaque vague ; son volet fermé bouche presque le trou. Les volets ne bougent qu'avec du
-//    courant.
+//    à chaque vague ; son volet fermé bouche presque le trou. Les volets sont les portes de
+//    FNAF : ils ne bougent qu'avec du courant, et fermés, leurs moteurs les tiennent serrés
+//    contre la mer — ils tirent un peu sur la batterie, côté par côté. Sans courant (ou leur
+//    disjoncteur coupé), plus rien ne les tient : la mer les force, ils ne protègent plus qu'à
+//    moitié.
 //
 // Comme la nuit, ce fichier ne dessine rien et ne fait aucun bruit : il calcule, et il dit au
 // jeu ce qui arrive (ses événements). Les veilleurs automatiques s'en servent aussi.
@@ -55,6 +58,7 @@ export const CONSO = {
   radar: 3.6, traceur: 1.4, vhf: 0.6, feux: 2.2,
   eclairageBlanc: 2.4, eclairageRouge: 0.5, baladeuse: 1.2,
   pompe: 11, volets: 9, // (la pompe quand elle tourne, les volets quand ils bougent)
+  voletsTenus: 1.5, // (par côté fermé : ses moteurs le tiennent serré)
   demarreur: 160, // (le démarreur du moteur, pendant qu'il lance)
 };
 export const BATTERIE = {
@@ -75,6 +79,9 @@ export const MOTEUR = {
 export const PILOTE = {
   alarme: 0.85, // il bipe : il chauffe trop
   rearmement: 0.7, // son disjoncteur thermique ne se réarme qu'en dessous
+  // ce qui le fait forcer davantage : le foc qui bat (il secoue le bateau) ; le cockpit plein
+  // d'eau (au-delà de 300 L, l'arrière alourdi tire sur la barre : jusqu'à 1,9 fois plus à 750 L)
+  focBat: 1.6, cockpit: [300, 750, 0.9],
 };
 export const EAU_BATTERIES = {
   mouillees: 600, // litres dans la cale : l'eau touche les batteries (elles sont à 20 cm du fond… de l'eau)
@@ -126,6 +133,12 @@ export class Systemes {
   // (0 : arrêté → le régime du moteur, pour la physique : la poussée de l'hélice)
   get regime() { return this.moteurEnMarche ? MOTEUR.regime : 0; }
   voletsFermes(cote) { return this.volets[cote].cible > 0.5; }
+  // ce que les volets d'un côté protègent ses vitres (0 : ouverts → 1 : fermés et tenus par
+  // leurs moteurs ; fermés sans courant, la mer les force : 0,5)
+  protection(cote) {
+    if (this.volets[cote].fraction <= 0.95) return 0;
+    return this.alimente('volets') ? 1 : 0.5;
+  }
 
   // ---------- Ce qu'on fait ----------
   basculerDisjoncteur(nom) {
@@ -196,7 +209,7 @@ export class Systemes {
       b.charge *= EAU_BATTERIES.perte;
       this.emettre('batteries-noyees');
     }
-    this.majPilote(dt, physique, heure, vent);
+    this.majPilote(dt, physique, heure, vent, eau);
     this.majMoteur(dt, physique, mer);
     this.majVolets(dt);
     // ce que tire le bord, ce que rend l'alternateur
@@ -244,6 +257,7 @@ export class Systemes {
     if (d.eclairage && this.baladeuse) a += CONSO.baladeuse;
     if (this.pompe.marche) a += CONSO.pompe;
     if (d.volets && COTES.some((c) => this.volets[c].fraction !== this.volets[c].cible)) a += CONSO.volets;
+    if (d.volets) a += CONSO.voletsTenus * COTES.filter((c) => this.volets[c].fraction > 0.5).length;
     if (this.moteur.etat === 'lancement') a += CONSO.demarreur;
     return a;
   }
@@ -252,9 +266,11 @@ export class Systemes {
   // d'autant plus dur que la mer est grosse (le vent qui monte) ; ses coups de barre (la
   // vitesse de sa barre, rapportée au plus vite qu'il peut) en disent l'effort du moment. Il
   // chauffe avec son travail (de plus en plus, la nuit avançant : il fatigue) ; le moteur le
-  // soulage (le souffle de l'hélice fait mordre le safran : il corrige moins). Il refroidit
-  // doucement en travaillant, plus vite en veille ; trop chaud, son disjoncteur thermique saute.
-  majPilote(dt, physique, heure, vent) {
+  // soulage (le souffle de l'hélice fait mordre le safran : il corrige moins). Le foc qui bat
+  // le fait forcer (il secoue le bateau), et le cockpit plein d'eau aussi (l'arrière alourdi
+  // tire sur la barre). Il refroidit doucement en travaillant, plus vite en veille ; trop
+  // chaud, son disjoncteur thermique saute.
+  majPilote(dt, physique, heure, vent, eau = null) {
     const p = this.pilote;
     const barre = physique.barre;
     const vitesse = p.barre === null || dt <= 0 ? 0 : Math.abs(barre - p.barre) / dt;
@@ -266,7 +282,10 @@ export class Systemes {
     const mer = 0.0024 + 0.0055 * borne((vent - 32) / 14, 0, 1);
     const coups = 0.75 + 0.25 * Math.min(3, p.effort / 0.07);
     const fatigue = 1 + 0.05 * Math.max(0, heure - 24);
-    p.travail = marche ? mer * coups * fatigue * (this.moteurEnMarche ? 0.55 : 1) : 0;
+    const [c0, c1, plus] = PILOTE.cockpit;
+    const charge = (physique.ecouteFocLibre && physique.deroule > 0.03 ? PILOTE.focBat : 1)
+      * (1 + plus * borne(((eau?.cockpit ?? 0) - c0) / (c1 - c0), 0, 1));
+    p.travail = marche ? mer * coups * fatigue * charge * (this.moteurEnMarche ? 0.55 : 1) : 0;
     const refroidit = (marche ? 0.006 : 0.015) * (p.temperature - 0.25);
     p.temperature = borne(p.temperature + (p.travail - refroidit) * dt, 0, 1);
     if (marche && p.temperature >= 1) {
@@ -333,21 +352,21 @@ export class Systemes {
   // ---------- Les vitres ----------
   // Une vague frappe : sa force (0 → 1,3), d'où elle vient (angle depuis l'étrave, 0 → 180 ;
   // vientDe : 1 tribord, -1 bâbord), et sa prise (l'eau qu'elle jette à bord, 0 → 1). Chaque
-  // vitre de ce côté, volet ouvert, en prend un coup. Rend les vitres brisées par ce coup (et
-  // l'eau qui entre par celles qui l'étaient déjà).
+  // vitre de ce côté, volet ouvert, en prend un coup (volet fermé sans courant : la moitié).
+  // Rend l'eau qui entre : par les vitres que ce coup brise, et par celles qui l'étaient déjà.
   frapper(force, angle, vientDe, prise, { scelerate = false } = {}) {
     let eauEntree = 0;
     for (const v of this.vitres) {
       const e = exposition(v.cote, angle, vientDe);
       if (e <= 0.02) continue;
-      const protegee = this.volets[v.cote].fraction > 0.95;
+      const protection = this.protection(v.cote);
       if (v.etat === 'brisee') {
         // (par le trou : la mer entre ; le volet fermé le bouche presque)
-        eauEntree += force * e * prise * (scelerate ? 400 : 140) * (protegee ? 0.15 : 1);
+        eauEntree += force * e * prise * (scelerate ? 400 : 140) * (1 - 0.85 * protection);
         continue;
       }
-      if (protegee) continue;
-      const coup = force * e * (0.35 + 0.65 * prise) * (scelerate ? 1.6 : 0.55) * (0.7 + 0.6 * this.hasard());
+      if (protection >= 1) continue;
+      const coup = force * e * (0.35 + 0.65 * prise) * (scelerate ? 1.6 : 0.55) * (0.7 + 0.6 * this.hasard()) * (1 - protection);
       v.integrite -= coup;
       if (v.integrite <= 0) {
         v.etat = 'brisee';
@@ -368,7 +387,7 @@ export class Systemes {
     let l = 0;
     for (const v of this.vitres) {
       if (v.etat !== 'brisee') continue;
-      l += (0.15 + 0.35 * borne((vent - 30) / 15, 0, 1)) * (this.volets[v.cote].fraction > 0.95 ? 0.1 : 1);
+      l += (0.15 + 0.35 * borne((vent - 30) / 15, 0, 1)) * (1 - 0.9 * this.protection(v.cote));
     }
     return l;
   }
