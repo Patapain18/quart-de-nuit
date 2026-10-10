@@ -19,7 +19,7 @@
 import * as THREE from 'three';
 import { Monde3D, QUALITES } from './rendu/monde3d.js';
 import { Regulateur, CRANS, DERNIER_CRAN } from './rendu/regulateur.js';
-import { nomCarteGraphique, sansCarteGraphique } from './rendu/capacites.js';
+import { nomCarteGraphique, sansCarteGraphique, derniereVerification } from './rendu/capacites.js';
 import { Vent } from './monde/vent.js';
 import { Grains } from './monde/grains.js';
 import { Foudre, REGLAGES_FOUDRE } from './monde/foudre.js';
@@ -363,7 +363,7 @@ function cranDeDepart() {
   // la première fois : selon la carte graphique, quand le navigateur dit son nom (sans
   // carte graphique : le plus léger ; une carte Intel intégrée : économique ; sinon, moyenne)
   const carte = nomCarteGraphique(monde.renderer.getContext());
-  if (sansCarteGraphique(carte)) return DERNIER_CRAN;
+  if (derniereVerification?.sansCarteGraphique || sansCarteGraphique(carte)) return DERNIER_CRAN;
   if (/intel/i.test(carte) && !/\barc\b/i.test(carte)) return 2;
   return 1;
 }
@@ -1858,6 +1858,23 @@ document.getElementById('ouvrir-options').addEventListener('click', () => ouvrir
 document.getElementById('pause-options').addEventListener('click', () => ouvrirFenetre('options'));
 document.getElementById('ouvrir-apropos').addEventListener('click', () => ouvrirFenetre('apropos'));
 
+// ---------- La carte graphique qui lâche ----------
+// Trop de travail d'un coup, l'ordinateur en veille, un pilote qui redémarre : le navigateur
+// reprend la carte graphique, et l'on ne peut plus rien dessiner. On le dit, et on propose
+// de recharger la page (la nuit est gardée au début de chaque heure : on la reprendra là).
+canvas.addEventListener('webglcontextlost', (e) => {
+  e.preventDefault();
+  etat.cartePerdue = true;
+  document.exitPointerLock?.();
+  audio.ctx?.suspend?.();
+  document.getElementById('detail-carte-perdue').textContent = nuit && lirePartie()
+    ? 'Recharge la page : ta nuit reprendra au début de l\'heure (elle est gardée à chaque heure).'
+    : 'Recharge la page pour reprendre.';
+  document.getElementById('carte-perdue').hidden = false;
+  document.getElementById('recharger').focus();
+});
+document.getElementById('recharger').addEventListener('click', () => location.reload());
+
 // ---------- Au démarrage ----------
 appliquerOptions(options);
 majAccueil();
@@ -2007,8 +2024,9 @@ function boucle(maintenant) {
   const intervalle = maintenant - dernier;
   const dt = Math.min(intervalle / 1000, 0.05);
   dernier = maintenant;
-  // (les outils de mise au point font avancer le jeu eux-mêmes, image par image)
-  if (etat.fige) { requestAnimationFrame(boucle); return; }
+  // (les outils de mise au point font avancer le jeu eux-mêmes, image par image ; et sans
+  // carte graphique, il n'y a plus rien à faire)
+  if (etat.fige || etat.cartePerdue) { requestAnimationFrame(boucle); return; }
   const debut = performance.now();
   monde.image(dt, { simuler, placerCamera, enDirect: true });
   ageInstruments += dt;
@@ -2026,8 +2044,10 @@ function boucle(maintenant) {
     while (performance.now() < fin);
   }
   // (la qualité « Auto » : le régulateur juge chaque image — son intervalle, et le temps du
-  // calcul, sans celui passé à donner le dessin à la carte graphique)
-  if (regulateur) {
+  // calcul, sans celui passé à donner le dessin à la carte graphique ; pas quand l'onglet est
+  // caché, où le navigateur ralentit exprès les images)
+  if (regulateur && document.hidden) regulateur.interrompre(maintenant);
+  else if (regulateur) {
     const cran = regulateur.noter(intervalle, performance.now() - debut - monde.derniere.dessin, maintenant);
     if (cran !== null) appliquerCran(cran);
     garderCran(maintenant);

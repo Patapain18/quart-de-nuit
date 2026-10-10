@@ -99,6 +99,14 @@ export class Regulateur {
     return this.juger(f, maintenant);
   }
 
+  // Ce qui se passe maintenant ne dit rien de l'ordinateur (l'onglet est caché : le
+  // navigateur ralentit exprès ses images) : on oublie la seconde en cours, et on attendra
+  // un peu, une fois revenu, avant de juger
+  interrompre(maintenant) {
+    this.fenetre = null;
+    this.calmeJusqua = Math.max(this.calmeJusqua, maintenant + CALME);
+  }
+
   juger(f, maintenant) {
     const moyenne = f.somme / f.images;
     const ips = 1000 / moyenne;

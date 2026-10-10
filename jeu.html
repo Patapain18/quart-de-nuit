@@ -31,6 +31,16 @@
         <button type="button" id="ouvrir-apropos">À propos</button>
       </div>
       <p id="telephone" class="note avertissement" hidden>Quart de nuit se joue sur un ordinateur, au clavier et à la souris. Sur un téléphone, tu peux regarder la mer… mais pas encore jouer.</p>
+      <p id="sans-carte" class="note avertissement" hidden></p>
+    </div>
+  </section>
+
+  <section id="carte-perdue" hidden role="alertdialog" aria-labelledby="titre-carte-perdue" aria-describedby="detail-carte-perdue">
+    <div class="carte">
+      <h2 id="titre-carte-perdue">La carte graphique a lâché le jeu</h2>
+      <p>Trop de travail d'un coup, l'ordinateur qui s'est mis en veille, ou son pilote qui a redémarré : le navigateur a repris la carte graphique, et le jeu ne peut plus rien dessiner.</p>
+      <p id="detail-carte-perdue">Recharge la page pour reprendre.</p>
+      <button type="button" class="principal" id="recharger">Recharger la page</button>
     </div>
   </section>
 
@@ -166,6 +176,6 @@
     </form>
   </dialog>
 
-  <script type="module" src="./src/quart.js"></script>
+  <script type="module" src="./src/entree.js"></script>
 </body>
 </html>

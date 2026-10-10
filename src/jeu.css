@@ -251,6 +251,17 @@ button.deux-lignes small { font-weight: 500; font-size: 13px; opacity: 0.8; }
 .liens-bas button { flex: 1; text-align: center; }
 .avertissement { border-left: 3px solid var(--ambre); padding-left: var(--e3); color: var(--encre); }
 
+/* ---------- Partout : quand le jeu ne peut pas tourner ici ---------- */
+/* (l'accueil devient le message : src/entree.js) */
+.sous-titre.impossible { color: var(--ambre); font-weight: 600; }
+.que-faire { margin: 0 0 var(--e4); padding-left: 1.2em; display: grid; gap: var(--e2); }
+.que-faire li { text-wrap: pretty; }
+.retour { color: var(--ambre); }
+.retour:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+/* la carte graphique a lâché : par-dessus tout */
+#carte-perdue { position: fixed; inset: 0; z-index: 60; display: grid; place-items: center; padding: var(--e4); background: rgba(2, 6, 9, 0.86); }
+#carte-perdue p { margin: 0 0 var(--e3); text-wrap: pretty; }
+
 /* la pause : où l'on en est */
 #pause .sous-titre:empty { display: none; }
 #pause .boutons { margin: var(--e3) 0 var(--e4); }
