@@ -96,6 +96,9 @@ button.principal:hover { background: #f6c47a; }
   text-shadow: 0 1px 6px rgba(0, 0, 0, 0.7);
 }
 #heure .h { margin: 0; font: 600 34px/1 var(--chiffres); letter-spacing: 0.02em; color: rgba(236, 240, 236, 0.92); }
+#heure .batterie { margin: 0; font: 600 13px/1.2 var(--chiffres); color: rgba(206, 226, 214, 0.75); }
+#heure .batterie.faible { color: #ff7a5a; }
+#heure .batterie:empty { display: none; }
 #heure .alertes { margin: 0; padding: 0; list-style: none; display: grid; gap: 2px; font-size: 13.5px; color: var(--ambre); }
 #heure .alertes:empty { display: none; }
 

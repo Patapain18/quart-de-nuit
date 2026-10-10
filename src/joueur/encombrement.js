@@ -15,7 +15,7 @@
 // Ce qui ne compte pas : les voiles, les câbles fins, l'eau, les cordages, et les pièces mobiles
 const IGNORER = new Set([
   'grand-voile', 'foc', 'haubans', 'filieres', 'lignes-de-vie', 'cordages', 'eau-cockpit', 'eau-cabine',
-  'pivot-bome', 'pivot-safran', 'voile-ferlee', 'porte-timonerie', 'essuie-glace', 'pompe', 'trappe-cale', 'volets',
+  'pivot-bome', 'pivot-safran', 'voile-ferlee', 'porte-timonerie', 'essuie-glace', 'pompe', 'trappe-cale', 'volets', 'timonerie-felure',
 ]);
 const IGNORER_TOUJOURS = new Set(['grand-voile', 'foc', 'haubans', 'filieres', 'lignes-de-vie', 'cordages', 'eau-cockpit', 'eau-cabine']);
 const Y_MIN = -0.7; // (sous le fond de la cale et au-dessus de la tête, debout sur le rouf : inutile)

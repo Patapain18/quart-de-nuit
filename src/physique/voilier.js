@@ -50,6 +50,11 @@ const HAUT = new Vector3(0, 1, 0);
 // pour que de travers elle le couche comme l'ancien — les crêtes de cette nuit ne sont pas
 // plus petites parce que le bateau est plus grand
 const POUSSEE_DEFERLANTE = 80000 * L * H * 1.75;
+// Le moteur (un diesel de 75 ch, sous le cockpit) : la poussée de son hélice à plein régime,
+// le bateau arrêté (elle baisse à mesure qu'il va plus vite), et le souffle qu'elle envoie sur
+// le safran, juste derrière elle : même lent, le bateau répond à la barre
+const POUSSEE_MOTEUR = 4200; // N
+const SOUFFLE_HELICE = 2.6; // m/s, à plein régime
 // Le foc ne peut pas être bordé plus près de l'axe que ses rails, sur le pont (~10°)
 export const ANGLE_MIN_FOC = 0.17;
 
@@ -219,6 +224,7 @@ export class PhysiqueVoilier {
 
     // les commandes
     this.barre = 0; // angle du safran (rad) : + = bord de fuite vers tribord → on tourne à tribord
+    this.moteur = 0; // le régime du moteur (0 : arrêté → 1 : plein gaz)
     this.ecouteGV = 0.35; // angle maximal que l'écoute laisse à la bôme (rad)
     this.ecouteFoc = 0.3;
     this.ris = 0;
@@ -422,6 +428,8 @@ export class PhysiqueVoilier {
     this.ajouterLocal(fq.multiplyScalar(enEau), pointQuille, force, couple);
     const pointSafran = new Vector3(0, -0.8 * H, 3.85 * L);
     const wSafran = this.vitesseEauLocale(vLocal, rotLocal, pointSafran);
+    // (le moteur en marche : le souffle de l'hélice passe sur le safran, vers l'arrière)
+    if (this.moteur > 0) wSafran.z += SOUFFLE_HELICE * this.moteur * Math.max(0.3, 1 - Math.max(0, avance) / 7);
     const corde = new Vector3(Math.sin(this.barre), 0, Math.cos(this.barre));
     const fs = forceAile(wSafran, corde, 0.52 * L * H, 4.2, 0.012, new Vector3());
     // le safran ne tient que s'il est bien dans l'eau : quand le bateau gîte fort, ou que
@@ -432,6 +440,12 @@ export class PhysiqueVoilier {
     const tenue = Math.min(1, Math.max(0, (eau.h - ps.y - 0.05) / (0.6 * H))) ** 1.5;
     this.tenueSafran = tenue;
     this.ajouterLocal(fs.multiplyScalar(enEau * tenue), pointSafran, force, couple);
+    // la poussée de l'hélice, juste devant le safran (elle aussi aspire de l'air quand
+    // l'arrière se soulève)
+    if (this.moteur > 0) {
+      const poussee = POUSSEE_MOTEUR * this.moteur * Math.max(0, 1 - Math.max(0, avance) / 6.5) * enEau * tenue;
+      this.ajouterLocal(new Vector3(0, 0, -poussee), new Vector3(0, -0.7 * H, 3.45 * L), force, couple);
+    }
     // la coque freine aussi les mouvements de travers et les rotations (amortissement)
     const travers = -0.5 * RHO_EAU * 1.0 * 3.5 * L * H * vLocal.x * Math.abs(vLocal.x) * enEau;
     this.ajouterLocal(new Vector3(travers, 0, 0), new Vector3(0, -0.3 * H, 0), force, couple);

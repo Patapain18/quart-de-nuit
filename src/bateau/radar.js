@@ -128,8 +128,24 @@ export class Radar {
   //   cibles : [{ x, z, rayon, force }] (les navires, les bouées, la trombe, l'écho fantôme ;
   //     avec ligne, lx, lz, largeurLigne : un segment de ±ligne m le long de (lx, lz), dont
   //     l'écho faiblit vers les bouts — la crête d'une vague scélérate) }
-  // nuit : 0 → 1 (l'écran baisse son éclat)
+  // nuit : 0 → 1 (l'écran baisse son éclat). (this.alimente : sans courant — son disjoncteur
+  // coupé, ou plus de batterie —, l'écran est noir ; quand le courant revient, il redémarre)
   maj(dt, m, monde, nuit = 0) {
+    if (this.alimente === false) {
+      if (!this.eteint) {
+        this.eteint = true;
+        this.intensites.fill(0);
+        this.cx.fillStyle = '#000';
+        this.cx.fillRect(0, 0, TAILLE, TAILLE);
+        this.texture.needsUpdate = true;
+      }
+      this.materiau.emissiveIntensity = 0;
+      return;
+    }
+    if (this.eteint) {
+      this.eteint = false;
+      this.redemarrer(12);
+    }
     // (la foudre est tombée sur le mât : le radar redémarre — l'écran noir, puis le
     // préchauffage du magnétron, puis l'antenne reprend ses tours)
     if (this.redemarrage > 0) {

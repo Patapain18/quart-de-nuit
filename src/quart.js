@@ -42,6 +42,7 @@ import { distanceALaTerre } from './rendu/cote.js';
 import { lireOptions, changerOptions, quandOptionsChangent } from './quart/options.js';
 import { COCKPIT, MAT, TIMONERIE } from './bateau/forme.js';
 import { SIEGE, YEUX_POSTE, COTES_VOLETS } from './bateau/interieur-timonerie.js';
+import { NOMS_DISJONCTEURS, BATTERIE, PILOTE, EAU_BATTERIES } from './quart/systemes.js';
 
 const parametres = new URLSearchParams(location.search);
 const canvas = document.getElementById('scene');
@@ -187,10 +188,10 @@ const jeu = {
   },
   // passer une nouvelle écoute de foc (à l'avant), réarmer le pilote (au tableau)
   reparer(nom) {
-    if (nuit?.reparer(nom, contexteNuit(0))) {
-      afficherMessage(nom === 'pilote' ? 'Disjoncteur réarmé : le pilote reprend la barre' : 'Nouvelle écoute de foc passée');
-      audio.clic?.();
-    }
+    if (!nuit?.reparer(nom, contexteNuit(0))) return false;
+    afficherMessage(nom === 'pilote' ? 'Disjoncteur réarmé : le pilote reprend la barre' : 'Nouvelle écoute de foc passée');
+    audio.clic?.();
+    return true;
   },
   basculerDescente() {
     bateau.ouvrirDescente(!bateau.descenteOuverte);
@@ -214,28 +215,85 @@ const jeu = {
     const ouverte = !bateau.interieur.trappeOuverte;
     bateau.interieur.ouvrirTrappe(ouverte);
     ouvrirTrappe(ouverte);
+    if (nuit) nuit.systemes.baladeuse = ouverte;
     audio.clic?.();
     afficherMessage(ouverte ? 'Trappe de la cale ouverte' : 'Trappe refermée');
   },
-  // les volets de tempête d'un côté de la timonerie
+  // les volets de tempête d'un côté de la timonerie (leurs moteurs ont besoin de courant)
   basculerVolets(cote) {
-    const fermer = !bateau.interieur.voletsFermes(cote);
-    bateau.interieur.fermerVolets(cote, fermer);
+    const sy = nuit?.systemes;
+    if (!sy) return;
+    const fermer = !sy.voletsFermes(cote);
     audio.clic?.();
+    if (!sy.fermerVolets(cote, fermer)) {
+      afficherMessage(sy.courant ? 'Les moteurs des volets sont coupés, au tableau' : 'Plus de courant : les volets ne bougent pas');
+      return;
+    }
     const nom = { avant: 'du pare-brise', tribord: 'de tribord', babord: 'de bâbord', arriere: 'de l\'arrière' }[cote];
     afficherMessage(fermer ? `Les volets ${nom} descendent : les vitres sont protégées, mais on ne voit plus dehors` : `Les volets ${nom} remontent`);
   },
-  basculerFeux() {
-    etat.feux = !etat.feux;
-    afficherMessage(etat.feux ? 'Feux de navigation allumés' : 'Feux de navigation éteints');
-  },
+  // l'éclairage de la timonerie : rouge (une veilleuse, qui garde la vision de nuit), blanc,
+  // éteint (le blanc tire cinq fois plus sur la batterie)
   basculerEclairage() {
-    etat.eclairage = { eteint: 'blanc', blanc: 'rouge', rouge: 'eteint' }[etat.eclairage];
-    afficherMessage({ blanc: 'Éclairage : blanc', rouge: 'Éclairage : rouge (pour garder sa vision de nuit)', eteint: 'Éclairage éteint' }[etat.eclairage]);
+    const sy = nuit?.systemes;
+    etat.eclairage = { eteint: 'rouge', rouge: 'blanc', blanc: 'eteint' }[etat.eclairage];
+    if (sy) sy.eclairage = etat.eclairage;
+    afficherMessage({ blanc: 'Éclairage : blanc (il tire sur la batterie)', rouge: 'Éclairage : rouge (pour garder ta vision de nuit)', eteint: 'Éclairage éteint' }[etat.eclairage]);
+  },
+  // ---------- les systèmes du bord (quart/systemes.js) ----------
+  // un disjoncteur du tableau : on le coupe, on le remet (celui du pilote, sauté, se réarme…
+  // une fois le pilote refroidi)
+  basculerDisjoncteur(nom) {
+    const sy = nuit?.systemes;
+    if (!sy) return;
+    audio.clic?.();
+    if (nom === 'pilote' && sy.pilote.disjoncte) {
+      if (jeu.reparer('pilote')) return;
+      afficherMessage(`Le disjoncteur du pilote ressaute : son moteur est encore trop chaud (${Math.round(sy.pilote.temperature * 100)} %, il faut moins de ${Math.round(PILOTE.rearmement * 100)} %)`);
+      return;
+    }
+    const mis = sy.basculerDisjoncteur(nom);
+    if (nom === 'feux') etat.feux = mis;
+    const nomCircuit = NOMS_DISJONCTEURS[nom];
+    const suite = !mis && nom === 'pilote' ? ' : plus personne ne tient la barre !' : !mis && nom === 'pompe' ? ' : l\'eau va monter dans la cale' : '';
+    afficherMessage(`${nomCircuit.charAt(0).toUpperCase()}${nomCircuit.slice(1)} : ${mis ? 'remis' : 'coupé'}${suite}`);
+  },
+  // le moteur : le démarrer (il recharge la batterie, soulage le pilote… et couvre tous les
+  // bruits du dehors) ou l'arrêter
+  basculerMoteur() {
+    const sy = nuit?.systemes;
+    if (!sy) return;
+    audio.clic?.();
+    if (sy.moteur.etat !== 'arrete') {
+      sy.arreterMoteur();
+      afficherMessage('Moteur arrêté : on entend de nouveau la mer');
+      return;
+    }
+    const r = sy.demarrerMoteur();
+    if (r === 'chaud') afficherMessage(`Le moteur est encore trop chaud pour repartir (${Math.round(20 + 90 * sy.moteur.temperature)} °C) : attends qu'il refroidisse`);
+    else if (r === 'batterie') afficherMessage(sy.courant ? 'Le démarreur tourne à peine : la batterie est trop faible pour lancer le moteur' : 'Plus de courant : le démarreur ne tourne pas');
+  },
+  // le pilote : en veille (il refroidit, mais plus personne ne tient la barre) ou enclenché
+  basculerPilote() {
+    const sy = nuit?.systemes;
+    if (!sy) return;
+    audio.clic?.();
+    const engage = sy.basculerPilote();
+    afficherMessage(engage ? 'Pilote enclenché : il reprend la barre' : 'Pilote en veille : il refroidit… mais plus personne ne tient la barre');
+  },
+  // le coupe-batterie : l'eau l'a fait sauter ; on le réarme une fois l'eau redescendue
+  rearmerBatterie() {
+    const sy = nuit?.systemes;
+    if (!sy) return;
+    audio.clic?.();
+    const r = sy.rearmerBatterie(nuit.eau.cale);
+    if (r === 'eau') afficherMessage('L\'eau baigne encore les batteries : pompe d\'abord, sous leur étagère');
+    else if (sy.batterie.coupee === false && r === 'ok') afficherMessage(`Coupe-batterie réarmé : le courant revient (la batterie a perdu sa charge dans l'eau : ${Math.round(sy.batterie.charge * 100)} %)`);
   },
 };
 const gestes = creerGestes(jeu, bateau.interieur);
 const gestesDehors = gestes.filter((g) => !g.dedans);
+const gestesAuPoste = gestes.filter((g) => g.id !== 'siege');
 const sousTitres = document.getElementById('sous-titres');
 jeu.radio = new Radio({
   afficher: (t) => { sousTitres.textContent = t; sousTitres.hidden = !t || !options.sousTitres; },
@@ -270,7 +328,7 @@ quandOptionsChangent((o, changements) => {
 // quand il a lâché, plus personne ne tient la barre (elle revient au milieu, et le bateau
 // finit par se mettre en travers)
 function tenirLeBateau(dt) {
-  piloter(physique, etat.pilote && (!nuit || nuit.avaries.pilote !== 'panne'), dt);
+  piloter(physique, nuit ? nuit.systemes.piloteEnMarche : etat.pilote, dt);
 }
 
 // Les touches que l'on vient d'enfoncer
@@ -501,8 +559,8 @@ function simuler(dt) {
   } else if (etat.mode === 'poste') {
     // assis au poste de la timonerie : on agit sur ce qui est à portée de main (la VHF, le
     // radar, le traceur, le tableau électrique…), sans se lever
-    etat.geste = gesteVise(gestes.filter((g) => g.id !== 'poste' && g.id !== 'siege'), YEUX_POSTE, marin.direction(), {
-      portee: 1.1, encombrement: marin.encombrement, obstacle: porteFermeeEntre,
+    etat.geste = gesteVise(gestesAuPoste, YEUX_POSTE, marin.direction(), {
+      portee: 1.25, encombrement: marin.encombrement, obstacle: porteFermeeEntre,
     });
     poursuivreAction(dt);
   } else {
@@ -512,8 +570,12 @@ function simuler(dt) {
   // (les lumières du bord vacillent quand l'étrange arrive, ou quand la foudre tombe tout près ;
   // sur le mât, les écrans s'éteignent quelques secondes)
   etat.coupure = Math.max(0, (etat.coupure ?? 0) - dt);
-  const vacille = etat.coupure > 0 ? 0 : facteurVacille(dt);
+  const sy = nuit?.systemes ?? null;
+  // (la batterie presque vide : la lumière faiblit et hésite)
+  const faible = sy && sy.courant && sy.batterie.charge < BATTERIE.vide ? (0.45 + 0.55 * sy.batterie.charge / BATTERIE.vide) * (Math.random() < 0.08 ? 0.4 : 1) : 1;
+  const vacille = etat.coupure > 0 ? 0 : facteurVacille(dt) * faible;
   bateau.radar.vacille = vacille;
+  bateau.radar.alimente = !sy || sy.alimente('radar');
   // le modèle 3D suit la physique
   physique.origine(_origine);
   bateau.groupe.position.copy(_origine);
@@ -534,15 +596,17 @@ function simuler(dt) {
   if (physique.ecouteFocLibre) r.faseyementFoc = 1;
   r.deroule = Math.max(0.02, physique.deroule);
   r.angleSafran = physique.barre;
-  bateau.instruments.maj(dt, m, monde.ecl.nuit);
+  bateau.instruments.maj(dt, m, monde.ecl.nuit, !sy || sy.courant);
   majRadar(dt);
   // le traceur de cartes et la commande du pilote, sur la console de la timonerie
   const fond = physique.vitesse;
-  const piloteEnMarche = etat.pilote && nuit?.avaries.pilote !== 'panne';
+  const piloteEnMarche = sy ? sy.piloteEnMarche : etat.pilote;
   bateau.electronique.maj(dt, {
     x: physique.position.x, z: physique.position.z, cap: m.cap, vitesse: m.vitesse,
     route: (Math.atan2(fond.x, -fond.z) * 180 / Math.PI + 360) % 360,
     pilote: piloteEnMarche ? m.cap : null, panne: nuit?.avaries.pilote === 'panne', barre: physique.barre,
+    temperature: sy?.pilote.temperature ?? 0.3,
+    alimente: { traceur: !sy || sy.alimente('traceur'), pilote: !sy || sy.alimente('pilote'), compas: !sy || sy.courant },
     bouees: [], nuit: monde.ecl.nuit,
     // (la chose sous la coque : le sondeur la voit, lui)
     sonde: nuit?.peur?.chose?.sonde ?? null,
@@ -564,7 +628,9 @@ function simuler(dt) {
     pesanteur,
     temps: monde.temps,
   });
-  bateau.allumerFeux(etat.feux ? 1 : 0);
+  bateau.allumerFeux((sy ? sy.alimente('feux') : etat.feux) ? 1 : 0);
+  // les vitres de la timonerie (fendues, brisées)
+  if (sy) bateau.montrerVitres(sy.vitres.map((v) => v.etat));
   // le baromètre du bord : il montre la pression d'ici ; le bateau qui tape dans la mer décolle
   // son aiguille
   barometre.maj(dt, pressionIci(), { secousse: etat.mouvement ?? 0, heure: heureIci(), passe: (h) => pressionDuJour(h - 1.15) });
@@ -574,6 +640,7 @@ function simuler(dt) {
   }
   // l'intérieur : sa lumière (les plafonniers), le baromètre et la pendule
   bateau.interieur.regler({
+    systemes: sy,
     eclairage: etat.eclairage,
     feux: etat.feux,
     ciel: monde.ecl.ambiance,
@@ -583,8 +650,6 @@ function simuler(dt) {
     temoin: barometre.temoin,
     heure: nuit ? nuit.heure % 24 : meteo.heure,
     vacille,
-    pilotePanne: nuit?.avaries.pilote === 'panne',
-    baladeuse: bateau.interieur.trappeOuverte,
     nuit: monde.ecl.nuit,
     dt,
   });
@@ -652,6 +717,12 @@ function simuler(dt) {
     ...sonScelerate(),
     tension: nuit?.peur?.tension ?? 0,
     saintElme: dedans ? 0 : THREE.MathUtils.smoothstep(foudreActive().champ, 0.55, 0.85),
+    // les systèmes du bord : le moteur (il couvre le dehors), la pompe électrique, les volets,
+    // les alarmes
+    regimeMoteur: sy?.moteurEnMarche ? 1 : 0,
+    pompeElectrique: sy?.pompe.marche ?? false,
+    voletsBougent: !!sy && sy.alimente('volets') && COTES_VOLETS.some((c) => sy.volets[c].fraction !== sy.volets[c].cible),
+    alarmes: sy?.alarmes ?? null,
   });
   etat.attenteClaque = Math.max(0, etat.attenteClaque - dt);
   if (m.impactEtrave > 0.05 && etat.attenteClaque === 0) {
@@ -698,14 +769,13 @@ function contexteNuit(dt) {
     noir: monde.ecl.noir ?? 0,
     danger: etat.danger ?? 0,
     calme: etat.calme ?? 0,
-    pilote: etat.pilote && nuit?.avaries.pilote !== 'panne',
     mode: etat.mode,
     aBord: {
       feux: etat.feux,
       gilet: etat.gilet,
       descenteOuverte: bateau.descenteOuverte,
       trappeOuverte: bateau.interieur.trappeOuverte,
-      volets: Object.fromEntries(COTES_VOLETS.map((c) => [c, bateau.interieur.etatVolets(c)])),
+
       attache: marin.attache,
       dehors: etat.mode === 'pied' && marin.dehors,
       zone: marin.zone,
@@ -900,6 +970,54 @@ function facteurVacille(dt) {
   return etat.valeurVacille;
 }
 
+// Le côté d'où vient une chose (d : vers elle, dans le monde) : -1 à gauche → 1 à droite
+function panDepuis(d) {
+  const droite = _droite.setFromMatrixColumn(monde.camera.matrixWorld, 0);
+  const l = Math.hypot(d.x, d.z) || 1;
+  return THREE.MathUtils.clamp((d.x * droite.x + d.z * droite.z) / l, -1, 1) * 0.85;
+}
+// (le côté d'une vitre de la timonerie, vu d'où l'on est)
+const SENS_COTES = { tribord: [1, 0, 0], babord: [-1, 0, 0], avant: [0, 0, -1], arriere: [0, 0, 1] };
+const panVitre = (v) => panDepuis(new THREE.Vector3(...SENS_COTES[v.cote]).applyQuaternion(physique.orientation));
+const majuscule = (t) => t.charAt(0).toUpperCase() + t.slice(1);
+
+// Ce qui arrive aux systèmes du bord (quart/systemes.js, par la nuit) : on l'entend, on le
+// lit (les conseils, une seule fois par nuit)
+const premieresFois = new Set();
+function vivreSysteme(nom, arg) {
+  const sy = nuit.systemes;
+  const une = (cle, texte) => {
+    if (premieresFois.has(cle)) return;
+    premieresFois.add(cle);
+    afficherMessage(texte);
+  };
+  if (nom === 'moteur-lance') audio.demarreur?.();
+  else if (nom === 'moteur-refuse') audio.demarreurFaible?.();
+  else if (nom === 'moteur-demarre') une('moteur', 'Le moteur tourne : il recharge la batterie et soulage le pilote… mais on n\'entend plus venir les vagues');
+  else if (nom === 'moteur-arrete' && arg === 'surchauffe') {
+    audio.alarme?.(2);
+    afficherMessage('Le moteur a trop chauffé : il s\'est arrêté tout seul');
+  } else if (nom === 'vitre-fendue') {
+    audio.vitreFendue?.(panVitre(arg));
+    afficherMessage(`${majuscule(arg.nom)} s'est fendue : à la prochaine vague, elle éclate — ferme ses volets !`);
+  } else if (nom === 'vitre-brisee') {
+    audio.vitreBrisee?.(panVitre(arg));
+    secousse(0.5);
+    afficherMessage(`${majuscule(arg.nom)} a éclaté ! La mer entre : ferme ses volets`);
+  } else if (nom === 'noir') {
+    audio.coupure?.();
+    afficherMessage(sy.batterie.coupee
+      ? 'L\'eau a noyé les batteries : plus de courant ! Pompe à la main, puis réarme le coupe-batterie (derrière la pompe)'
+      : 'Plus de courant ! La batterie est vide… et sans courant, le moteur ne démarre plus');
+  } else if (nom === 'courant-revenu') afficherMessage('Le courant est revenu');
+  else if (nom === 'alarme') {
+    if (arg === 'cale') une('alarme-cale', 'Alarme de cale : l\'eau monte (la trappe est derrière le siège, la pompe à main juste à côté)');
+    else if (arg === 'batterie') une('alarme-batterie', 'Batterie faible : démarre le moteur (son tableau est à gauche du pupitre), ou coupe ce dont tu peux te passer');
+    else if (arg === 'pilote') une('alarme-pilote', 'Le pilote chauffe : le moteur le soulagerait… sinon, il va disjoncter');
+    else if (arg === 'moteur') une('alarme-moteur', 'Le moteur chauffe : arrête-le avant qu\'il ne se coupe tout seul');
+  }
+}
+
 // La foudre (monde/foudre.js) : ce qu'on en entend et ce qu'on en sent. La radio claque à
 // chaque éclair, même lointain ; le tonnerre arrive quand son bruit a fait le chemin (trois
 // secondes par kilomètre), de là où l'éclair est passé au plus près — à droite ou à gauche de
@@ -958,12 +1076,17 @@ function remettreLaTimonerie() {
   ouvrirDescente(false);
   bateau.interieur.ouvrirTrappe(false);
   ouvrirTrappe(false);
-  for (const c of COTES_VOLETS) bateau.interieur.fermerVolets(c, false, true);
+  if (nuit) {
+    nuit.systemes.baladeuse = false;
+    etat.eclairage = nuit.systemes.eclairage;
+    etat.feux = nuit.systemes.disjoncteurs.feux;
+  }
 }
 
 // Commencer la nuit : à minuit (ou reprendre une nuit gardée, au début d'une heure)
 function commencerNuit({ reprise = null, heure = null } = {}) {
   jeu.radio.taire();
+  premieresFois.clear();
   nuit = new Nuit({ graine: reprise?.graine ?? Math.floor(Math.random() * 1e6) });
   meteo = nuit.meteo;
   jeu.meteo = meteo;
@@ -1010,7 +1133,7 @@ function commencerNuit({ reprise = null, heure = null } = {}) {
       garderPartie({ heure: h, graine: nuit.graine, sauvegarde: nuit.instantaneAGarder(), journal: nuit.journal.slice(-40) });
     })
     .on('deferlante-annonce', (a) => {
-      audio.deferlante?.(a.force, a.dans);
+      audio.deferlante?.(a.force, a.dans, panDepuis(a.vers.clone().negate()));
       monde.deferlantes.annoncer(a);
       if (a.force > 0.9 && etat.mode === 'pied' && marin.dehors) afficherMessage(`Une grosse déferlante, ${cotePar(a.vers)} ! Tiens-toi (Maj)`);
     })
@@ -1027,15 +1150,18 @@ function commencerNuit({ reprise = null, heure = null } = {}) {
         marin.glissade.z += d.z * f.force * 3.2;
       }
     })
-    .on('avarie', (nom) => {
+    .on('avarie', (nom, { raison } = {}) => {
       if (nom === 'pilote') audio.alarme?.();
       else audio.dechirure?.(nom === 'ecouteFoc' ? 'claque' : 'dechire');
       afficherMessage({
         ecouteFoc: 'L\'écoute du foc a cassé : il bat ! Sors le rouler (la bosse d\'enrouleur, dans le cockpit)',
         foc: 'Le foc s\'est déchiré',
-        pilote: 'Alarme : le pilote a lâché ! Réarme son disjoncteur au tableau électrique',
+        pilote: raison === 'surchauffe'
+          ? 'Alarme : le pilote a trop chauffé, son disjoncteur a sauté ! Il se réarme au tableau… une fois refroidi'
+          : 'Alarme : le pilote a lâché ! Réarme son disjoncteur au tableau électrique',
       }[nom]);
     })
+    .on('systeme', (nom, arg) => vivreSysteme(nom, arg))
     .on('etrange', (nom) => vivreEtrange(nom))
     .on('peur', (e) => vivrePeur(e))
     .on('scelerate-trou', () => audio.etouffer?.(2.6, 0.55))
@@ -1205,14 +1331,28 @@ function afficherHeure() {
   }
   zone.hidden = false;
   const alertes = [];
+  const sy = nuit.systemes;
+  if (!sy.courant) alertes.push(sy.batterie.coupee ? 'Batteries noyées' : 'Plus de courant');
   if (nuit.avaries.pilote === 'panne') alertes.push('Pilote en panne');
+  else if (sy.alarmes.has('pilote')) alertes.push('Le pilote chauffe');
+  else if (!sy.pilote.engage) alertes.push('Pilote en veille');
+  if (sy.alarmes.has('moteur')) alertes.push('Le moteur chauffe');
+  if (sy.alarmes.has('batterie')) alertes.push('Batterie faible');
+  if (sy.alarmes.has('cale')) alertes.push('Alarme de cale');
+  const brisees = sy.vitres.filter((v) => v.etat === 'brisee').length;
+  const fendues = sy.vitres.filter((v) => v.etat === 'fendue').length;
+  if (brisees) alertes.push(`${brisees} vitre${brisees > 1 ? 's' : ''} brisée${brisees > 1 ? 's' : ''}`);
+  else if (fendues) alertes.push(`${fendues} vitre${fendues > 1 ? 's' : ''} fendue${fendues > 1 ? 's' : ''}`);
   if (nuit.avaries.ecouteFoc === 'cassee' && physique.deroule > 0.03) alertes.push('Le foc bat');
-  if (nuit.eau.cale > EAU.planchers) alertes.push(`Eau à bord : ${Math.round(nuit.eau.cale / 10) * 10} L`);
   if (bateau.descenteOuverte) alertes.push('Porte ouverte');
-  const cle = `${heureRonde(nuit.heure)}|${alertes.join('|')}`;
+  // (la batterie, sous l'heure, comme le courant qui reste dans FNAF ; le moteur qui tourne)
+  const batterie = sy.courant ? `Batterie ${Math.round(sy.batterie.charge * 100)} %${sy.moteurEnMarche ? ' · moteur' : ''}` : 'Batterie —';
+  const cle = `${heureRonde(nuit.heure)}|${batterie}|${alertes.join('|')}`;
   if (cle === heureAffichee) return;
   heureAffichee = cle;
   zone.querySelector('.h').textContent = heureRonde(Math.min(nuit.heure, HEURE_AUBE));
+  zone.querySelector('.batterie').textContent = batterie;
+  zone.querySelector('.batterie').classList.toggle('faible', !sy.courant || sy.batterie.charge < BATTERIE.faible);
   zone.querySelector('.alertes').innerHTML = alertes.map((a) => `<li>${a}</li>`).join('');
 }
 
@@ -1326,7 +1466,8 @@ function afficherMessage(texte) {
   m.textContent = texte;
   m.classList.add('visible');
   clearTimeout(minuterieMessage);
-  minuterieMessage = setTimeout(() => m.classList.remove('visible'), 3400);
+  // (le temps de le lire : plus il est long, plus il reste)
+  minuterieMessage = setTimeout(() => m.classList.remove('visible'), Math.min(8000, 2600 + texte.length * 40));
 }
 
 // ce que l'on vise (au centre de l'écran) : « E : pomper »

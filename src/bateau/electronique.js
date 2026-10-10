@@ -90,9 +90,10 @@ export class Electronique {
   }
 
   // dt ; etat : { x, z, cap, vitesse (nds), route (degrés, sur le fond), pilote (null : en
-  // veille, ou le cap voulu), panne (le pilote a lâché), barre (-1 → 1), bouees : [{x, z}],
-  // nuit (0 → 1), baro : { p (hPa), dp (hPa en trois heures, ou null), historique : [{ heure,
-  // p }], heure } ou null }
+  // veille, ou le cap voulu), panne (le pilote a lâché), barre (-1 → 1), temperature (celle
+  // du moteur du pilote, 0 → 1), bouees : [{x, z}], nuit (0 → 1), baro : { p (hPa), dp (hPa en
+  // trois heures, ou null), historique : [{ heure, p }], heure } ou null, alimente : { traceur,
+  // pilote, compas } (sans courant, l'écran est noir) }
   maj(dt, etat) {
     // (la rose garde le nord : elle tourne dans l'autre sens que le bateau)
     this.rose.quaternion.copy(this.roseQuaternion).multiply(_qRose.setFromAxisAngle(_axeZ, (etat.cap * Math.PI) / 180));
@@ -107,9 +108,13 @@ export class Electronique {
       this.trajet.push({ x: etat.x, z: etat.z });
       if (this.trajet.length > 360) this.trajet.shift();
     }
-    // (l'éclat des écrans : plus faible la nuit ; il hésite quand le courant hésite)
-    for (const m of this.materiaux) m.emissiveIntensity = (1 - 0.78 * etat.nuit) * (etat.vacille ?? 1);
-    this.materiauRose.emissiveIntensity = 0.35 * etat.nuit * (etat.vacille ?? 1);
+    // (l'éclat des écrans : plus faible la nuit ; il hésite quand le courant hésite ; noir sans
+    // courant)
+    const a = etat.alimente ?? { traceur: true, pilote: true, compas: true };
+    const eclat = (1 - 0.78 * etat.nuit) * (etat.vacille ?? 1);
+    this.materiaux[0].emissiveIntensity = a.traceur ? eclat : 0;
+    this.materiaux[1].emissiveIntensity = a.pilote ? eclat : 0;
+    this.materiauRose.emissiveIntensity = a.compas ? 0.35 * etat.nuit * (etat.vacille ?? 1) : 0;
     if (this.age < 0.25) return;
     this.age = 0;
     this.dessinerTraceur(etat);
@@ -308,27 +313,38 @@ export class Electronique {
     ctx.strokeStyle = encre;
     ctx.textAlign = 'left';
     ctx.font = '700 20px ui-monospace, Menlo, monospace';
-    const mode = e.panne ? 'ALARME' : e.pilote === null ? 'VEILLE' : 'AUTO';
-    if (!(e.panne && Math.floor(this.clignote * 2) % 2)) ctx.fillText(mode, 12, 28);
+    const temperature = e.temperature ?? 0;
+    const chaud = temperature > 0.85;
+    const mode = e.panne ? 'ALARME' : chaud ? 'CHAUD !' : e.pilote === null ? 'VEILLE' : 'AUTO';
+    if (!((e.panne || chaud) && Math.floor(this.clignote * 2) % 2)) ctx.fillText(mode, 12, 26);
     ctx.font = '600 15px ui-monospace, Menlo, monospace';
     ctx.textAlign = 'right';
-    ctx.fillText(`CAP ${String(Math.round(e.cap) % 360).padStart(3, '0')}°`, L - 12, 26);
+    ctx.fillText(`CAP ${String(Math.round(e.cap) % 360).padStart(3, '0')}°`, L - 12, 24);
     ctx.textAlign = 'center';
-    ctx.font = '700 52px ui-monospace, Menlo, monospace';
-    ctx.fillText(e.pilote === null || e.panne ? '---' : `${String(Math.round(e.pilote) % 360).padStart(3, '0')}°`, L / 2, 86);
-    // l'angle de barre : une petite échelle en bas
-    const y = 108;
+    ctx.font = '700 42px ui-monospace, Menlo, monospace';
+    ctx.fillText(e.pilote === null || e.panne ? '---' : `${String(Math.round(e.pilote) % 360).padStart(3, '0')}°`, L / 2, 68);
+    // l'angle de barre : une petite échelle
+    const y = 86;
     ctx.lineWidth = 2;
     ctx.beginPath();
     ctx.moveTo(40, y);
     ctx.lineTo(L - 40, y);
     ctx.stroke();
     ctx.beginPath();
-    ctx.moveTo(L / 2, y - 6);
-    ctx.lineTo(L / 2, y + 6);
+    ctx.moveTo(L / 2, y - 5);
+    ctx.lineTo(L / 2, y + 5);
     ctx.stroke();
     const xb = L / 2 + Math.max(-1, Math.min(1, e.barre / 0.6)) * (L / 2 - 44);
-    ctx.fillRect(xb - 5, y - 9, 10, 18);
+    ctx.fillRect(xb - 4, y - 7, 8, 14);
+    // la température du moteur du pilote : un thermomètre couché (rouge au-delà de 85 %)
+    const yt = 112;
+    ctx.font = '700 14px ui-monospace, Menlo, monospace';
+    ctx.textAlign = 'left';
+    ctx.fillText('TEMP', 12, yt + 5);
+    ctx.lineWidth = 2;
+    ctx.strokeRect(62, yt - 7, L - 76, 14);
+    ctx.fillRect(64, yt - 5, (L - 80) * Math.min(1, temperature), 10);
+    ctx.fillRect(62 + (L - 76) * 0.85, yt - 10, 2, 20);
     texture.needsUpdate = true;
   }
 }

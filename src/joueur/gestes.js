@@ -15,7 +15,13 @@ import { Vector3 } from 'three';
 import { COCKPIT, TIMONERIE, zDe, hauteurPont, hauteurLivet } from '../bateau/forme.js';
 import { SIEGE, surPupitre } from '../bateau/interieur-timonerie.js';
 import { UW_ENROULEUR } from '../bateau/modele.js';
+import { NOMS_DISJONCTEURS } from '../quart/systemes.js';
 
+// (un appareil électrique : sans courant, ou son disjoncteur coupé, il ne fait rien)
+const sousTension = (jeu, nom, appareil) => ({
+  possible: () => !jeu.nuit || jeu.nuit.systemes.alimente(nom),
+  refus: () => (jeu.nuit?.systemes.courant ? `${appareil} : son disjoncteur est coupé, au tableau` : `${appareil} : plus de courant`),
+});
 const NOMS_COTES = { avant: 'à l\'avant', tribord: 'à tribord', babord: 'à bâbord', arriere: 'à l\'arrière' };
 
 // jeu : l'objet qui sait agir (voir quart.js) ; interieur : pour placer la radio, le
@@ -59,13 +65,78 @@ export function creerGestes(jeu, interieur) {
       principal: { texte: () => (jeu.bateau.descenteOuverte ? 'fermer la porte' : 'ouvrir la porte'), faire: () => jeu.basculerDescente() },
     },
     {
-      // le poste de pilotage : on s'assied, et l'on règle le cap du pilote automatique
-      id: 'poste',
+      // la commande du pilote, au milieu du pupitre : on le met en veille (il refroidit, mais
+      // plus personne ne tient la barre) ou on l'enclenche
+      id: 'pilote',
       point: surPupitre(0, 0.2).position,
-      rayon: 0.13,
+      rayon: 0.08,
+      dedans: true,
       soi: ['noir', 'sans-nom', 'instruments'],
-      titre: () => 'Le poste de pilotage : la commande du pilote',
-      principal: { texte: 't\'asseoir au poste (barrer au pilote)', faire: () => jeu.allerAuPoste() },
+      titre: () => {
+        const sy = jeu.nuit?.systemes;
+        return sy ? `Le pilote automatique (moteur à ${Math.round(sy.pilote.temperature * 100)} %)` : 'Le pilote automatique';
+      },
+      principal: {
+        texte: () => (jeu.nuit?.systemes.pilote.engage === false ? 'l\'enclencher' : 'le mettre en veille'),
+        possible: () => !!jeu.nuit,
+        faire: () => jeu.basculerPilote(),
+      },
+    },
+    {
+      // le bouton du moteur, sur son tableau, à gauche du pupitre
+      id: 'moteur',
+      point: interieur.positionMoteur.clone(),
+      rayon: 0.05,
+      dedans: true,
+      soi: ['tableau-moteur', 'noir', 'sans-nom'],
+      titre: () => {
+        const m = jeu.nuit?.systemes.moteur;
+        return m ? `Le moteur (${m.etat === 'marche' ? 'en marche' : m.etat === 'lancement' ? 'il démarre' : 'arrêté'}, ${Math.round(20 + 90 * m.temperature)} °C)` : 'Le moteur';
+      },
+      principal: {
+        texte: () => (jeu.nuit?.systemes.moteur.etat === 'arrete' ? 'démarrer' : 'arrêter'),
+        possible: () => !!jeu.nuit,
+        faire: () => jeu.basculerMoteur(),
+      },
+    },
+    // les disjoncteurs du tableau électrique, un par un
+    ...Object.entries(interieur.tableau.positionsDisjoncteurs).map(([nom, point]) => ({
+      id: `disjoncteur-${nom}`,
+      point: point.clone(),
+      rayon: 0.021,
+      dedans: true,
+      soi: ['tableau-electrique', 'noir', 'sans-nom'],
+      titre: () => {
+        const sy = jeu.nuit?.systemes;
+        const etat = !sy ? '' : nom === 'pilote' && sy.pilote.disjoncte ? ' (sauté)' : sy.disjoncteurs[nom] ? '' : ' (coupé)';
+        return `Disjoncteur : ${NOMS_DISJONCTEURS[nom]}${etat}`;
+      },
+      principal: {
+        texte: () => {
+          const sy = jeu.nuit?.systemes;
+          if (nom === 'pilote' && sy?.pilote.disjoncte) return 'le réarmer';
+          return sy?.disjoncteurs[nom] === false ? 'le remettre' : 'le couper';
+        },
+        possible: () => !!jeu.nuit,
+        faire: () => jeu.basculerDisjoncteur(nom),
+      },
+      ...(nom === 'eclairage' ? { secondaire: { texte: () => (jeu.etat.eclairage === 'rouge' ? 'passer en blanc' : jeu.etat.eclairage === 'blanc' ? 'éteindre' : 'passer en rouge'), faire: () => jeu.basculerEclairage() } } : {}),
+    })),
+    {
+      // le coupe-batterie, sur la paroi bâbord, derrière la pompe : l'eau des batteries le fait
+      // sauter ; on le réarme une fois l'eau redescendue
+      id: 'coupe-batterie',
+      point: interieur.positionCoupeBatterie.clone(),
+      rayon: 0.09,
+      dedans: true,
+      soi: ['coupe-batterie', 'noir', 'lambris-timonerie'],
+      titre: () => (jeu.nuit?.systemes.batterie.coupee ? 'Le coupe-batterie : il a sauté !' : 'Le coupe-batterie (le courant passe)'),
+      principal: {
+        texte: 'le réarmer',
+        possible: () => !!jeu.nuit?.systemes.batterie.coupee,
+        refus: () => 'Le courant passe : le coupe-batterie est en place',
+        faire: () => jeu.rearmerBatterie(),
+      },
     },
     {
       id: 'siege',
@@ -114,9 +185,9 @@ export function creerGestes(jeu, interieur) {
       rayon: 0.13,
       soi: ['noir', 'sans-nom'],
       titre: () => `Radio VHF (canal ${jeu.radio.canal})`,
-      principal: { texte: 'écouter', faire: () => jeu.ecouterMeteo() },
+      principal: { texte: 'écouter', faire: () => jeu.ecouterMeteo(), ...sousTension(jeu, 'vhf', 'La VHF') },
       // (on appelle sur le 16, le canal de détresse : personne ne répond)
-      secondaire: { texte: 'appeler', faire: () => jeu.appelerJos() },
+      secondaire: { texte: 'appeler', faire: () => jeu.appelerJos(), ...sousTension(jeu, 'vhf', 'La VHF') },
     },
     {
       // le baromètre : on tapote le verre (l'aiguille colle un peu)
@@ -143,8 +214,8 @@ export function creerGestes(jeu, interieur) {
         rayon,
         soi: ['noir', 'sans-nom', 'instruments'],
         titre: () => `${nom} : ${String(jeu.bateau.radar.milles).replace('.', ',')} milles`,
-        principal: { texte: 'changer de portée', faire: () => jeu.radarPortee() },
-        secondaire: { texte: () => (jeu.bateau.radar.filtreMer ? 'couper le filtre de mer' : 'remettre le filtre de mer'), faire: () => jeu.radarFiltre() },
+        principal: { texte: 'changer de portée', faire: () => jeu.radarPortee(), ...sousTension(jeu, 'radar', 'Le radar') },
+        secondaire: { texte: () => (jeu.bateau.radar.filtreMer ? 'couper le filtre de mer' : 'remettre le filtre de mer'), faire: () => jeu.radarFiltre(), ...sousTension(jeu, 'radar', 'Le radar') },
       })),
     {
       // le traceur de cartes : on change l'échelle de la carte
@@ -153,22 +224,8 @@ export function creerGestes(jeu, interieur) {
       rayon: 0.12,
       soi: ['noir', 'sans-nom'],
       titre: () => `Traceur de cartes : ${String(jeu.bateau.electronique.milles).replace('.', ',')} milles`,
-      principal: { texte: 'agrandir la carte', faire: () => jeu.zoomTraceur(-1) },
-      secondaire: { texte: 'voir plus loin', faire: () => jeu.zoomTraceur(1) },
-    },
-    {
-      id: 'tableau',
-      point: interieur.positionTableau.clone(),
-      rayon: 0.1,
-      soi: ['noir', 'sans-nom', 'tableau-electrique'],
-      titre: () => 'Tableau électrique',
-      // (le pilote en panne : son disjoncteur a sauté, on le réarme ici)
-      principal: {
-        texte: () => (jeu.nuit?.avaries.pilote === 'panne' ? 'réarmer le disjoncteur du pilote'
-          : jeu.etat.feux ? 'éteindre les feux de navigation' : 'allumer les feux de navigation'),
-        faire: () => (jeu.nuit?.avaries.pilote === 'panne' ? jeu.reparer('pilote') : jeu.basculerFeux()),
-      },
-      secondaire: { texte: 'éclairage', faire: () => jeu.basculerEclairage() },
+      principal: { texte: 'agrandir la carte', faire: () => jeu.zoomTraceur(-1), ...sousTension(jeu, 'traceur', 'Le traceur') },
+      secondaire: { texte: 'voir plus loin', faire: () => jeu.zoomTraceur(1), ...sousTension(jeu, 'traceur', 'Le traceur') },
     },
   ];
 }

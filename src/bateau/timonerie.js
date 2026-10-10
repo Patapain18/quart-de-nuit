@@ -231,36 +231,201 @@ export function geometrieCorniches() {
   return mergeGeometries(geos);
 }
 
-// Les vitres : un peu en retrait des trous (2 cm vers l'intérieur)
-function geometrieVitres() {
-  const vitres = [];
+// Les vitres : un peu en retrait des trous (2 cm vers l'intérieur). Chacune à part (dans
+// l'ordre de quart/systemes.js, VITRES : tribord arrière et avant, bâbord arrière et avant, le
+// pare-brise de bâbord à tribord, les fenêtres arrière de tribord et de bâbord) : une grille
+// de points (ni × nj cases), et le sens de l'intérieur de la timonerie
+function grillesDesVitres() {
+  const grilles = [];
   // les côtés
   for (const s of [1, -1]) {
     for (const [f0, f1] of FENETRES_COTE) {
-      vitres.push(grilleTrouee(8, 1, (i, j) => {
-        const a = f0 + ((f1 - f0) * i) / 8;
-        const p = pointParoi(s, a, j === 0 ? Y_VITRE_BAS : Y_VITRE_HAUT);
-        return [p[0] - s * 0.02, p[1], p[2]];
-      }));
+      grilles.push({
+        ni: 8, nj: 1, dedans: [-s, 0, 0],
+        point: (i, j) => {
+          const p = pointParoi(s, f0 + ((f1 - f0) * i) / 8, j === 0 ? Y_VITRE_BAS : Y_VITRE_HAUT);
+          return [p[0] - s * 0.02, p[1], p[2]];
+        },
+      });
     }
   }
   // le pare-brise
   for (const [c0, c1] of vitresPareBrise()) {
-    vitres.push(grilleTrouee(6, 4, (i, j) => {
-      const c = c0 + ((c1 - c0) * i) / 6;
-      const y = Y_VITRE_BAS + 0.04 + ((Y_VITRE_HAUT - Y_VITRE_BAS - 0.04) * j) / 4;
-      const p = pointPareBrise(c, y);
-      return [p[0], p[1], p[2] + 0.02];
-    }));
+    grilles.push({
+      ni: 6, nj: 4, dedans: [0, 0, 1],
+      point: (i, j) => {
+        const y = Y_VITRE_BAS + 0.04 + ((Y_VITRE_HAUT - Y_VITRE_BAS - 0.04) * j) / 4;
+        const p = pointPareBrise(c0 + ((c1 - c0) * i) / 6, y);
+        return [p[0], p[1], p[2] + 0.02];
+      },
+    });
   }
   // les fenêtres arrière
   const F = FENETRE_ARRIERE;
   for (const s of [1, -1]) {
-    const g = new THREE.PlaneGeometry(F.x1 - F.x0, F.y1 - F.y0);
-    g.translate(s * (F.x0 + F.x1) / 2, (F.y0 + F.y1) / 2, Z_AR - 0.02);
-    vitres.push(g);
+    const [x0, x1] = s > 0 ? [F.x0, F.x1] : [-F.x1, -F.x0];
+    grilles.push({ ni: 1, nj: 1, dedans: [0, 0, -1], point: (i, j) => [x0 + (x1 - x0) * i, F.y0 + (F.y1 - F.y0) * j, Z_AR - 0.02] });
   }
-  return mergeGeometries(vitres.map((g) => (g.index ? g.toNonIndexed() : g)));
+  return grilles;
+}
+// La surface d'une vitre (u le long de sa largeur, v de sa hauteur, de 0 à 1), décalée de
+// « decalage » mètres vers l'intérieur (pour ses fêlures, posées juste derrière elle)
+function surfaceVitre({ ni, nj, point, dedans }, decalage = 0) {
+  const positions = [];
+  const uvs = [];
+  for (let i = 0; i <= ni; i++) {
+    for (let j = 0; j <= nj; j++) {
+      const p = point(i, j);
+      positions.push(p[0] + dedans[0] * decalage, p[1] + dedans[1] * decalage, p[2] + dedans[2] * decalage);
+      uvs.push(i / ni, j / nj);
+    }
+  }
+  const indices = [];
+  for (let i = 0; i < ni; i++) {
+    for (let j = 0; j < nj; j++) {
+      const a = i * (nj + 1) + j;
+      const b = a + nj + 1;
+      indices.push(a, b, a + 1, b, b + 1, a + 1);
+    }
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+  g.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
+  g.setIndex(indices);
+  g.computeVertexNormals();
+  return g;
+}
+function geometriesVitres() {
+  return grillesDesVitres().map((g) => surfaceVitre(g));
+}
+
+// Les fêlures d'une vitre, dessinées au hasard (graine) : une étoile de fissures autour du
+// point d'impact, reliées par des arcs (la toile d'araignée d'un verre feuilleté) ; brisée :
+// il ne reste que des éclats sur le pourtour, le milieu est un trou aux bords déchiquetés.
+// Rend deux textures (avec leur transparence).
+function hasardDe(graine) {
+  let a = (graine * 2654435761) >>> 0;
+  return () => {
+    a = (a + 0x6d2b79f5) >>> 0;
+    let t = Math.imul(a ^ (a >>> 15), a | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+function texturesFelures(graine) {
+  const h = hasardDe(graine + 1);
+  const N = 512;
+  const fissures = (cx, { trou = false } = {}) => {
+    const ix = N * (0.3 + 0.4 * h());
+    const iy = N * (0.3 + 0.4 * h());
+    const n = 9 + Math.floor(h() * 6);
+    const rayons = [];
+    for (let k = 0; k < n; k++) {
+      const a = ((k + h() * 0.6) / n) * Math.PI * 2;
+      const pts = [[ix, iy]];
+      let x = ix;
+      let y = iy;
+      let dir = a;
+      for (let m = 0; m < 14 && x > -20 && x < N + 20 && y > -20 && y < N + 20; m++) {
+        dir += (h() - 0.5) * 0.5;
+        const l = N * (0.03 + 0.05 * h());
+        x += Math.cos(dir) * l;
+        y += Math.sin(dir) * l;
+        pts.push([x, y]);
+      }
+      rayons.push(pts);
+    }
+    cx.strokeStyle = 'rgba(225, 235, 240, 0.9)';
+    cx.lineCap = 'round';
+    for (const pts of rayons) {
+      cx.lineWidth = 1.6 + h() * 1.6;
+      cx.beginPath();
+      cx.moveTo(...pts[0]);
+      for (const p of pts.slice(1)) cx.lineTo(...p);
+      cx.stroke();
+      // (une branche, de temps en temps)
+      if (h() < 0.6 && pts.length > 4) {
+        const p = pts[2 + Math.floor(h() * (pts.length - 3))];
+        cx.lineWidth = 1.1;
+        cx.beginPath();
+        cx.moveTo(...p);
+        cx.lineTo(p[0] + (h() - 0.5) * N * 0.18, p[1] + (h() - 0.5) * N * 0.18);
+        cx.stroke();
+      }
+    }
+    // les arcs entre les fissures (deux ou trois tours de toile)
+    for (const r of [0.08, 0.16, 0.27].slice(0, trou ? 2 : 3)) {
+      cx.lineWidth = 1.2;
+      cx.beginPath();
+      rayons.forEach((pts, k) => {
+        const p = pts[Math.min(pts.length - 1, Math.max(1, Math.round((r * N) / (N * 0.055))))];
+        const [x, y] = [p[0] + (h() - 0.5) * 8, p[1] + (h() - 0.5) * 8];
+        if (k === 0) cx.moveTo(x, y);
+        else cx.lineTo(x, y);
+      });
+      cx.closePath();
+      cx.stroke();
+    }
+    // (le point d'impact : du verre broyé, blanc)
+    const g = cx.createRadialGradient(ix, iy, 0, ix, iy, N * 0.07);
+    g.addColorStop(0, 'rgba(235, 240, 242, 0.85)');
+    g.addColorStop(1, 'rgba(235, 240, 242, 0)');
+    cx.fillStyle = g;
+    cx.fillRect(0, 0, N, N);
+    return { ix, iy, rayons };
+  };
+  const fendue = document.createElement('canvas');
+  fendue.width = fendue.height = N;
+  fissures(fendue.getContext('2d'));
+  // brisée : le verre qui reste (teinté, un peu blanchi), percé d'un trou déchiqueté
+  const brisee = document.createElement('canvas');
+  brisee.width = brisee.height = N;
+  const cb = brisee.getContext('2d');
+  cb.fillStyle = 'rgba(120, 140, 150, 0.32)';
+  cb.fillRect(0, 0, N, N);
+  const { ix, iy } = fissures(cb, { trou: true });
+  cb.globalCompositeOperation = 'destination-out';
+  cb.beginPath();
+  const nb = 22;
+  for (let k = 0; k <= nb; k++) {
+    const a = (k / nb) * Math.PI * 2;
+    // (le bord du trou : en dents de scie, jusqu'à 6 % du bord de la vitre)
+    const r = N * (0.3 + 0.18 * h()) * (k % 2 ? 0.75 : 1.05);
+    const x = Math.min(N * 0.94, Math.max(N * 0.06, ix + Math.cos(a) * r));
+    const y = Math.min(N * 0.94, Math.max(N * 0.06, iy + Math.sin(a) * r));
+    if (k === 0) cb.moveTo(x, y);
+    else cb.lineTo(x, y);
+  }
+  cb.closePath();
+  cb.fill();
+  cb.globalCompositeOperation = 'source-over';
+  return [fendue, brisee].map((c) => {
+    const t = new THREE.CanvasTexture(c);
+    t.colorSpace = THREE.SRGBColorSpace;
+    t.anisotropy = 4;
+    return t;
+  });
+}
+
+// Pour chaque vitre : sa fêlure (cachée tant qu'elle tient) et ce qu'il en reste brisée,
+// posées 2 mm derrière elle
+function creerFelures() {
+  return grillesDesVitres().map((grille, k) => {
+    const [fendue, brisee] = texturesFelures(k * 7 + 3);
+    // (le verre broyé accroche la moindre lumière : il luit à peine, même la nuit)
+    const materiau = (map) => new THREE.MeshStandardMaterial({
+      map, emissive: 0xffffff, emissiveMap: map, emissiveIntensity: 0.1, transparent: true, depthWrite: false, roughness: 0.25, metalness: 0, side: THREE.DoubleSide,
+    });
+    const felure = new THREE.Mesh(surfaceVitre(grille, 0.002), materiau(fendue));
+    felure.name = 'timonerie-felure';
+    felure.visible = false;
+    felure.renderOrder = 4;
+    const eclats = new THREE.Mesh(surfaceVitre(grille, 0.002), materiau(brisee));
+    eclats.name = 'timonerie-felure';
+    eclats.visible = false;
+    eclats.renderOrder = 4;
+    return { felure, eclats };
+  });
 }
 
 // Les cadres des vitres : un joint noir de 2 cm autour de chaque fenêtre, vu de dehors
@@ -412,7 +577,8 @@ function creerEssuieGlaces(materiaux) {
 export function construireTimonerie(materiaux) {
   return {
     blanc: mergeGeometries([...geometrieCotes(), geometriePareBrise(), geometrieToit(), geometrieParoiArriere()].map((g) => (g.index ? g.toNonIndexed() : g))),
-    verre: geometrieVitres(),
+    verres: geometriesVitres(),
+    felures: creerFelures(),
     joints: geometrieJoints(),
     mains: geometrieMainsCourantes(),
     porte: creerPorte(materiaux),

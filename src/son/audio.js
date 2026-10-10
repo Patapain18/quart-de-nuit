@@ -165,9 +165,11 @@ export class Audio {
     // les bus
     this.filtreCabine = filtre('lowpass', 18000, 0.5);
     this.bus = { dehors: gain(1), dedans: gain(0), bord: gain(1), radio: gain(1) };
-    // (le bruit du monde peut se retirer un instant : etouffer())
+    // (le bruit du monde peut se retirer un instant : etouffer() ; et le moteur du bord, quand
+    // il tourne, le couvre : masque)
     this.etouffe = gain(1);
-    this.bus.dehors.connect(this.etouffe).connect(this.filtreCabine).connect(this.compresseur);
+    this.masque = gain(1);
+    this.bus.dehors.connect(this.etouffe).connect(this.masque).connect(this.filtreCabine).connect(this.compresseur);
     this.bus.dedans.connect(this.compresseur);
     this.bus.bord.connect(this.compresseur);
     this.bus.radio.connect(this.sortie);
@@ -251,6 +253,63 @@ export class Audio {
     diesel.connect(module).connect(this.moteur.filtre).connect(this.moteur.gain).connect(this.bus.dehors);
     diesel.start();
     battement.start();
+    // le moteur du bord : un diesel de quatre cylindres, sous le cockpit — à 1 800 tours, une
+    // explosion toutes les 17 ms (60 Hz), irrégulière d'un cycle à l'autre (15 Hz), le
+    // claquement des injecteurs par-dessus, et la coque qui vibre dessous ; il s'entend
+    // partout à bord
+    this.diesel = { gain: gain(), regime: 0 };
+    {
+      const explosions = ctx.createOscillator();
+      explosions.type = 'sawtooth';
+      explosions.frequency.value = 60;
+      const cycle = ctx.createOscillator();
+      cycle.frequency.value = 15;
+      const irregulier = gain(0.7);
+      cycle.connect(gain(0.3)).connect(irregulier.gain);
+      const grave = filtre('lowpass', 210, 1.2);
+      explosions.connect(irregulier).connect(grave).connect(gain(0.9)).connect(this.diesel.gain);
+      const claque = gain(0);
+      const hacheur = ctx.createOscillator();
+      hacheur.type = 'square';
+      hacheur.frequency.value = 60;
+      hacheur.connect(gain(0.5)).connect(claque.gain);
+      claque.gain.value = 0.5;
+      source(this.blanc, 1).connect(filtre('bandpass', 1300, 1.6)).connect(claque).connect(gain(0.22)).connect(this.diesel.gain);
+      const coque = ctx.createOscillator();
+      coque.frequency.value = 30;
+      coque.connect(gain(0.45)).connect(this.diesel.gain);
+      for (const o of [explosions, cycle, hacheur, coque]) o.start();
+      this.diesel.oscillateurs = [explosions, cycle, hacheur, coque];
+      this.diesel.gain.connect(this.bus.bord);
+    }
+    // la pompe de cale électrique : un moteur qui geint, l'eau qui gicle dans le tuyau
+    this.pompeElectrique = { gain: gain() };
+    {
+      const o = ctx.createOscillator();
+      o.type = 'sawtooth';
+      o.frequency.value = 182;
+      o.connect(filtre('lowpass', 900, 0.8)).connect(gain(0.5)).connect(this.pompeElectrique.gain);
+      source(this.rose, 1.4).connect(filtre('bandpass', 700, 1.2)).connect(gain(0.6)).connect(this.pompeElectrique.gain);
+      o.start();
+      this.pompeElectrique.gain.connect(this.bus.bord);
+    }
+    // les moteurs des volets : un ronronnement, tant qu'ils bougent
+    this.moteursVolets = { gain: gain() };
+    {
+      const o = ctx.createOscillator();
+      o.type = 'sawtooth';
+      o.frequency.value = 96;
+      const f = filtre('bandpass', 420, 2);
+      const lfo = ctx.createOscillator();
+      lfo.frequency.value = 23;
+      const m = gain(0.6);
+      lfo.connect(gain(0.4)).connect(m.gain);
+      o.connect(f).connect(m).connect(this.moteursVolets.gain);
+      o.start();
+      lfo.start();
+      this.moteursVolets.gain.connect(this.bus.bord);
+    }
+    this.alarmesBord = {}; // (quand chaque alarme a sonné la dernière fois)
     // la vague scélérate : un grondement grave qui enfle pendant qu'elle approche, et
     // dessous une pulsation sourde (deux notes très graves, presque pareilles, qui battent
     // lentement l'une contre l'autre : on la sent plus qu'on ne l'entend)
@@ -467,6 +526,25 @@ export class Audio {
     this.boucle('hurlement', (this.dedans ? 0.5 : 0.22) * lisse(26, 42, vent) * (0.4 + 0.6 * (e.nuit ?? 0)), 1.2);
     // le moteur du pilote, quand il pousse la barre
     this.boucle('pilote', 0.5 * Math.min(1, e.pilote ?? 0), 0.08);
+    // le moteur du bord (0 : arrêté → 1 : à son régime ; il se lance et s'arrête en douceur) ;
+    // quand il tourne, il couvre le monde du dehors : on n'entend plus venir les vagues
+    const regime = e.regimeMoteur ?? 0;
+    this.niveaux.moteur = regime;
+    if (Math.abs(regime - this.diesel.regime) > 0.002) {
+      this.diesel.regime = regime;
+      const [explosions, cycle, hacheur, coque] = this.diesel.oscillateurs;
+      const f = 0.25 + 0.75 * regime;
+      explosions.frequency.setTargetAtTime(60 * f, t, 0.3);
+      hacheur.frequency.setTargetAtTime(60 * f, t, 0.3);
+      cycle.frequency.setTargetAtTime(15 * f, t, 0.3);
+      coque.frequency.setTargetAtTime(30 * f, t, 0.3);
+    }
+    this.vers(this.diesel.gain.gain, 0.42 * regime * (this.dedans ? 1 : 0.8), 0.4);
+    this.vers(this.masque.gain, 1 - 0.55 * regime, 0.6);
+    this.vers(this.pompeElectrique.gain.gain, e.pompeElectrique ? 0.08 : 0, 0.15);
+    this.vers(this.moteursVolets.gain.gain, e.voletsBougent ? 0.07 : 0, 0.08);
+    // les alarmes du bord (elles sonnent tant qu'il y a de quoi)
+    for (const nom of e.alarmes ?? []) this.sonnerAlarme(nom, t);
     // l'eau embarquée : elle clapote d'autant plus que le bateau roule
     const cale = Math.min(1, (e.eauCale ?? 0) / 900);
     const roule = Math.min(1, Math.abs(e.roulis ?? 0) / 0.4);
@@ -942,12 +1020,16 @@ export class Audio {
   // Une déferlante : on l'entend arriver (un grondement qui enfle pendant « dans »
   // secondes), puis elle s'écrase sur le bateau (fracas enregistré, et un coup sourd dans
   // la coque)
-  deferlante(force = 0.5, dans = 3.5) {
+  // (pan : -1 → 1, d'où elle vient : on l'entend arriver de son côté)
+  deferlante(force = 0.5, dans = 3.5, pan = 0) {
     if (!this.actif()) return;
     const ctx = this.ctx;
     const t = ctx.currentTime;
     const impact = t + dans;
     const v = 0.35 + 0.7 * force;
+    const cote = ctx.createStereoPanner();
+    cote.pan.value = pan;
+    cote.connect(this.bus.dehors);
     // le grondement : du bruit grave qui monte et s'éclaircit en approchant
     const g1 = ctx.createBufferSource();
     g1.buffer = this.brun;
@@ -960,13 +1042,13 @@ export class Audio {
     a1.gain.setValueAtTime(0.0001, t);
     a1.gain.exponentialRampToValueAtTime(v * 0.9, impact);
     a1.gain.setTargetAtTime(0.0001, impact + 0.1, 0.5);
-    g1.connect(f1).connect(a1).connect(this.bus.dehors);
+    g1.connect(f1).connect(a1).connect(cote);
     g1.start(t, Math.random() * 2);
     g1.stop(impact + 3);
     // le fracas : une vague de falaise enregistrée (morceaux 5 à 8), ou le souffle calculé
     const enregistre = this.jouer('vagues', {
       index: 5 + Math.floor(Math.random() * 4), dans: Math.max(0, dans - 0.15), gain: 0.6 + 0.8 * force, bus: 'dehors',
-      vitesse: 0.85 + 0.15 * Math.random(),
+      vitesse: 0.85 + 0.15 * Math.random(), pan: pan * 0.8,
     });
     if (!enregistre) {
       const g2 = ctx.createBufferSource();
@@ -979,7 +1061,7 @@ export class Audio {
       a2.gain.setValueAtTime(0.0001, impact - 0.05);
       a2.gain.linearRampToValueAtTime(v * 1.3, impact + 0.04);
       a2.gain.setTargetAtTime(0.0001, impact + 0.3, 0.7);
-      g2.connect(f2).connect(a2).connect(this.bus.dehors);
+      g2.connect(f2).connect(a2).connect(cote);
       g2.start(impact - 0.05, Math.random() * 2);
       g2.stop(impact + 4);
     }
@@ -998,6 +1080,188 @@ export class Audio {
     for (let k = 0; k < 2; k++) {
       this.jouer('craquements', { dans: dans + 0.1 + k * 0.35, gain: 0.5 + 0.5 * force, vitesse: 0.5 + 0.2 * Math.random(), pan: (Math.random() - 0.5) * 1.2 });
     }
+  }
+
+  // ---------- Les sons des systèmes du bord ----------
+  // Une alarme, à son rythme : la cale (un vibreur grave et insistant), la batterie (trois
+  // bips aigus toutes les six secondes), le pilote (deux notes, toutes les deux secondes), le
+  // moteur (une sirène continue, qui ondule)
+  sonnerAlarme(nom, t) {
+    const R = { cale: 1.0, batterie: 6, pilote: 2, moteur: 0.9 }[nom];
+    if (!R) return;
+    const dernier = this.alarmesBord[nom] ?? -Infinity;
+    if (t - dernier < R) return;
+    this.alarmesBord[nom] = t;
+    const ctx = this.ctx;
+    const bip = (frequence, debut, duree, niveau, type = 'square') => {
+      const o = ctx.createOscillator();
+      o.type = type;
+      o.frequency.value = frequence;
+      const g = ctx.createGain();
+      g.gain.setValueAtTime(0.0001, debut);
+      g.gain.linearRampToValueAtTime(niveau, debut + 0.01);
+      g.gain.setValueAtTime(niveau, debut + duree - 0.02);
+      g.gain.linearRampToValueAtTime(0.0001, debut + duree);
+      o.connect(g).connect(this.bus.bord);
+      o.start(debut);
+      o.stop(debut + duree + 0.05);
+      return o;
+    };
+    if (nom === 'cale') bip(420, t, 0.45, 0.05);
+    else if (nom === 'batterie') for (let k = 0; k < 3; k++) bip(3200, t + k * 0.16, 0.08, 0.025, 'sine');
+    else if (nom === 'pilote') {
+      bip(1800, t, 0.12, 0.03, 'sine');
+      bip(2400, t + 0.18, 0.12, 0.03, 'sine');
+    } else if (nom === 'moteur') {
+      const o = bip(2700, t, 0.85, 0.022, 'triangle');
+      o.frequency.setValueAtTime(2500, t);
+      o.frequency.linearRampToValueAtTime(3000, t + 0.42);
+      o.frequency.linearRampToValueAtTime(2500, t + 0.85);
+    }
+  }
+
+  // Le démarreur lance le diesel (2,5 s : rrr-rrr-rrr), puis il prend
+  demarreur(duree = 2.5) {
+    if (!this.actif()) return;
+    const ctx = this.ctx;
+    const t = ctx.currentTime;
+    const o = ctx.createOscillator();
+    o.type = 'sawtooth';
+    o.frequency.setValueAtTime(110, t);
+    o.frequency.linearRampToValueAtTime(150, t + duree);
+    const hache = ctx.createGain();
+    hache.gain.value = 0.5;
+    const lfo = ctx.createOscillator();
+    lfo.type = 'square';
+    lfo.frequency.value = 7;
+    const p = ctx.createGain();
+    p.gain.value = 0.5;
+    lfo.connect(p).connect(hache.gain);
+    const f = ctx.createBiquadFilter();
+    f.type = 'lowpass';
+    f.frequency.value = 900;
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.linearRampToValueAtTime(0.22, t + 0.08);
+    g.gain.setValueAtTime(0.22, t + duree - 0.1);
+    g.gain.linearRampToValueAtTime(0.0001, t + duree);
+    o.connect(hache).connect(f).connect(g).connect(this.bus.bord);
+    o.start(t);
+    lfo.start(t);
+    o.stop(t + duree + 0.1);
+    lfo.stop(t + duree + 0.1);
+  }
+
+  // Le démarreur tourne, mais trop lentement : il n'y a plus assez de courant
+  demarreurFaible() {
+    if (!this.actif()) return;
+    const ctx = this.ctx;
+    const t = ctx.currentTime;
+    for (let k = 0; k < 3; k++) {
+      const o = ctx.createOscillator();
+      o.type = 'sawtooth';
+      o.frequency.setValueAtTime(70 - k * 8, t + k * 0.5);
+      o.frequency.linearRampToValueAtTime(40 - k * 8, t + k * 0.5 + 0.35);
+      const g = ctx.createGain();
+      g.gain.setValueAtTime(0.0001, t + k * 0.5);
+      g.gain.linearRampToValueAtTime(0.14, t + k * 0.5 + 0.03);
+      g.gain.linearRampToValueAtTime(0.0001, t + k * 0.5 + 0.38);
+      const f = ctx.createBiquadFilter();
+      f.type = 'lowpass';
+      f.frequency.value = 500;
+      o.connect(f).connect(g).connect(this.bus.bord);
+      o.start(t + k * 0.5);
+      o.stop(t + k * 0.5 + 0.45);
+    }
+  }
+
+  // Une vitre se fend (un claquement sec, aigu) ; pan : -1 à gauche → 1 à droite
+  vitreFendue(pan = 0) {
+    if (!this.actif()) return;
+    const ctx = this.ctx;
+    const t = ctx.currentTime;
+    const n = ctx.createBufferSource();
+    n.buffer = this.blanc;
+    const f = ctx.createBiquadFilter();
+    f.type = 'highpass';
+    f.frequency.value = 2800;
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.linearRampToValueAtTime(0.5, t + 0.004);
+    g.gain.exponentialRampToValueAtTime(0.001, t + 0.12);
+    const pn = ctx.createStereoPanner();
+    pn.pan.value = pan;
+    n.connect(f).connect(g).connect(pn).connect(this.bus.bord);
+    n.start(t, Math.random());
+    n.stop(t + 0.2);
+    // (et le verre qui chante un instant)
+    const o = ctx.createOscillator();
+    o.frequency.value = 3400 + Math.random() * 900;
+    const go = ctx.createGain();
+    go.gain.setValueAtTime(0.0001, t);
+    go.gain.linearRampToValueAtTime(0.03, t + 0.005);
+    go.gain.exponentialRampToValueAtTime(0.0005, t + 0.5);
+    o.connect(go).connect(pn);
+    o.start(t);
+    o.stop(t + 0.55);
+  }
+
+  // Une vitre éclate : le fracas, puis les éclats qui tombent et tintent
+  vitreBrisee(pan = 0) {
+    if (!this.actif()) return;
+    const ctx = this.ctx;
+    const t = ctx.currentTime;
+    const pn = ctx.createStereoPanner();
+    pn.pan.value = pan;
+    pn.connect(this.bus.bord);
+    const n = ctx.createBufferSource();
+    n.buffer = this.blanc;
+    const f = ctx.createBiquadFilter();
+    f.type = 'highpass';
+    f.frequency.setValueAtTime(1200, t);
+    f.frequency.exponentialRampToValueAtTime(4000, t + 0.6);
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.linearRampToValueAtTime(0.9, t + 0.006);
+    g.gain.exponentialRampToValueAtTime(0.001, t + 0.9);
+    n.connect(f).connect(g).connect(pn);
+    n.start(t, Math.random());
+    n.stop(t + 1);
+    for (let k = 0; k < 26; k++) {
+      const d = t + 0.05 + Math.random() * Math.random() * 1.6;
+      const o = ctx.createOscillator();
+      o.frequency.value = 2600 + Math.random() * 3800;
+      const go = ctx.createGain();
+      go.gain.setValueAtTime(0.0001, d);
+      go.gain.linearRampToValueAtTime(0.02 + 0.03 * Math.random(), d + 0.003);
+      go.gain.exponentialRampToValueAtTime(0.0005, d + 0.08 + Math.random() * 0.15);
+      o.connect(go).connect(pn);
+      o.start(d);
+      o.stop(d + 0.3);
+    }
+    this.choc(0.5);
+  }
+
+  // Le courant meurt : tout ce qui ronronnait à bord descend et se tait (et un claquement :
+  // le dernier relais)
+  coupure() {
+    if (!this.actif()) return;
+    const ctx = this.ctx;
+    const t = ctx.currentTime;
+    const o = ctx.createOscillator();
+    o.type = 'sawtooth';
+    o.frequency.setValueAtTime(120, t);
+    o.frequency.exponentialRampToValueAtTime(24, t + 1.6);
+    const f = ctx.createBiquadFilter();
+    f.type = 'lowpass';
+    f.frequency.value = 400;
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(0.12, t);
+    g.gain.exponentialRampToValueAtTime(0.001, t + 1.7);
+    o.connect(f).connect(g).connect(this.bus.bord);
+    o.start(t);
+    o.stop(t + 1.8);
+    this.clic();
   }
 
   // Le bruit du monde se retire (le vent, la mer, la pluie) : profondeur 0 → 1, pendant

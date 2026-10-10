@@ -9,8 +9,12 @@
 //  - l'eau embarque : le cockpit se remplit et se vide par ses nables, la cabine prend
 //    l'eau si la porte de la timonerie est ouverte, le bateau « travaille » et suinte de
 //    plus en plus ; on pompe ;
-//  - des avaries : le pilote automatique qui lâche (on réarme son disjoncteur au tableau),
-//    l'écoute du foc qui casse (le foc bat : il faut sortir le rouler) ;
+//  - les systèmes du bord (quart/systemes.js) : la batterie que tout vide, le moteur qui la
+//    recharge mais chauffe et couvre les bruits, le pilote qui chauffe et disjoncte (on le
+//    réarme au tableau, une fois refroidi), la pompe électrique, les vitres que les vagues
+//    fendent puis brisent si leurs volets sont ouverts ;
+//  - des avaries : l'écoute du foc qui casse (le foc bat : il faut sortir le rouler), la
+//    foudre ou une vague scélérate qui font sauter le pilote ;
 //  - des grains : des averses d'orage qui passent, chacune avec sa rafale (monde/grains.js) ;
 //  - la foudre, qui part de leurs nuages (monde/foudre.js), et peut tomber tout près — ou sur
 //    le mât ;
@@ -26,9 +30,9 @@
 // événements). On peut donc faire jouer toute la nuit par un programme (scripts/test-nuit.js).
 //
 // ctx, ce que l'on sait à chaque image (fabriqué par le jeu) : dt, m (les mesures du
-// bateau), physique, houle, pilote (le pilote automatique tient-il le bateau ?), mode, aBord
-// (feux, descenteOuverte, attache, dehors), evenements ; et pour la peur : lieu, yeux,
-// regard, haut, tanX, tanY, lampe, eclairage, eclair, noir, danger, calme.
+// bateau), physique, houle, mode, aBord (feux, descenteOuverte, attache, dehors),
+// evenements ; et pour la peur : lieu, yeux, regard, haut, tanX, tanY, lampe, eclairage,
+// eclair, noir, danger, calme. (Le pilote, le moteur, la batterie : this.systemes.)
 import { Vector3 } from 'three';
 import { AMBIANCES, etatMeteo, interpoler, angleVers } from '../monde/meteo.js';
 import { Deferlantes } from '../monde/deferlantes.js';
@@ -37,6 +41,7 @@ import { Grains, PORTEUR } from '../monde/grains.js';
 import { Foudre } from '../monde/foudre.js';
 import { pressionDuJour } from '../monde/pression.js';
 import { Peur } from './peur.js';
+import { Systemes } from './systemes.js';
 
 export const NOM_BATEAU = 'Morgane';
 export const HEURE_DEBUT = 24; // minuit (les heures de la nuit comptent après 24 : 1 h = 25)
@@ -156,6 +161,11 @@ const lisse = (a, b, x) => {
   return t * t * (3 - 2 * t);
 };
 const ecartAngle = (a, b) => ((a - b + 540) % 360) - 180;
+// d'où vient une vague qui va vers « vers » (monde) : 1 si elle arrive par tribord, -1 par bâbord
+function cote(vers, physique) {
+  const local = vers.clone().applyQuaternion(physique.orientation.clone().invert());
+  return local.x > 0 ? -1 : 1;
+}
 
 // Où est une chose, vue du bateau : « droit devant », « derrière, sur bâbord »…
 export function directionRelative(relatif) {
@@ -186,10 +196,11 @@ export class Nuit {
     this.fatigue = { foc: 0 };
     // l'heure (de la nuit) où arriveront les imprévus
     this.prevu = {
-      pilote: 25.7 + this.hasard() * 0.5,
       ecouteFoc: 26.9 + this.hasard() * 0.5,
       trombe: 27.35 + this.hasard() * 0.2,
     };
+    // les systèmes du bord (un hasard à part : pour les vitres)
+    this.systemes = new Systemes({ hasard: generateur(graine * 271 + 9), dureeHeure: DUREE_HEURE });
     // l'étrange (jamais expliqué) — une lumière sur l'eau, une voix sur le 16, des coups contre
     // la coque. (Un hasard à part, pour que les autres imprévus n'en dépendent pas.)
     const etrange = generateur(graine * 104729 + 7);
@@ -280,6 +291,7 @@ export class Nuit {
     this.suivreScelerates(dt, ctx);
     this.suivreDeferlantes(dt, ctx);
     this.suivreEau(dt, ctx);
+    this.suivreSystemes(dt, ctx);
     this.suivreAvaries(dt, ctx);
     this.suivreTrombe(dt, ctx);
     this.suivreFoudre(dt, ctx);
@@ -343,6 +355,9 @@ export class Nuit {
       this.eau.cockpit = Math.min(EAU.cockpitMax, this.eau.cockpit + litres);
       // (et un peu passe toujours à l'intérieur : sous la porte, par les aérateurs)
       this.eau.cale += frappe.force * prise * (ctx.aBord.descenteOuverte ? 70 : 6);
+      // les vitres de ce côté-là, volets ouverts, en prennent un coup (et la mer entre par
+      // celles qui sont déjà brisées)
+      this.eau.cale += this.systemes.frapper(frappe.force, angle, cote(frappe.vers, p), prise);
       this.stats.deferlantes++;
       this.suiviCoup = { t: 4, gite: 0, force: frappe.force, angle, prise };
       this.emettre('deferlante', { ...frappe, angle, litres });
@@ -392,6 +407,8 @@ export class Nuit {
     // en heure (les joints fatiguent)
     const usure = 1 + 0.25 * (this.heure - HEURE_DEBUT);
     e.cale += dt * this.niveau.fuite * usure * Math.max(0, (this.meteo.vent - 28) / 12) * 0.45;
+    // (et par les vitres brisées, la pluie et les embruns)
+    e.cale += dt * this.systemes.infiltration(this.meteo.vent);
     this.stats.caleMax = Math.max(this.stats.caleMax, e.cale);
     ctx.physique.eauCale = e.cale;
     ctx.physique.eauCockpit = e.cockpit;
@@ -405,6 +422,29 @@ export class Nuit {
       }
     }
     if (e.cale > EAU.naufrage) this.perdre('naufrage', ctx);
+  }
+
+  // ---------- Les systèmes du bord ----------
+  // (quart/systemes.js : la batterie, le moteur, le pilote, la pompe électrique, les volets et
+  // les vitres) ; ce qu'il en arrive va au journal, et au jeu (événement 'systeme')
+  suivreSystemes(dt, ctx) {
+    const sy = this.systemes;
+    const evts = sy.maj(dt, { physique: ctx.physique, eau: this.eau, heure: this.heure, mer: ctx.houle?.hauteurSignificative ?? 4, vent: this.meteo.vent });
+    // (le moteur pousse le bateau : la physique le sait)
+    ctx.physique.moteur = sy.regime;
+    const majuscule = (t) => t.charAt(0).toUpperCase() + t.slice(1);
+    for (const [nom, arg] of evts) {
+      if (nom === 'pilote-disjoncte') this.avarie('pilote', ctx, false, false, 'surchauffe');
+      else if (nom === 'batterie-vide') this.ecrire('La batterie est vide : tout s\'éteint.');
+      else if (nom === 'batteries-noyees') this.ecrire('L\'eau a noyé les batteries : le coupe-batterie a sauté. Plus de courant.');
+      else if (nom === 'courant-revenu' && this.faits.has('noir')) this.ecrire('Le courant est revenu.');
+      else if (nom === 'moteur-arrete' && arg === 'surchauffe') this.ecrire('Le moteur a trop chauffé : il s\'est arrêté tout seul.');
+      else if (nom === 'vitre-fendue') this.ecrire(`${majuscule(arg.nom)} s'est fendue.`);
+      else if (nom === 'vitre-brisee') this.ecrire(`${majuscule(arg.nom)} a éclaté : la mer entre.`);
+      if (nom === 'noir') this.faits.add('noir');
+      if (nom === 'moteur-demarre') this.stats.demarrages = (this.stats.demarrages ?? 0) + 1;
+      this.emettre('systeme', nom, arg);
+    }
   }
 
   // un coup de pompe (le jeu sait combien de litres)
@@ -429,13 +469,12 @@ export class Nuit {
       this.fatigue.foc += dt * (trop * surface / 60 + bat / 300) * this.niveau.avaries;
       if (this.fatigue.foc >= 1) this.avarie('foc', ctx);
     }
-    // l'écoute de foc s'use contre le hauban, et casse ; le pilote automatique force trop dans
-    // les vagues de l'arrière, et lâche. (Si la rafale d'un grain arrive un peu avant l'heure,
-    // c'est elle qui les achève.)
+    // l'écoute de foc s'use contre le hauban, et casse. (Si la rafale d'un grain arrive un peu
+    // avant l'heure, c'est elle qui l'achève.) (Le pilote, lui, lâche quand il chauffe trop :
+    // suivreSystemes.)
     const rafale = (this.ici?.agitation ?? 0) > 0.45;
     const lHeure = (nom) => this.heure >= this.prevu[nom] || (rafale && this.heure >= this.prevu[nom] - 0.3);
     if (av.ecouteFoc === 'ok' && av.foc === 'ok' && lHeure('ecouteFoc') && p.deroule > 0.08) this.avarie('ecouteFoc', ctx, rafale);
-    if (av.pilote === 'ok' && lHeure('pilote') && ctx.pilote) this.avarie('pilote', ctx, rafale);
     if (av.ecouteFoc === 'cassee' && p.deroule < 0.03 && !this.faits.has('foc-roule')) {
       this.faits.add('foc-roule');
       this.ecrire('Le foc qui battait est roulé.');
@@ -443,20 +482,23 @@ export class Nuit {
     }
   }
 
-  // (foudre : c'est la foudre, tombée sur le mât, qui l'a causée)
-  avarie(nom, ctx, dansLaRafale = false, foudre = false) {
+  // (foudre : c'est la foudre, tombée sur le mât, qui l'a causée ; raison : pour le pilote,
+  // 'surchauffe' — son disjoncteur thermique a sauté —, ou 'vague' — la barre arrachée)
+  avarie(nom, ctx, dansLaRafale = false, foudre = false, raison = null) {
     const p = ctx.physique;
     this.avaries[nom] = nom === 'pilote' ? 'panne' : nom === 'ecouteFoc' ? 'cassee' : 'dechiree';
+    if (nom === 'pilote') this.systemes.pilote.disjoncte = true;
     this.stats.avaries++;
     const journal = {
       ecouteFoc: 'L\'écoute de foc a cassé : le foc bat.',
       foc: 'Le foc s\'est déchiré.',
-      pilote: foudre ? 'La foudre est tombée sur le mât : le pilote a disjoncté.' : 'Le pilote automatique a lâché.',
+      pilote: foudre ? 'La foudre est tombée sur le mât : le pilote a disjoncté.'
+        : raison === 'surchauffe' ? 'Le pilote a trop chauffé : son disjoncteur a sauté.' : 'Le pilote automatique a lâché.',
     }[nom];
     if (nom === 'ecouteFoc') p.ecouteFocLibre = true;
     if (nom === 'foc') p.focDechire = true;
     this.ecrire(dansLaRafale ? `${journal.replace(/\.$/, '')}, dans la rafale d'un grain.` : journal);
-    this.emettre('avarie', nom, { foudre });
+    this.emettre('avarie', nom, { foudre, raison });
   }
 
   // Réparer : passer une nouvelle écoute (à l'avant), réarmer le pilote (au tableau)
@@ -468,9 +510,9 @@ export class Nuit {
       p.ecouteFoc = Math.min(1.2, Math.max(0.3, Math.abs(p.angleFoc)));
       this.ecrire('Nouvelle écoute de foc passée.');
     } else if (nom === 'pilote' && this.avaries.pilote === 'panne') {
+      // (son disjoncteur thermique ne se réarme qu'une fois le pilote refroidi)
+      if (this.systemes.rearmerPilote() !== 'ok') return false;
       this.avaries.pilote = 'ok';
-      // (il peut relâcher : plus la nuit avance, plus vite)
-      this.prevu.pilote = this.heure < 29.3 ? this.heure + 0.9 + this.hasard() * 0.6 : Infinity;
       this.ecrire('Disjoncteur du pilote réarmé.');
     } else {
       return false;
@@ -537,10 +579,12 @@ export class Nuit {
       const c = chocScelerate(ctx.physique, this.scelerates, { porteOuverte: ctx.aBord.descenteOuverte });
       this.eau.cockpit = Math.min(EAU.cockpitMax, this.eau.cockpit + c.cockpit);
       this.eau.cale += c.interieur;
+      // (ses vitres : elle brise toutes celles de son côté dont le volet est ouvert)
+      this.eau.cale += this.systemes.frapper(1.3, c.angle, cote(this.scelerates.direction(), ctx.physique), c.prise, { scelerate: true });
       this.suiviCoup = { t: 6, gite: 0, force: 1.3, angle: c.angle, prise: c.prise, scelerate: true };
       // (le pilote peut lâcher : la barre arrachée par la vague — moins souvent si elle est
       // bien venue par l'arrière)
-      if (ctx.pilote && this.avaries.pilote === 'ok' && this.hasardScelerate() < (c.angle > 150 ? 0.15 : 0.4)) this.avarie('pilote', ctx);
+      if (this.systemes.piloteEnMarche && this.avaries.pilote === 'ok' && this.hasardScelerate() < (c.angle > 150 ? 0.15 : 0.4)) this.avarie('pilote', ctx, false, false, 'vague');
       this.emettre('scelerate-choc', { ...c, vers: this.scelerates.direction(), relatif });
     } else if (etape === 'passee') this.emettre('scelerate-passee', w);
   }
@@ -617,7 +661,7 @@ export class Nuit {
       this.stats.trombeTouche = true;
       this.ecrire('La trombe est passée sur le bateau !');
       this.emettre('trombe-touche', { force: t.force });
-      if (ctx.pilote && this.avaries.pilote === 'ok' && this.hasard() < 0.4) this.avarie('pilote', ctx);
+      if (this.systemes.piloteEnMarche && this.avaries.pilote === 'ok' && this.hasard() < 0.4) this.avarie('pilote', ctx, false, false, 'vague');
     }
     if (t.age > t.duree) {
       this.trombe = null;
@@ -968,12 +1012,26 @@ export class Nuit {
       ['Heure', heureEnTexte(Math.min(this.heure, HEURE_AUBE))],
       ['Déferlantes encaissées', `${s.deferlantes}${s.coups ? ` (dont ${s.coups} qui t'ont couché)` : ''}`],
       ['Gîte la plus forte', `${Math.round(s.giteMax)}°`],
-      ['Eau pompée', `${Math.round(s.pompee)} litres (au plus ${Math.round(s.caleMax)} à bord)`],
+      ['Eau pompée', `${Math.round(s.pompee)} litres à la main, ${Math.round(this.systemes.pompe.pompee)} par la pompe électrique (au plus ${Math.round(s.caleMax)} à bord)`],
       ['Avaries', avaries.length ? avaries.join(', ') : 'aucune'],
       ['La trombe', s.trombeDistance === Infinity ? 'pas vue' : `passée à ${metres(s.trombeDistance)}`],
       ['Les vagues scélérates', s.scelerates ? `${s.scelerates}${s.sceleratesCouche ? ` (dont ${s.sceleratesCouche} qui t'${s.sceleratesCouche > 1 ? 'ont' : 'a'} couché)` : ', passées sans être couché'}` : 'aucune'],
       ['Les grains', s.grains ? `${s.grains}, rafales jusqu'à ${Math.round(s.rafaleMax)} nœuds` : 'aucun sur toi'],
-      ['La foudre', s.surLeMat ? `${s.eclairs} éclairs, et un sur le mât !` : s.eclairs ? `${s.eclairs} éclairs, le plus proche à ${metres(s.eclairPlusPres ?? Infinity)}` : 'pas un éclair'],
+      ['La foudre', s.surLeMat ? `${s.eclairs} éclairs, et un sur le mât !` : s.eclairs ? `${s.eclairs} éclair${s.eclairs > 1 ? 's' : ''}, le plus proche à ${metres(s.eclairPlusPres ?? Infinity)}` : 'pas un éclair'],
+      ...this.bilanSystemes(),
+    ];
+  }
+
+  bilanSystemes() {
+    const sy = this.systemes;
+    const st = sy.stats;
+    const minutes = (secondes) => Math.round((secondes * 3600) / DUREE_HEURE / 60);
+    const brisees = sy.vitres.filter((v) => v.etat === 'brisee').length;
+    const fendues = sy.vitres.filter((v) => v.etat === 'fendue').length;
+    return [
+      ['Le courant', `${Math.round(sy.batterie.charge * 100)} % à la fin, ${Math.round(st.chargeMin * 100)} % au plus bas${st.noir > 1 ? ` ; ${minutes(st.noir)} minutes dans le noir` : ''}`],
+      ['Le moteur', st.moteur > 1 ? `${minutes(st.moteur)} minutes de moteur, ${this.stats.demarrages ?? 0} démarrage${(this.stats.demarrages ?? 0) > 1 ? 's' : ''}` : 'jamais démarré'],
+      ['Les vitres', brisees || fendues ? [brisees && `${brisees} brisée${brisees > 1 ? 's' : ''}`, fendues && `${fendues} fendue${fendues > 1 ? 's' : ''}`].filter(Boolean).join(', ') : 'toutes intactes'],
     ];
   }
 
@@ -985,7 +1043,7 @@ export class Nuit {
     this.commence = true;
     this.tReprise = this.t;
     for (const nom of ['trombe', 'grainBete', 'lumiere', 'voix16', 'coups', 'scelerate0', 'scelerate1']) if (this.prevu[nom] < this.heure) this.faits.add(nom);
-    for (const nom of ['ecouteFoc', 'pilote']) if (this.prevu[nom] < this.heure) this.prevu[nom] = Infinity;
+    for (const nom of ['ecouteFoc']) if (this.prevu[nom] < this.heure) this.prevu[nom] = Infinity;
     this.plansGrains.forEach((plan, k) => { if (this.prevu[`grain${k}`] < this.heure) this.faits.add(`grain${k}`); });
     this.grains.vider();
     this.grainBete = null;
@@ -1015,6 +1073,7 @@ export class Nuit {
       stats: { ...this.stats },
       peur: this.peur.instantane(),
       voiles: { ris: p.ris, deroule: p.deroule, ecouteFocLibre: p.ecouteFocLibre, focDechire: p.focDechire },
+      systemes: this.systemes.instantane(),
       // (les grains en route vers nous : on les relance à la reprise, d'où sera le bateau)
       grainsEnRoute: this.grains.liste.filter((g) => g.prevu && !g.faits.rafale && g.plan !== undefined && !g.bete)
         .map((g) => ({ plan: g.plan, dans: Math.max(90, (g.dans ?? DANS_GRAIN) - g.age) })),
@@ -1061,6 +1120,9 @@ export class Nuit {
     this.vitesseLissee = null;
     for (const r of s.grainsEnRoute ?? []) if (this.plansGrains[r.plan]) this.lancerGrain(this.plansGrains[r.plan], ctx, r.dans, r.plan);
     this.peur.restaurer(s.peur);
+    this.systemes.restaurer(s.systemes);
+    // (le pilote : son disjoncteur suit la panne gardée)
+    this.systemes.pilote.disjoncte = this.avaries.pilote === 'panne';
     this.dernierEtrange = null;
     this.deferlantes.annonce = null;
     this.deferlantes.attente = 8;

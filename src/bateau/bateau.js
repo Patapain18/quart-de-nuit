@@ -18,7 +18,9 @@ import { LARGEUR_BATTANT } from './timonerie.js';
 
 export class Bateau {
   constructor() {
-    const { groupe, materiaux, pivotBome, pivotSafran, roue, mesures, porte, essuieGlaces } = construireBateau();
+    const { groupe, materiaux, pivotBome, pivotSafran, roue, mesures, porte, essuieGlaces, carreaux } = construireBateau();
+    // les vitres de la timonerie, une par une (dans l'ordre de quart/systemes.js, VITRES)
+    this.carreaux = carreaux;
     this.roue = roue; // (elle tourne avec le safran : le pilote la fait tourner)
     this.porte = porte; // la porte coulissante de la timonerie, vers le cockpit
     this.essuieGlaces = essuieGlaces;
@@ -105,6 +107,19 @@ export class Bateau {
     // ne touche pas le lambris, qui se resserre vers le haut)
     gauche.position.x = ouverte ? -2 * l + 0.03 : -l;
     droite.position.x = ouverte ? l - 0.03 : 0;
+  }
+
+  // Les vitres de la timonerie : 'ok', 'fendue' ou 'brisee', chacune (etats : dans l'ordre de
+  // quart/systemes.js, VITRES)
+  montrerVitres(etats) {
+    etats.forEach((etat, k) => {
+      const c = this.carreaux[k];
+      if (!c || c.etat === etat) return;
+      c.etat = etat;
+      c.verre.visible = etat !== 'brisee';
+      c.felure.visible = etat === 'fendue';
+      c.eclats.visible = etat === 'brisee';
+    });
   }
 
   // Le levier de la pompe de cale (angle en radians, de -0,7 à 0,7 : de haut en bas ; il

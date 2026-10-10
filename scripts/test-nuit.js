@@ -2,8 +2,9 @@
 // Trois veilleurs automatiques (src/quart/veilleurs.js) font toute la nuit, de minuit à six
 // heures, avec la vraie physique : l'attentif, le distrait, l'absent. On vérifie que la nuit
 // dure ce qu'elle doit, que le temps empire d'heure en heure, que ce qui doit arriver arrive
-// (les grains, la trombe, les deux vagues scélérates, les avaries), que chaque heure est gardée
-// et qu'on peut la reprendre.
+// (les grains, la trombe, les deux vagues scélérates, les avaries), que les systèmes du bord
+// font leur travail (la batterie, le moteur, le pilote qui chauffe, les vitres), que qui ne
+// fait rien coule, que chaque heure est gardée et qu'on peut la reprendre.
 import { jouerLaNuit } from '../src/quart/veilleurs.js';
 import { meteoDeLaNuit, heureEnTexte, HEURE_DEBUT, HEURE_AUBE, DUREE_HEURE } from '../src/quart/nuit.js';
 
@@ -31,7 +32,9 @@ const resultats = jouerLaNuit({ graine: 3 });
 console.log(`  (${Math.round((performance.now() - debut) / 1000)} s)`);
 for (const r of resultats) {
   const s = r.stats;
+  const sy = r.systemes;
   console.log(`  ${r.nom.padEnd(12)} ${r.fin === 'aube' ? 'a vu l\'aube' : `perdu (${r.fin}) à ${heureEnTexte(r.heureFin)}`} · ${s.deferlantes} déferlantes (couché ${s.coups} fois) · gîte max ${Math.round(s.giteMax)}° · eau à bord au plus ${Math.round(s.caleMax)} L · avaries : ${r.avaries.map((a) => `${a.nom} à ${heureEnTexte(a.heure)}`).join(', ') || 'aucune'}`);
+  console.log(`  ${''.padEnd(12)} batterie au plus bas ${Math.round(sy.stats.chargeMin * 100)} %, ${Math.round(sy.stats.noir)} s dans le noir · moteur ${Math.round(sy.stats.moteur)} s · vitres brisées ${sy.stats.vitresBrisees}`);
 }
 const attentif = resultats.find((r) => r.cle === 'attentif');
 const nuit = attentif.nuit;
@@ -47,11 +50,22 @@ verifier(scelerates.length === 2 && scelerates[0].heure > 26.3 && scelerates[0].
   `deux vagues scélérates : ${scelerates.map((j) => heureEnTexte(j.heure)).join(' et ')}`);
 verifier(attentif.avaries.some((a) => a.nom === 'pilote') && attentif.avaries.some((a) => a.nom === 'ecouteFoc'), 'le pilote lâche, l\'écoute de foc casse');
 const pilotes = attentif.avaries.filter((a) => a.nom === 'pilote');
-verifier(pilotes.length >= 3, `le pilote lâche de plus en plus souvent (${pilotes.length} fois : ${pilotes.map((a) => heureEnTexte(a.heure)).join(', ')})`);
+verifier(pilotes.length >= 2 && pilotes.every((a) => a.heure > 26), `le pilote lâche dans la seconde moitié de la nuit (${pilotes.length} fois : ${pilotes.map((a) => heureEnTexte(a.heure)).join(', ')})`);
+const chaud = resultats.some((r) => r.journal.some((j) => j.texte.startsWith('Le pilote a trop chauffé')));
+verifier(chaud, 'le pilote finit par trop chauffer, et disjoncte');
 verifier(nuit.stats.eclairs > 100, `la foudre : ${nuit.stats.eclairs} éclairs, le plus proche à ${Math.round(nuit.stats.eclairPlusPres)} m`);
 const etrange = ['Une voix sur le 16', 'Des coups contre la coque'].filter((t) => resultats.some((r) => r.journal.some((j) => j.texte.startsWith(t))));
 verifier(etrange.length === 2, `l'étrange : ${etrange.join(', ').toLowerCase()}`);
 const absent = resultats.find((r) => r.cle === 'absent');
+// les systèmes du bord
+const minAttentif = Math.min(...attentif.serie.batterie);
+verifier(minAttentif > 0.25 && attentif.systemes.stats.noir === 0, `l'attentif garde du courant toute la nuit (sa batterie au plus bas : ${Math.round(minAttentif * 100)} %)`);
+verifier(attentif.systemes.stats.moteur > 60, `il fait tourner le moteur (${Math.round(attentif.systemes.stats.moteur)} s) pour la recharger`);
+const noirAbsent = absent.journal.find((j) => j.texte.startsWith('La batterie est vide'));
+verifier(noirAbsent && noirAbsent.heure < 27.5, `l'absent n'a plus de courant ${noirAbsent ? `à ${heureEnTexte(noirAbsent.heure)}` : '— jamais ?'} (sans moteur, la batterie meurt)`);
+verifier(absent.fin !== 'aube', `et il ne voit pas l'aube : ${absent.fin === 'aube' ? 'il la voit !' : `${absent.fin} à ${heureEnTexte(absent.heureFin)}`}`);
+const brisees = resultats.filter((r) => r.cle !== 'attentif').reduce((n, r) => n + r.systemes.stats.vitresBrisees, 0);
+verifier(brisees > 0 && attentif.systemes.stats.vitresBrisees <= 2, `qui ne ferme pas ses volets voit ses vitres éclater (${brisees} pour le distrait et l'absent, ${attentif.systemes.stats.vitresBrisees} pour l'attentif)`);
 verifier(absent.stats.caleMax > 4 * Math.max(1, attentif.stats.caleMax), `qui ne pompe pas finit avec ${Math.round(absent.stats.caleMax)} L d'eau à bord (l'attentif : ${Math.round(attentif.stats.caleMax)} L)`);
 
 // ---------- Reprendre une heure ----------

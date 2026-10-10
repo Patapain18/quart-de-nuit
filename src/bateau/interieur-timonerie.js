@@ -718,6 +718,7 @@ export function construireInterieurTimonerie(i, { mat, garder, ajouter, boisGeos
   const combine = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.1, 0.03), mat.noir);
   combine.position.set(0.13, -0.045, 0.06);
   radio.add(boitier, ecran, combine);
+  i.ecranRadio = ecran;
   const posRadio = surPlafonnier(-0.3, -0.055);
   radio.position.copy(posRadio.position);
   radio.quaternion.copy(posRadio.quaternion);
@@ -835,6 +836,25 @@ export function construireInterieurTimonerie(i, { mat, garder, ajouter, boisGeos
     groupe.add(pivot);
     i.levierPompe = pivot;
     i.positionPompe = new THREE.Vector3(xMur + 0.075, POMPE.y + 0.14, POMPE.z + 0.36);
+  }
+
+  // --- le coupe-batterie : une grosse clé rouge sur sa platine, sur la paroi bâbord, derrière la
+  // pompe, près de la porte (quand l'eau noie les batteries, il saute ; on le réarme ici) ---
+  {
+    const z = 3.62;
+    const y = Y + 0.27;
+    const xMur = -xLambris(uDe(z), y);
+    const rouge = garder(new THREE.MeshStandardMaterial({ color: 0xb3201a, roughness: 0.45 }));
+    const pieces = [
+      new THREE.CylinderGeometry(0.05, 0.05, 0.03, 24).rotateZ(Math.PI / 2).translate(xMur + 0.025, y, z),
+      new THREE.BoxGeometry(0.03, 0.025, 0.1).translate(xMur + 0.05, y, z),
+    ];
+    const cle = new THREE.Mesh(mergeGeometries(pieces.map((g) => preparer(g, []))), rouge);
+    cle.name = 'coupe-batterie';
+    groupe.add(cle);
+    noirGeos.push(new THREE.BoxGeometry(0.012, 0.14, 0.14).translate(xMur + 0.006, y, z));
+    i.cleBatterie = cle;
+    i.positionCoupeBatterie = new THREE.Vector3(xMur + 0.06, y, z);
   }
 
   // --- l'extincteur, contre la paroi arrière, à bâbord de la porte ---

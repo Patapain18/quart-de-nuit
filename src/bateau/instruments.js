@@ -258,15 +258,16 @@ export class Instruments {
     this._c = new THREE.Vector3();
   }
 
-  // mesures : celles de la physique ; nuit : 0 → 1 (les écrans baissent leur éclat la nuit)
-  maj(dt, mesures, nuit) {
+  // mesures : celles de la physique ; nuit : 0 → 1 (les écrans baissent leur éclat la nuit) ;
+  // courant : le bord a du courant (sinon les écrans sont noirs)
+  maj(dt, mesures, nuit, courant = true) {
     this.temps += dt;
     this.ageEcrans += dt;
     if (this.ageEcrans > 0.2) {
       this.ageEcrans = 0;
       dessinerVitesse(this.ecrans[0], mesures);
       dessinerVent(this.ecrans[1], mesures);
-      for (const mat of this.materiauxEcrans) mat.emissiveIntensity = 0.9 - 0.75 * nuit;
+      for (const mat of this.materiauxEcrans) mat.emissiveIntensity = courant ? 0.9 - 0.75 * nuit : 0;
     }
     // la rose garde le nord : elle tourne dans l'autre sens que le bateau
     this.rose.rotation.z = (mesures.cap * Math.PI) / 180;

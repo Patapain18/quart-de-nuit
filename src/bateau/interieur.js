@@ -21,6 +21,8 @@ import { entre, uvBois, teinter, preparer } from './outils-geometrie.js';
 import { construireInterieurTimonerie, COTES_VOLETS } from './interieur-timonerie.js';
 import { formeBattant } from './timonerie.js';
 import { TableauElectrique } from './tableau-electrique.js';
+import { TableauMoteur } from './tableau-moteur.js';
+import { Systemes } from '../quart/systemes.js';
 import { texturesBoisVerni, texturesSolCabine, texturesPlafond } from './textures.js';
 import { ecranRadio, cadranBarometre, cadranPendule, angleBarometre } from './peintures.js';
 
@@ -397,9 +399,14 @@ export class Interieur {
         b.add(face, poignee);
       });
     }
-    // le tableau électrique, sur le pupitre de la console
+    // le tableau électrique et celui du moteur, sur le pupitre de la console
     this.tableau = new TableauElectrique(this.groupe, { noir: mat.noir, inox: mat.inox, garder });
     this.positionTableau = this.tableau.position.clone();
+    this.tableauMoteur = new TableauMoteur(this.groupe, { noir: mat.noir, inox: mat.inox, garder });
+    this.positionMoteur = this.tableauMoteur.positionBouton.clone();
+    // (hors de la nuit — l'accueil, les ateliers —, des systèmes au repos : la batterie
+    // chargée, le moteur arrêté, tout en marche)
+    this.systemesAuRepos = new Systemes();
 
     // tout le bois verni en un seul objet ; de même pour l'inox, le noir, l'acier et les objets
     ajouter(mergeGeometries(boisGeos.map((g) => preparer(g, ['uv']))), mat.bois, 'boiseries');
@@ -461,50 +468,47 @@ export class Interieur {
     this.uniforms.uTrappe.value = ouverte ? 1 : 0;
   }
 
-  // Les volets de tempête d'un côté ('avant', 'tribord', 'babord', 'arriere') : on les
-  // ferme (ils descendent en 2,5 s) ou on les ouvre
-  // (immediat : sans attendre qu'ils descendent, au début d'une partie)
-  fermerVolets(cote, fermes, immediat = false) {
-    const v = this.volets[cote];
-    v.cible = fermes ? 1 : 0;
-    if (!immediat) return;
-    v.fraction = v.cible;
-    for (const volet of v.liste) volet.maj(v.fraction);
-  }
-  voletsFermes(cote) { return this.volets[cote].cible > 0.5; }
-  // (0 : roulés, 1 : fermés ; entre les deux, ils bougent)
-  etatVolets(cote) { return this.volets[cote].fraction; }
-
   // Réglé à chaque image.
-  //   eclairage : 'eteint', 'blanc' ou 'rouge' (les plafonniers) ; feux : les feux de
-  //   navigation sont-ils allumés (le voyant du tableau) ; ciel : [r, g, b], la lumière du
-  //   ciel (eclairage(meteo).ambiance) ; eclair : un éclair illumine les vitres ;
-  //   descente : 0 (porte fermée) → 1 (ouverte) ; pression (hPa) et heure, pour les cadrans ;
-  //   temoin (hPa) : l'aiguille témoin du baromètre, calée à la main ;
-  //   vacille : 0 → 1, la lumière des plafonniers (1 : normale ; moins : elle faiblit, quand
-  //   le courant hésite) ; pilotePanne : le disjoncteur du pilote a sauté (le tableau) ;
-  //   baladeuse : l'ampoule de la cale est allumée ; nuit : 0 → 1 (les noms du tableau
-  //   s'éclairent) ; dt : le temps écoulé
+  //   systemes : les systèmes du bord (quart/systemes.js : le courant, les disjoncteurs,
+  //   l'éclairage, le moteur, les volets…) ; sans eux (l'accueil, les ateliers) : eclairage
+  //   ('eteint', 'blanc' ou 'rouge' : les plafonniers) et feux (les feux de navigation) ;
+  //   ciel : [r, g, b], la lumière du ciel (eclairage(meteo).ambiance) ; eclair : un éclair
+  //   illumine les vitres ; descente : 0 (porte fermée) → 1 (ouverte) ; pression (hPa) et
+  //   heure, pour les cadrans ; temoin (hPa) : l'aiguille témoin du baromètre, calée à la
+  //   main ; vacille : 0 → 1, la lumière des plafonniers (1 : normale ; moins : elle faiblit,
+  //   quand le courant hésite) ; nuit : 0 → 1 (les noms des tableaux s'éclairent) ; dt
   regler({
-    eclairage, feux, ciel, eclair = 0, descente = 1, pression = 1015, temoin = null, heure = 12, vacille = 1, pilotePanne = false,
-    baladeuse = false, nuit = 0, dt = 0,
+    systemes = null, eclairage = 'eteint', feux = false, ciel, eclair = 0, descente = 1, pression = 1015, temoin = null, heure = 12,
+    vacille = 1, nuit = 0, dt = 0,
   }) {
-    this.eclairage = eclairage;
-    // les volets avancent vers où on les a mis ; leurs voyants, sur la commande du plafond
+    const sy = systemes ?? this.systemesAuRepos;
+    if (!systemes) {
+      sy.eclairage = eclairage;
+      sy.disjoncteurs.feux = !!feux;
+    }
+    const courant = sy.courant;
+    // (sans courant, ou son disjoncteur coupé, les plafonniers sont éteints ; la baladeuse aussi)
+    const lumiere = courant && sy.disjoncteurs.eclairage ? sy.eclairage : 'eteint';
+    const baladeuse = courant && sy.disjoncteurs.eclairage && sy.baladeuse;
+    this.eclairage = lumiere;
+    // les volets : là où ils en sont ; leurs voyants, sur la commande du plafond
     this._tempsVoyants = (this._tempsVoyants ?? 0) + dt;
     for (const cote of COTES_VOLETS) {
       const v = this.volets[cote];
-      const bouge = v.fraction !== v.cible;
+      const etat = sy.volets[cote];
+      const bouge = etat.fraction !== etat.cible && sy.alimente('volets');
       const voyant = this.voyantsVolets[cote].material.color;
-      if (bouge) voyant.setHex(this._tempsVoyants % 0.5 < 0.25 ? 0xffa21a : 0x2a1a0a);
-      else voyant.setHex(v.cible > 0.5 ? 0xff3a22 : 0x3dff7a);
+      if (!courant) voyant.setHex(0x1a0d08);
+      else if (bouge) voyant.setHex(this._tempsVoyants % 0.5 < 0.25 ? 0xffa21a : 0x2a1a0a);
+      else voyant.setHex(etat.cible > 0.5 ? 0xff3a22 : 0x3dff7a);
       voyant.multiplyScalar(vacille);
-      if (!bouge) continue;
-      const pas = dt / 2.5;
-      v.fraction = v.cible > v.fraction ? Math.min(v.cible, v.fraction + pas) : Math.max(v.cible, v.fraction - pas);
+      if (v.fraction === etat.fraction) continue;
+      v.fraction = etat.fraction;
       for (const volet of v.liste) volet.maj(v.fraction);
     }
-    this.faceCommandeVolets.material.emissiveIntensity = (0.03 + 0.2 * nuit) * vacille;
+    this.faceCommandeVolets.material.emissiveIntensity = courant ? (0.03 + 0.2 * nuit) * vacille : 0;
+    // (l'écran de la VHF)
+    this.ecranRadio.material.emissiveIntensity = sy.alimente('vhf') ? 0.9 * vacille : 0;
     const u = this.uniforms;
     const S = u.uSourceCouleur.value;
     // la luminance du ciel vue par une ouverture (sa lumière ramenée à un angle solide),
@@ -518,8 +522,8 @@ export class Interieur {
     // (les plafonniers sont faibles : on veille la nuit, ils ne doivent pas éblouir — on
     // garde sa vision de nuit pour voir dehors, par les vitres ; en rouge, ce n'est plus
     // qu'une veilleuse : le bois sombre, les écrans pour seule vraie lumière)
-    const lampe = eclairage === 'blanc' ? LAMPE_BLANCHE : eclairage === 'rouge' ? LAMPE_ROUGE : NOIR;
-    const k = (eclairage === 'rouge' ? 0.09 : 0.35) * vacille;
+    const lampe = lumiere === 'blanc' ? LAMPE_BLANCHE : lumiere === 'rouge' ? LAMPE_ROUGE : NOIR;
+    const k = (lumiere === 'rouge' ? 0.09 : 0.35) * vacille;
     this.lampesTimonerie.forEach((l, i) => {
       S[i].copy(lampe).multiplyScalar(k);
       l.diffuseur.material.emissive.copy(lampe).multiplyScalar(3.2 * k);
@@ -530,8 +534,8 @@ export class Interieur {
       const ouvert = 1 - 0.97 * this.volets[cote].fraction;
       S[v.source].copy(L).multiplyScalar(0.5 * v.surface * ouvert + (cote === 'arriere' ? 0.25 * descente : 0));
     }
-    // (les écrans de la console : une faible lueur verte, toujours là)
-    S[6].setRGB(0.0012, 0.004, 0.0028).multiplyScalar(vacille);
+    // (les écrans de la console : une faible lueur verte, tant qu'il y a du courant)
+    S[6].setRGB(0.0012, 0.004, 0.0028).multiplyScalar(courant ? vacille : 0);
     // (la baladeuse de la cale)
     S[BALADEUSE].copy(baladeuse ? AMPOULE : NOIR).multiplyScalar(vacille);
     this.ampoule.material.emissive.copy(baladeuse ? AMPOULE : NOIR).multiplyScalar(6 * vacille);
@@ -568,8 +572,10 @@ export class Interieur {
     this.luminance = luminance([r, g, b]);
     this.luminanceTimonerie = luminance(timonerie);
 
-    // le tableau (ses voyants et ses leviers), l'aiguille du baromètre, les aiguilles de la pendule
-    this.tableau.regler(dt, { feux, eclairage, pilotePanne, nuit, vacille });
+    // les tableaux (leurs voyants, leurs leviers, leurs cadrans), l'aiguille du baromètre, les
+    // aiguilles de la pendule
+    this.tableau.regler(dt, { systemes: sy, nuit, vacille });
+    this.tableauMoteur.regler(dt, { systemes: sy, nuit, vacille });
     this.aiguilles.pression.rotation.z = -angleBarometre(pression);
     this.aiguilles.temoin.rotation.z = -angleBarometre(temoin ?? pression);
     const h = ((heure % 12) + 12) % 12;

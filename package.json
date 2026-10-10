@@ -19,6 +19,7 @@
     "test-risees": "node scripts/test-risees.js",
     "test-eclairs": "node scripts/test-eclairs.js",
     "test-feux": "node scripts/test-feux.js",
+    "test-systemes": "node scripts/test-systemes.js",
     "sons": "node scripts/preparer-sons.mjs"
   },
   "dependencies": {

@@ -43,13 +43,17 @@ dans la grandeur du jeu ». Sa nouvelle direction, et ce qu'il a choisi parmi me
 Tu es dans la timonerie, assis au poste. Dehors, la nuit noire : tu ne vois la mer qu'à ta
 frontale et dans les éclairs. Les instruments sont tes caméras : le radar (ce qui arrive), le
 baromètre (le pire qui approche), le sondeur (ce qu'il y a dessous…), la trappe de la cale (l'eau
-qui monte), et bientôt la jauge de la batterie. Les menaces arrivent, chacune avec ses signes et
-sa parade :
+qui monte). Et comme le courant de FNAF, **la batterie** : tout ce qui est électrique la vide (le
+pilote, le radar, la pompe, les volets…), et quand elle meurt, tout s'éteint. Les menaces
+arrivent, chacune avec ses signes et sa parade :
 
 | La menace | Ses signes | La parade |
 |---|---|---|
-| L'eau qui monte (les fuites s'aggravent d'heure en heure, chaque vague en apporte) | l'eau noire qu'on voit monter dans la cale, par la trappe, vers les batteries | pomper (la pompe à main, à côté de la trappe) |
-| Le pilote qui lâche (de plus en plus souvent) | son alarme, le bateau qui se met en travers | réarmer son disjoncteur au tableau |
+| La batterie qui se vide | sa jauge (au tableau, sous l'heure), l'alarme à 20 %, les lumières qui faiblissent | couper ce dont on peut se passer ; lancer le moteur |
+| L'eau qui monte (les fuites s'aggravent d'heure en heure, chaque vague en apporte) | l'alarme de cale, l'eau noire qu'on voit monter par la trappe, vers les batteries | la pompe électrique (elle tire sur la batterie) ; la pompe à main ; noyées, les batteries coupent tout |
+| Le pilote qui chauffe, puis disjoncte (de plus en plus, la nuit avançant) | sa température sur son écran, son alarme, le bateau qui se met en travers | le moteur le soulage ; en veille, il refroidit ; son disjoncteur se réarme au tableau, une fois froid |
+| Le moteur qui chauffe | sa température, son alarme ; il se coupe tout seul | l'arrêter avant ; et tant qu'il tourne, on n'entend plus venir les vagues |
+| Les vitres | une vague qui frappe un côté les fend (le claquement, la toile d'araignée), la suivante les brise | fermer les volets de ce côté — mais derrière, on ne voit plus |
 | Les déferlantes | leur grondement, de leur côté ; l'éclair qui les montre | fermer la porte ; se tenir (Maj) dehors |
 | Le foc qui bat (son écoute casse) | son claquement, le bateau qui part | sortir le rouler, harnais accroché |
 | La trombe, vers 3 h 30 | l'écho au radar, et rien d'autre : on ne la voit qu'à la lueur des éclairs | tenir |
@@ -57,12 +61,11 @@ sa parade :
 | La foudre | les éclairs, le tonnerre de plus en plus proche, le feu de Saint-Elme | réarmer ce qui a sauté |
 | L'inexpliqué | un écho qui suit, des pas sur le pont, une voix sur le 16, des coups sous la coque… | rien : ce n'est jamais confirmé |
 
-**Les volets de tempête** (étape 2) sont les portes de FNAF : on les ferme côté par côté, depuis
-le siège, quand une vague arrive de ce côté-là… mais volet fermé, on ne voit plus rien de ce
-côté. À venir (étape 3) : ce qui fait éclater une vitre sans volet, et **la batterie**, comme le
-courant de FNAF — la pompe électrique, les volets, le radar, le projecteur, le pilote la vident ;
-le moteur la recharge mais couvre tous les bruits ; si l'eau de la cale noie les batteries, ou
-quand elle meurt, tout s'éteint.
+**Les volets de tempête** sont les portes de FNAF : on les ferme côté par côté, depuis le siège,
+quand une vague arrive de ce côté-là… mais volet fermé, on ne voit plus rien de ce côté, et sans
+courant ils ne bougent plus. **Le moteur** est la grande tentation : il recharge la batterie et
+soulage le pilote, mais il chauffe, et tant qu'il tourne on n'entend plus le grondement qui
+annonce les vagues (on les entend venir de leur côté : c'est ce qui dit quels volets fermer).
 
 ### Les heures
 
@@ -83,8 +86,9 @@ La nuit est gardée au début de chaque heure : après un naufrage, on reprend �
 
 Au clavier (français) et à la souris. La souris tourne la tête.
 - **Assis au poste** (au début de la nuit) : E agit sur ce que tu regardes et qui est à portée
-  de main (le radar, le traceur, la VHF et la commande des volets au plafond, le tableau
-  électrique) ; Espace pour se lever.
+  de main (le radar, le traceur, la commande du pilote, le tableau du moteur, chaque
+  disjoncteur du tableau électrique, la VHF et la commande des volets au plafond) ; Espace pour
+  se lever (la pompe à main, la trappe, le coupe-batterie, le baromètre : il faut y aller).
 - **À pied** : Z Q S D pour marcher, E pour agir (Maj + E : l'action inverse), Maj pour se
   tenir, C pour s'accroupir, X le harnais (dehors).
 - **Partout** : F la lampe frontale, L le carnet de bord, H pour cacher l'aide, Échap la pause.
@@ -99,7 +103,7 @@ ligne reste l'ancien tant que le nouveau n'est pas jouable.
    dures ; plus de rideaux de pluie.
 2. ✅ **Le bateau de 14 m** — plus grand, sans carré, une grande timonerie vitrée : les volets des
    vitres, la porte, la console, le tableau, la pompe à main, une trappe vers la cale.
-3. **Les systèmes du bord** — la batterie et ce qui la vide, le moteur qui la recharge mais couvre
+3. ✅ **Les systèmes du bord** — la batterie et ce qui la vide, le moteur qui la recharge mais couvre
    les bruits, l'eau qui monte et les deux pompes, le pilote qui chauffe et disjoncte, les volets
    et les vitres qui éclatent ; les veilleurs automatiques pour régler la difficulté.
 4. **Les heures** — chaque heure plus dure, chaque menace annoncée par ses signes (le grondement
@@ -212,6 +216,67 @@ l'ancien bateau, même lui voyait l'aube. La vague scélérate se comporte comme
 
 **À voir** : `docs/bateau-14m-*.jpg` (la timonerie, ses volets fermés, la cale par la trappe et du
 dedans, le bateau de dehors, la nuit, la vue au poste).
+
+### Étape 3 : les systèmes du bord ✅ (10 octobre 2026)
+
+Tout est calculé dans `src/quart/systemes.js`, sans image ni son (comme la nuit) : les veilleurs
+automatiques s'en servent aussi. Le temps de la nuit passe trente fois plus vite que le vrai :
+les ampères sont de vrais ampères, qui vident la batterie en heures de la nuit.
+- **La batterie** : 60 Ah (de vieilles batteries), à 80 % à minuit. Tout en marche, le bord tire
+  15 à 25 A — le pilote de 1,6 à 13 A selon qu'il force, le radar 3,6, les feux 2,2, le traceur
+  1,4, la VHF 0,6, l'éclairage rouge 0,5 (blanc 2,4), la pompe électrique 11 quand elle tourne,
+  les volets 9 pendant qu'ils bougent, le démarreur 160 pendant qu'il lance : sans moteur, elle
+  meurt vers 2 h. Huit disjoncteurs au tableau, un par appareil. À 20 %, l'alarme ; sous 6 %, les
+  lumières faiblissent et hésitent ; à zéro, le noir (plus de pilote, de radar, de pompe, de
+  volets, d'écrans).
+- **Le moteur** : il démarre en 2,5 s s'il reste 12 % de batterie, recharge 55 A, pousse le bateau
+  (4,2 kN à plein régime, dans la physique) et souffle sur le safran (le bateau répond mieux : le
+  pilote force moins, mesuré de 20 à 35 % de coups de barre en moins). Il chauffe d'autant plus
+  vite que la mer est grosse (sa prise d'eau aspire de l'air quand l'arrière se soulève) : dans la
+  mer de 4 h, il se coupe tout seul au bout de deux minutes et demie, et ne repart qu'après trois
+  quarts de minute de repos. Tant qu'il tourne, le monde du dehors est couvert (−7 dB, et son
+  grondement par-dessus).
+- **Le pilote** chauffe avec son travail : la mer qui monte (le vent), ses coups de barre, la
+  fatigue de la nuit ; le moteur l'en soulage de moitié. Par 32 nœuds à minuit, il tient (53 %) ;
+  par 46 nœuds à 5 h, il disjoncte en moins d'une minute s'il est déjà chaud. Son disjoncteur
+  thermique ne se réarme que sous 70 % (une demi-minute de refroidissement). Il ne tombe plus en
+  panne à heure fixe : seulement de chaleur, par la foudre sur le mât, une vague scélérate ou la
+  trombe qui arrachent la barre.
+- **L'eau** : la pompe électrique (son flotteur la lance au-dessus de 60 L, 3 L/s) ; la pompe à main
+  (4 L/s, il faut rester à pomper). À 300 L, l'alarme de cale ; à 760 L, l'eau atteint les bornes
+  des batteries (sur leur étagère, juste sous la trappe) : le coupe-batterie saute, c'est le noir,
+  et elles perdent la moitié de leur charge ; sous 600 L, on le réarme (la clé rouge, derrière la
+  pompe).
+- **Les vitres** : chaque déferlante frappe les vitres du côté d'où elle vient (de l'arrière, les
+  fenêtres arrière ; de travers, un côté ; par l'avant, le pare-brise), si leurs volets sont
+  ouverts. Une vitre fendue montre une toile d'araignée ; brisée, des éclats sur le pourtour, et
+  la mer entre à chaque vague (et la pluie sans cesse) ; son volet fermé bouche presque le trou.
+  La vague scélérate brise d'un coup toutes les vitres de son côté.
+
+Ce qu'on voit et qu'on touche : le **tableau électrique** (la jauge de la batterie, sa tension,
+l'ampèremètre, trois voyants, huit disjoncteurs à levier), le **tableau du moteur** (compte-tours,
+température, bouton marche/arrêt), la température sur l'**écran du pilote**, la **commande du
+pilote** (veille/enclenché), le **coupe-batterie** ; sous l'heure, la batterie en %, et la liste
+des alarmes. Les sons : le diesel, son démarreur (et le démarreur qui force, batterie faible), la
+pompe électrique, les moteurs des volets, quatre alarmes (la cale, la batterie, le pilote, le
+moteur), le verre qui se fend et qui éclate, la coupure de courant ; les déferlantes s'entendent
+maintenant venir **de leur côté**.
+
+**Mesuré** (`npm run test-systemes`, 37 vérifications ; `npm run test-nuit`) : la même nuit (graine
+3), l'attentif voit l'aube, sans jamais perdre le courant (batterie au plus bas 39 %, 7 minutes de
+moteur, une vitre brisée) ; le distrait noie ses batteries vers 3 h (porte ouverte, une grosse
+vague), passe cinq minutes dans le noir et coule à 5 h 41 ; l'absent n'a plus de courant à
+2 h 14, se met en travers sans pilote, perd cinq vitres et coule à 5 h 05. Sur trois nuits (graines
+3, 5, 7) : l'attentif voit l'aube trois fois ; le distrait deux fois, toujours après des minutes
+de noir ; l'absent jamais (il coule entre 3 h 11 et 5 h 05). **La nuit est enfin dangereuse** :
+qui ne fait rien coule.
+
+**Limites** : la difficulté reste à régler heure par heure (étape 4) ; les veilleurs entendent
+parfaitement (ils lisent l'annonce des vagues), un joueur moins : le moteur coûtera plus cher à
+un vrai joueur qu'à eux. Les sons sont fonctionnels, ils seront repris à l'étape 6.
+
+**À voir** : `docs/systemes-*.jpg` (la console, le tableau électrique, celui du moteur, les vitres
+fendues vues du cockpit, et le noir quand le courant meurt).
 
 ## 4. Le moteur (ce qu'on garde de l'ancien jeu)
 

@@ -633,7 +633,14 @@ export function construireBateau() {
   // la timonerie (timonerie.js) : ses parois, ses vitres, sa porte, ses essuie-glaces
   const timonerie = construireTimonerie(materiaux);
   ajouter(timonerie.blanc, materiaux.gelcoat, 'timonerie');
-  ajouter(timonerie.verre, materiaux.vitreTimonerie, 'timonerie-vitres').castShadow = false;
+  // (les vitres, une par une : chacune peut se fendre, puis éclater — quart/systemes.js)
+  const carreaux = timonerie.verres.map((g, k) => {
+    const verre = ajouter(g, materiaux.vitreTimonerie, 'timonerie-vitres');
+    verre.castShadow = false;
+    const { felure, eclats } = timonerie.felures[k];
+    groupe.add(felure, eclats);
+    return { verre, felure, eclats };
+  });
   ajouter(timonerie.joints, materiaux.noir, 'timonerie-joints');
   ajouter(timonerie.mains, materiaux.inox, 'timonerie-mains-courantes');
   const porte = timonerie.porte;
@@ -707,5 +714,5 @@ export function construireBateau() {
   for (const m2 of roue.children) m2.castShadow = true;
   groupe.add(roue);
 
-  return { groupe, materiaux, pivotBome, pivotSafran, roue, mesures: m, porte, essuieGlaces: timonerie.essuieGlaces };
+  return { groupe, materiaux, pivotBome, pivotSafran, roue, mesures: m, porte, essuieGlaces: timonerie.essuieGlaces, carreaux };
 }
